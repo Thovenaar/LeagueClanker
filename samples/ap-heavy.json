@@ -1,0 +1,431 @@
+{
+  "activePlayer": {
+    "riotId": "You#EUW",
+    "riotIdGameName": "You",
+    "riotIdTagLine": "EUW",
+    "summonerName": "You#EUW",
+    "level": 11,
+    "currentGold": 1450.0
+  },
+  "allPlayers": [
+    {
+      "championName": "Garen",
+      "rawChampionName": "game_character_displayname_Garen",
+      "riotId": "You#EUW",
+      "riotIdGameName": "You",
+      "riotIdTagLine": "EUW",
+      "summonerName": "You#EUW",
+      "team": "ORDER",
+      "position": "TOP",
+      "level": 11,
+      "isBot": false,
+      "isDead": false,
+      "items": [
+        {
+          "itemID": 1055,
+          "displayName": "Doran's Blade",
+          "count": 1,
+          "slot": 0,
+          "canUse": false,
+          "consumable": false,
+          "price": 0
+        },
+        {
+          "itemID": 1001,
+          "displayName": "Boots",
+          "count": 1,
+          "slot": 1,
+          "canUse": false,
+          "consumable": false,
+          "price": 0
+        },
+        {
+          "itemID": 3044,
+          "displayName": "Phage",
+          "count": 1,
+          "slot": 2,
+          "canUse": false,
+          "consumable": false,
+          "price": 0
+        },
+        {
+          "itemID": 3340,
+          "displayName": "Stealth Ward",
+          "count": 1,
+          "slot": 3,
+          "canUse": false,
+          "consumable": false,
+          "price": 0
+        }
+      ],
+      "scores": {
+        "kills": 2,
+        "deaths": 1,
+        "assists": 1,
+        "creepScore": 120,
+        "wardScore": 8.0
+      }
+    },
+    {
+      "championName": "Lee Sin",
+      "rawChampionName": "game_character_displayname_LeeSin",
+      "riotId": "Ally1#EUW",
+      "riotIdGameName": "Ally1",
+      "riotIdTagLine": "EUW",
+      "summonerName": "Ally1#EUW",
+      "team": "ORDER",
+      "position": "JUNGLE",
+      "level": 11,
+      "isBot": false,
+      "isDead": false,
+      "items": [
+        {
+          "itemID": 6692,
+          "displayName": "Eclipse",
+          "count": 1,
+          "slot": 0,
+          "canUse": false,
+          "consumable": false,
+          "price": 0
+        },
+        {
+          "itemID": 3047,
+          "displayName": "Plated Steelcaps",
+          "count": 1,
+          "slot": 1,
+          "canUse": false,
+          "consumable": false,
+          "price": 0
+        }
+      ],
+      "scores": {
+        "kills": 3,
+        "deaths": 2,
+        "assists": 4,
+        "creepScore": 120,
+        "wardScore": 8.0
+      }
+    },
+    {
+      "championName": "Zed",
+      "rawChampionName": "game_character_displayname_Zed",
+      "riotId": "Ally2#EUW",
+      "riotIdGameName": "Ally2",
+      "riotIdTagLine": "EUW",
+      "summonerName": "Ally2#EUW",
+      "team": "ORDER",
+      "position": "MIDDLE",
+      "level": 11,
+      "isBot": false,
+      "isDead": false,
+      "items": [
+        {
+          "itemID": 3142,
+          "displayName": "Youmuu's Ghostblade",
+          "count": 1,
+          "slot": 0,
+          "canUse": false,
+          "consumable": false,
+          "price": 0
+        },
+        {
+          "itemID": 3158,
+          "displayName": "Ionian Boots of Lucidity",
+          "count": 1,
+          "slot": 1,
+          "canUse": false,
+          "consumable": false,
+          "price": 0
+        }
+      ],
+      "scores": {
+        "kills": 4,
+        "deaths": 3,
+        "assists": 2,
+        "creepScore": 120,
+        "wardScore": 8.0
+      }
+    },
+    {
+      "championName": "Jinx",
+      "rawChampionName": "game_character_displayname_Jinx",
+      "riotId": "Ally3#EUW",
+      "riotIdGameName": "Ally3",
+      "riotIdTagLine": "EUW",
+      "summonerName": "Ally3#EUW",
+      "team": "ORDER",
+      "position": "BOTTOM",
+      "level": 11,
+      "isBot": false,
+      "isDead": false,
+      "items": [
+        {
+          "itemID": 3032,
+          "displayName": "Yun Tal Wildarrows",
+          "count": 1,
+          "slot": 0,
+          "canUse": false,
+          "consumable": false,
+          "price": 0
+        },
+        {
+          "itemID": 3006,
+          "displayName": "Berserker's Greaves",
+          "count": 1,
+          "slot": 1,
+          "canUse": false,
+          "consumable": false,
+          "price": 0
+        }
+      ],
+      "scores": {
+        "kills": 2,
+        "deaths": 2,
+        "assists": 3,
+        "creepScore": 120,
+        "wardScore": 8.0
+      }
+    },
+    {
+      "championName": "Thresh",
+      "rawChampionName": "game_character_displayname_Thresh",
+      "riotId": "Ally4#EUW",
+      "riotIdGameName": "Ally4",
+      "riotIdTagLine": "EUW",
+      "summonerName": "Ally4#EUW",
+      "team": "ORDER",
+      "position": "UTILITY",
+      "level": 11,
+      "isBot": false,
+      "isDead": false,
+      "items": [
+        {
+          "itemID": 3190,
+          "displayName": "Locket of the Iron Solari",
+          "count": 1,
+          "slot": 0,
+          "canUse": false,
+          "consumable": false,
+          "price": 0
+        }
+      ],
+      "scores": {
+        "kills": 0,
+        "deaths": 3,
+        "assists": 7,
+        "creepScore": 120,
+        "wardScore": 8.0
+      }
+    },
+    {
+      "championName": "Mordekaiser",
+      "rawChampionName": "game_character_displayname_Mordekaiser",
+      "riotId": "Enemy1#EUW",
+      "riotIdGameName": "Enemy1",
+      "riotIdTagLine": "EUW",
+      "summonerName": "Enemy1#EUW",
+      "team": "CHAOS",
+      "position": "TOP",
+      "level": 11,
+      "isBot": false,
+      "isDead": false,
+      "items": [
+        {
+          "itemID": 4633,
+          "displayName": "Riftmaker",
+          "count": 1,
+          "slot": 0,
+          "canUse": false,
+          "consumable": false,
+          "price": 0
+        },
+        {
+          "itemID": 3047,
+          "displayName": "Plated Steelcaps",
+          "count": 1,
+          "slot": 1,
+          "canUse": false,
+          "consumable": false,
+          "price": 0
+        }
+      ],
+      "scores": {
+        "kills": 3,
+        "deaths": 1,
+        "assists": 1,
+        "creepScore": 120,
+        "wardScore": 8.0
+      }
+    },
+    {
+      "championName": "Diana",
+      "rawChampionName": "game_character_displayname_Diana",
+      "riotId": "Enemy2#EUW",
+      "riotIdGameName": "Enemy2",
+      "riotIdTagLine": "EUW",
+      "summonerName": "Enemy2#EUW",
+      "team": "CHAOS",
+      "position": "JUNGLE",
+      "level": 11,
+      "isBot": false,
+      "isDead": false,
+      "items": [
+        {
+          "itemID": 3152,
+          "displayName": "Hextech Rocketbelt",
+          "count": 1,
+          "slot": 0,
+          "canUse": false,
+          "consumable": false,
+          "price": 0
+        },
+        {
+          "itemID": 3020,
+          "displayName": "Sorcerer's Shoes",
+          "count": 1,
+          "slot": 1,
+          "canUse": false,
+          "consumable": false,
+          "price": 0
+        }
+      ],
+      "scores": {
+        "kills": 2,
+        "deaths": 2,
+        "assists": 5,
+        "creepScore": 120,
+        "wardScore": 8.0
+      }
+    },
+    {
+      "championName": "Syndra",
+      "rawChampionName": "game_character_displayname_Syndra",
+      "riotId": "Enemy3#EUW",
+      "riotIdGameName": "Enemy3",
+      "riotIdTagLine": "EUW",
+      "summonerName": "Enemy3#EUW",
+      "team": "CHAOS",
+      "position": "MIDDLE",
+      "level": 11,
+      "isBot": false,
+      "isDead": false,
+      "items": [
+        {
+          "itemID": 6655,
+          "displayName": "Luden's Echo",
+          "count": 1,
+          "slot": 0,
+          "canUse": false,
+          "consumable": false,
+          "price": 0
+        },
+        {
+          "itemID": 3020,
+          "displayName": "Sorcerer's Shoes",
+          "count": 1,
+          "slot": 1,
+          "canUse": false,
+          "consumable": false,
+          "price": 0
+        }
+      ],
+      "scores": {
+        "kills": 4,
+        "deaths": 0,
+        "assists": 3,
+        "creepScore": 120,
+        "wardScore": 8.0
+      }
+    },
+    {
+      "championName": "Kai'Sa",
+      "rawChampionName": "game_character_displayname_Kaisa",
+      "riotId": "Enemy4#EUW",
+      "riotIdGameName": "Enemy4",
+      "riotIdTagLine": "EUW",
+      "summonerName": "Enemy4#EUW",
+      "team": "CHAOS",
+      "position": "BOTTOM",
+      "level": 11,
+      "isBot": false,
+      "isDead": false,
+      "items": [
+        {
+          "itemID": 3115,
+          "displayName": "Nashor's Tooth",
+          "count": 1,
+          "slot": 0,
+          "canUse": false,
+          "consumable": false,
+          "price": 0
+        },
+        {
+          "itemID": 3006,
+          "displayName": "Berserker's Greaves",
+          "count": 1,
+          "slot": 1,
+          "canUse": false,
+          "consumable": false,
+          "price": 0
+        }
+      ],
+      "scores": {
+        "kills": 2,
+        "deaths": 3,
+        "assists": 2,
+        "creepScore": 120,
+        "wardScore": 8.0
+      }
+    },
+    {
+      "championName": "Soraka",
+      "rawChampionName": "game_character_displayname_Soraka",
+      "riotId": "Enemy5#EUW",
+      "riotIdGameName": "Enemy5",
+      "riotIdTagLine": "EUW",
+      "summonerName": "Enemy5#EUW",
+      "team": "CHAOS",
+      "position": "UTILITY",
+      "level": 11,
+      "isBot": false,
+      "isDead": false,
+      "items": [
+        {
+          "itemID": 6617,
+          "displayName": "Moonstone Renewer",
+          "count": 1,
+          "slot": 0,
+          "canUse": false,
+          "consumable": false,
+          "price": 0
+        },
+        {
+          "itemID": 3158,
+          "displayName": "Ionian Boots of Lucidity",
+          "count": 1,
+          "slot": 1,
+          "canUse": false,
+          "consumable": false,
+          "price": 0
+        }
+      ],
+      "scores": {
+        "kills": 0,
+        "deaths": 2,
+        "assists": 9,
+        "creepScore": 120,
+        "wardScore": 8.0
+      }
+    }
+  ],
+  "events": {
+    "Events": []
+  },
+  "gameData": {
+    "gameMode": "CLASSIC",
+    "gameTime": 840.0,
+    "mapName": "Map11",
+    "mapNumber": 11,
+    "mapTerrain": "Default"
+  }
+}

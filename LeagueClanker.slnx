@@ -1,0 +1,10 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/LeagueClanker.App/LeagueClanker.App.csproj" />
+    <Project Path="src/LeagueClanker.Cli/LeagueClanker.Cli.csproj" />
+    <Project Path="src/LeagueClanker.Core/LeagueClanker.Core.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/LeagueClanker.Core.Tests/LeagueClanker.Core.Tests.csproj" />
+  </Folder>
+</Solution>

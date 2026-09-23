@@ -1,0 +1,422 @@
+{
+  "activePlayer": {
+    "riotId": "You#EUW",
+    "riotIdGameName": "You",
+    "riotIdTagLine": "EUW",
+    "summonerName": "You#EUW",
+    "level": 11,
+    "currentGold": 1450.0
+  },
+  "allPlayers": [
+    {
+      "championName": "Aatrox",
+      "rawChampionName": "game_character_displayname_Aatrox",
+      "riotId": "Ally1#EUW",
+      "riotIdGameName": "Ally1",
+      "riotIdTagLine": "EUW",
+      "summonerName": "Ally1#EUW",
+      "team": "ORDER",
+      "position": "TOP",
+      "level": 11,
+      "isBot": false,
+      "isDead": false,
+      "items": [
+        {
+          "itemID": 6610,
+          "displayName": "Sundered Sky",
+          "count": 1,
+          "slot": 0,
+          "canUse": false,
+          "consumable": false,
+          "price": 0
+        },
+        {
+          "itemID": 3047,
+          "displayName": "Plated Steelcaps",
+          "count": 1,
+          "slot": 1,
+          "canUse": false,
+          "consumable": false,
+          "price": 0
+        }
+      ],
+      "scores": {
+        "kills": 2,
+        "deaths": 2,
+        "assists": 3,
+        "creepScore": 120,
+        "wardScore": 8.0
+      }
+    },
+    {
+      "championName": "Viego",
+      "rawChampionName": "game_character_displayname_Viego",
+      "riotId": "Ally2#EUW",
+      "riotIdGameName": "Ally2",
+      "riotIdTagLine": "EUW",
+      "summonerName": "Ally2#EUW",
+      "team": "ORDER",
+      "position": "JUNGLE",
+      "level": 11,
+      "isBot": false,
+      "isDead": false,
+      "items": [
+        {
+          "itemID": 3153,
+          "displayName": "Blade of The Ruined King",
+          "count": 1,
+          "slot": 0,
+          "canUse": false,
+          "consumable": false,
+          "price": 0
+        }
+      ],
+      "scores": {
+        "kills": 3,
+        "deaths": 3,
+        "assists": 4,
+        "creepScore": 120,
+        "wardScore": 8.0
+      }
+    },
+    {
+      "championName": "Orianna",
+      "rawChampionName": "game_character_displayname_Orianna",
+      "riotId": "Ally3#EUW",
+      "riotIdGameName": "Ally3",
+      "riotIdTagLine": "EUW",
+      "summonerName": "Ally3#EUW",
+      "team": "ORDER",
+      "position": "MIDDLE",
+      "level": 11,
+      "isBot": false,
+      "isDead": false,
+      "items": [
+        {
+          "itemID": 6655,
+          "displayName": "Luden's Echo",
+          "count": 1,
+          "slot": 0,
+          "canUse": false,
+          "consumable": false,
+          "price": 0
+        },
+        {
+          "itemID": 3020,
+          "displayName": "Sorcerer's Shoes",
+          "count": 1,
+          "slot": 1,
+          "canUse": false,
+          "consumable": false,
+          "price": 0
+        }
+      ],
+      "scores": {
+        "kills": 2,
+        "deaths": 1,
+        "assists": 5,
+        "creepScore": 120,
+        "wardScore": 8.0
+      }
+    },
+    {
+      "championName": "Jinx",
+      "rawChampionName": "game_character_displayname_Jinx",
+      "riotId": "You#EUW",
+      "riotIdGameName": "You",
+      "riotIdTagLine": "EUW",
+      "summonerName": "You#EUW",
+      "team": "ORDER",
+      "position": "BOTTOM",
+      "level": 11,
+      "isBot": false,
+      "isDead": false,
+      "items": [
+        {
+          "itemID": 3032,
+          "displayName": "Yun Tal Wildarrows",
+          "count": 1,
+          "slot": 0,
+          "canUse": false,
+          "consumable": false,
+          "price": 0
+        },
+        {
+          "itemID": 3006,
+          "displayName": "Berserker's Greaves",
+          "count": 1,
+          "slot": 1,
+          "canUse": false,
+          "consumable": false,
+          "price": 0
+        },
+        {
+          "itemID": 1038,
+          "displayName": "B. F. Sword",
+          "count": 1,
+          "slot": 2,
+          "canUse": false,
+          "consumable": false,
+          "price": 0
+        }
+      ],
+      "scores": {
+        "kills": 4,
+        "deaths": 2,
+        "assists": 3,
+        "creepScore": 120,
+        "wardScore": 8.0
+      }
+    },
+    {
+      "championName": "Lulu",
+      "rawChampionName": "game_character_displayname_Lulu",
+      "riotId": "Ally4#EUW",
+      "riotIdGameName": "Ally4",
+      "riotIdTagLine": "EUW",
+      "summonerName": "Ally4#EUW",
+      "team": "ORDER",
+      "position": "UTILITY",
+      "level": 11,
+      "isBot": false,
+      "isDead": false,
+      "items": [
+        {
+          "itemID": 3504,
+          "displayName": "Ardent Censer",
+          "count": 1,
+          "slot": 0,
+          "canUse": false,
+          "consumable": false,
+          "price": 0
+        }
+      ],
+      "scores": {
+        "kills": 0,
+        "deaths": 2,
+        "assists": 9,
+        "creepScore": 120,
+        "wardScore": 8.0
+      }
+    },
+    {
+      "championName": "Ornn",
+      "rawChampionName": "game_character_displayname_Ornn",
+      "riotId": "Enemy1#EUW",
+      "riotIdGameName": "Enemy1",
+      "riotIdTagLine": "EUW",
+      "summonerName": "Enemy1#EUW",
+      "team": "CHAOS",
+      "position": "TOP",
+      "level": 11,
+      "isBot": false,
+      "isDead": false,
+      "items": [
+        {
+          "itemID": 6653,
+          "displayName": "Liandry's Torment",
+          "count": 1,
+          "slot": 0,
+          "canUse": false,
+          "consumable": false,
+          "price": 0
+        },
+        {
+          "itemID": 3020,
+          "displayName": "Sorcerer's Shoes",
+          "count": 1,
+          "slot": 1,
+          "canUse": false,
+          "consumable": false,
+          "price": 0
+        }
+      ],
+      "scores": {
+        "kills": 1,
+        "deaths": 2,
+        "assists": 4,
+        "creepScore": 120,
+        "wardScore": 8.0
+      }
+    },
+    {
+      "championName": "Sejuani",
+      "rawChampionName": "game_character_displayname_Sejuani",
+      "riotId": "Enemy2#EUW",
+      "riotIdGameName": "Enemy2",
+      "riotIdTagLine": "EUW",
+      "summonerName": "Enemy2#EUW",
+      "team": "CHAOS",
+      "position": "JUNGLE",
+      "level": 11,
+      "isBot": false,
+      "isDead": false,
+      "items": [
+        {
+          "itemID": 3115,
+          "displayName": "Nashor's Tooth",
+          "count": 1,
+          "slot": 0,
+          "canUse": false,
+          "consumable": false,
+          "price": 0
+        },
+        {
+          "itemID": 3020,
+          "displayName": "Sorcerer's Shoes",
+          "count": 1,
+          "slot": 1,
+          "canUse": false,
+          "consumable": false,
+          "price": 0
+        }
+      ],
+      "scores": {
+        "kills": 1,
+        "deaths": 3,
+        "assists": 6,
+        "creepScore": 120,
+        "wardScore": 8.0
+      }
+    },
+    {
+      "championName": "Ahri",
+      "rawChampionName": "game_character_displayname_Ahri",
+      "riotId": "Enemy3#EUW",
+      "riotIdGameName": "Enemy3",
+      "riotIdTagLine": "EUW",
+      "summonerName": "Enemy3#EUW",
+      "team": "CHAOS",
+      "position": "MIDDLE",
+      "level": 11,
+      "isBot": false,
+      "isDead": false,
+      "items": [
+        {
+          "itemID": 6655,
+          "displayName": "Luden's Echo",
+          "count": 1,
+          "slot": 0,
+          "canUse": false,
+          "consumable": false,
+          "price": 0
+        },
+        {
+          "itemID": 3020,
+          "displayName": "Sorcerer's Shoes",
+          "count": 1,
+          "slot": 1,
+          "canUse": false,
+          "consumable": false,
+          "price": 0
+        }
+      ],
+      "scores": {
+        "kills": 3,
+        "deaths": 2,
+        "assists": 2,
+        "creepScore": 120,
+        "wardScore": 8.0
+      }
+    },
+    {
+      "championName": "Caitlyn",
+      "rawChampionName": "game_character_displayname_Caitlyn",
+      "riotId": "Enemy4#EUW",
+      "riotIdGameName": "Enemy4",
+      "riotIdTagLine": "EUW",
+      "summonerName": "Enemy4#EUW",
+      "team": "CHAOS",
+      "position": "BOTTOM",
+      "level": 11,
+      "isBot": false,
+      "isDead": false,
+      "items": [
+        {
+          "itemID": 3031,
+          "displayName": "Infinity Edge",
+          "count": 1,
+          "slot": 0,
+          "canUse": false,
+          "consumable": false,
+          "price": 0
+        },
+        {
+          "itemID": 3032,
+          "displayName": "Yun Tal Wildarrows",
+          "count": 1,
+          "slot": 1,
+          "canUse": false,
+          "consumable": false,
+          "price": 0
+        },
+        {
+          "itemID": 3006,
+          "displayName": "Berserker's Greaves",
+          "count": 1,
+          "slot": 2,
+          "canUse": false,
+          "consumable": false,
+          "price": 0
+        }
+      ],
+      "scores": {
+        "kills": 5,
+        "deaths": 1,
+        "assists": 2,
+        "creepScore": 120,
+        "wardScore": 8.0
+      }
+    },
+    {
+      "championName": "Braum",
+      "rawChampionName": "game_character_displayname_Braum",
+      "riotId": "Enemy5#EUW",
+      "riotIdGameName": "Enemy5",
+      "riotIdTagLine": "EUW",
+      "summonerName": "Enemy5#EUW",
+      "team": "CHAOS",
+      "position": "UTILITY",
+      "level": 11,
+      "isBot": false,
+      "isDead": false,
+      "items": [
+        {
+          "itemID": 3504,
+          "displayName": "Ardent Censer",
+          "count": 1,
+          "slot": 0,
+          "canUse": false,
+          "consumable": false,
+          "price": 0
+        },
+        {
+          "itemID": 3158,
+          "displayName": "Ionian Boots of Lucidity",
+          "count": 1,
+          "slot": 1,
+          "canUse": false,
+          "consumable": false,
+          "price": 0
+        }
+      ],
+      "scores": {
+        "kills": 0,
+        "deaths": 3,
+        "assists": 8,
+        "creepScore": 120,
+        "wardScore": 8.0
+      }
+    }
+  ],
+  "events": {
+    "Events": []
+  },
+  "gameData": {
+    "gameMode": "CLASSIC",
+    "gameTime": 1260.0,
+    "mapName": "Map11",
+    "mapNumber": 11,
+    "mapTerrain": "Default"
+  }
+}
