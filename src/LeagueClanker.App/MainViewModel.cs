@@ -115,7 +115,9 @@ public sealed class MainViewModel : INotifyPropertyChanged
         var me = rec.Game.Me;
         IsLive = true;
         Status = $"Live · {TimeSpan.FromSeconds(rec.Game.GameTimeSeconds):mm\\:ss}";
-        ChampionLine = $"{me.Name} · {me.Archetype.DisplayName()}";
+        ChampionLine = rec.Game.Mode == GameMode.SummonersRift
+            ? $"{me.Name} · {me.Archetype.DisplayName()}"
+            : $"{me.Name} · {me.Archetype.DisplayName()} · {rec.Game.Mode.DisplayName()}";
         DamageSummary = rec.DamageSummary;
         AdShare = new GridLength(rec.Game.Enemies.PhysicalShare, GridUnitType.Star);
         ApShare = new GridLength(rec.Game.Enemies.MagicShare, GridUnitType.Star);

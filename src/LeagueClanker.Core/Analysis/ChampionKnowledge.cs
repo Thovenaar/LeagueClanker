@@ -34,6 +34,34 @@ public static class ChampionKnowledge
         "Syndra", "TahmKench", "Taric", "Thresh", "TwistedFate", "Urgot", "Veigar", "Vex", "Vi", "Warwick",
         "Yasuo", "Yone", "Zac", "Zyra");
 
+    /// <summary>Champions with summons or pets (Tibbers, Daisy, turrets, plants, ...). Augments like Minionmancer need these.</summary>
+    public static readonly IReadOnlySet<string> Pets = Set(
+        "Annie", "Azir", "Elise", "Heimerdinger", "Illaoi", "Ivern", "Malzahar", "Naafiri", "Shaco", "Yorick", "Zyra");
+
+    /// <summary>Champions with a dash or blink on a basic ability or ultimate.</summary>
+    public static readonly IReadOnlySet<string> Dashers = Set(
+        "Aatrox", "Ahri", "Akali", "Alistar", "Aurora", "Belveth", "Briar", "Caitlyn", "Camille", "Corki",
+        "Diana", "Ekko", "Ezreal", "Fiora", "Fizz", "Galio", "Gnar", "Gragas", "Graves", "Gwen",
+        "Hecarim", "Irelia", "JarvanIV", "Jax", "Kaisa", "Kalista", "Katarina", "Kayn", "Khazix", "Kindred",
+        "Kled", "Leblanc", "LeeSin", "Leona", "Lucian", "Maokai", "MonkeyKing", "Naafiri", "Nidalee", "Nilah",
+        "Ornn", "Pantheon", "Poppy", "Pyke", "Qiyana", "Quinn", "Rakan", "Rell", "Renekton", "Rengar",
+        "Riven", "Samira", "Sejuani", "Shaco", "Shen", "Sylas", "Talon", "Tristana", "Tryndamere", "Urgot",
+        "Vayne", "Vi", "Viego", "Warwick", "XinZhao", "Yasuo", "Yone", "Zed", "Zeri");
+
+    /// <summary>Champions with a spinning ability (Garen E, Darius Q, Katarina R, ...).</summary>
+    public static readonly IReadOnlySet<string> Spinners = Set(
+        "Darius", "Draven", "Garen", "Katarina", "MonkeyKing", "Samira", "Tryndamere");
+
+    /// <summary>Champions that go invisible or camouflaged.</summary>
+    public static readonly IReadOnlySet<string> Stealthers = Set(
+        "Akali", "Evelynn", "Khazix", "MonkeyKing", "Pyke", "Qiyana", "Rengar", "Senna", "Shaco", "Talon",
+        "Twitch", "Vayne");
+
+    /// <summary>Champions that gain permanent stacks from their abilities.</summary>
+    public static readonly IReadOnlySet<string> Stackers = Set(
+        "AurelionSol", "Bard", "Chogath", "Kindred", "Nasus", "Senna", "Sion", "Smolder", "Swain", "Thresh",
+        "Veigar");
+
     /// <summary>Champions whose usual build doesn't match what their Riot class tags suggest.</summary>
     public static readonly IReadOnlyDictionary<string, Archetype> ArchetypeOverrides =
         new Dictionary<string, Archetype>(StringComparer.OrdinalIgnoreCase)

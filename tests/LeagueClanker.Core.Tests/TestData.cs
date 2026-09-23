@@ -28,7 +28,7 @@ internal static class TestData
         var items = new Dictionary<string, object>
         {
             ["1001"] = Item("Boots", 300, Stats(("Move Speed", "25")), tags: ["Boots"], into: ["3047", "3111"]),
-            [$"{Plate}"] = Item("Plate", 2800, Stats(("Armor", "60"), ("Health", "400"))),
+            [$"{Plate}"] = Item("Plate", 2800, Stats(("Armor", "60"), ("Health", "400")), maps: ["11", "12"]),
             [$"{Cloak}"] = Item("Cloak", 2800, Stats(("Magic Resist", "60"), ("Health", "400"))),
             [$"{Veil}"] = Item("Veil", 2900, Stats(("Magic Resist", "55"), ("Health", "450"))),
             [$"{Cleaver}"] = Item("Cleaver", 3000, Stats(("Attack Damage", "50"), ("Health", "350"), ("Ability Haste", "20"))),
@@ -106,12 +106,12 @@ internal static class TestData
         return $"<mainText><stats>{string.Join("<br>", parts)}</stats><br><br>";
     }
 
-    private static object Item(string name, int gold, string description, string[]? tags = null, string[]? from = null, string[]? into = null) => new
+    private static object Item(string name, int gold, string description, string[]? tags = null, string[]? from = null, string[]? into = null, string[]? maps = null) => new
     {
         name,
         description = description + "</mainText>",
         gold = new { total = gold, purchasable = true },
-        maps = new Dictionary<string, bool> { ["11"] = true },
+        maps = (maps ?? ["11"]).ToDictionary(m => m, _ => true),
         tags = tags ?? [],
         from = from ?? [],
         into = into ?? [],

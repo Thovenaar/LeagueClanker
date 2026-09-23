@@ -50,6 +50,14 @@ Run it with no arguments to watch the live game, or with `--items` to list every
 dotnet run --project src/LeagueClanker.Cli -- samples/pivot-demo --decline
 ```
 
+For ARAM: Mayhem augments, give it a snapshot, the offered cards, and the cards you already picked, separated by `;`:
+
+```bash
+dotnet run --project src/LeagueClanker.Cli -- --mayhem samples/mayhem/jinx-level7.json --picked "It's Critical" --offer "Critical Rhythm;Recursion;Celestial Body"
+```
+
+`--augments` lists all 225 augments with the tags the parser gave them.
+
 To turn one of your own games into a sample, save the API response while in a match:
 
 ```bash
@@ -85,6 +93,21 @@ Every player gets a full stat block in `StatBlock.cs`: AD, AP, attack speed, cri
 
 Accepting swaps just those items. Declining remembers them for the rest of the game. "Switch anyway" adopts the latest ranking whenever you want. Buying items from your build never counts as a pivot, and a new game or champion starts a fresh build.
 
+### Game modes
+
+The advisor reads `gameMode` and the map number from the live game. Summoner's Rift uses map 11 items. ARAM and ARAM: Mayhem (`KIWI`) use Howling Abyss items. Arena isn't supported.
+
+### ARAM: Mayhem augments
+
+`Augments/` ranks the three cards in an augment offer by the best final set of four they lead to, without win rates:
+
+1. `AugmentDataClient` downloads the wiki's augment data (225 cards) and caches it for a day. Riot's own data has no Mayhem augments.
+2. `AugmentTagger` tags each card with what it gives (attack speed, true damage, shields, ...) and what it needs or scales with (attacking, crits, pets, AP ratio, ...), from the description text. A short override list fixes cards the patterns misread.
+3. `AugmentScorer` values a card by its fit with your champion, its pairings with the cards you picked (a card that pays off on attacks wants attack speed), your items (on-hit items, "Upgrade Infinity Edge"), and the game situation from the item rules.
+4. `AugmentAdvisor` simulates your remaining picks 1,500 times per option with Mayhem's rules: picks at levels 3, 7, 11 and 15, one tier per offer, the first two offers never both Silver, one reroll per card. It ranks each option by the average value of the final set. That's how a weaker card that sets up combos can beat a stronger card that leads nowhere.
+
+Card tier odds aren't published, so the simulation treats Silver, Gold and Prismatic as equally likely.
+
 ### Rules
 
 All in `Recommendation/BuildRules.cs`.
@@ -113,9 +136,14 @@ To add a rule, implement `IBuildRule`, return a `Situation` with a label, a sent
 - Enemy stats are estimates. Runes, stat shards and stacking passives (Malphite, Cho'Gath, Sion) don't show up in the API.
 - Only stats and keyword traits count. Rabadon's Deathcap's AP multiplier, for example, is invisible to the scorer. The core-item bonus papers over some of this.
 - Your own archetype comes from Riot's class tags plus a short override list. Off-meta picks like AP Shaco get the wrong item pool. A manual archetype picker in the window would fix it.
-- Summoner's Rift only. Arena augments and item win rates are also off-limits under Riot's policy.
+- Arena isn't supported. Riot's policy also rules out showing win rates for augments and Arena items, so the augment advisor reasons from card effects only.
+- Augment tags come from description text. Expect some cards to be tagged wrong until they've been reviewed with `--augments`.
+- The app window doesn't show augment advice yet. Reading the offered cards from the screen is the next step.
 - The core-item lists and weights are my best guess for patch 16.18. Real win-rate data per matchup would beat them.
 
 ## Legal
+
+Augment data comes from the [League of Legends Wiki](https://wiki.leagueoflegends.com/en-us/Module:MayhemAugmentData/data) under CC BY-SA 3.0.
+
 
 LeagueClanker isn't endorsed by Riot Games and doesn't reflect the views or opinions of Riot Games or anyone officially involved in producing or managing Riot Games properties. Riot Games, and all associated properties are trademarks or registered trademarks of Riot Games, Inc.

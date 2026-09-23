@@ -72,6 +72,9 @@ public sealed record ItemInfo
     public IReadOnlySet<string> Passives { get; init; } = new HashSet<string>();
     public IReadOnlyList<int> BuildsFrom { get; init; } = [];
 
+    /// <summary>Data Dragon map ids the item can be bought on (11 = Summoner's Rift, 12 = Howling Abyss).</summary>
+    public IReadOnlySet<int> Maps { get; init; } = new HashSet<int> { GameModes.SummonersRiftMap };
+
     public bool IsBoots => Tags.Contains("Boots");
 
     public double Stat(string name) => Stats.TryGetValue(name, out var value) ? value : 0;
@@ -83,29 +86,38 @@ public sealed record ItemInfo
 
 public sealed partial class ItemCatalog
 {
-    private const string SummonersRiftMapId = "11";
     private const int LegendaryMinGold = 2200;
 
-    // Items with 6-digit ids are copies for other modes (Arena, ARAM variants) that still claim map 11.
-    private const int MaxSummonersRiftItemId = 9999;
+    // Items with 6-digit ids are copies for other modes (Arena, ARAM variants, Mayhem specials) with changed stats or prices.
+    // The standard versions are available on those maps too, so only standard ids are recommended.
+    private const int MaxStandardItemId = 9999;
 
     private readonly Dictionary<int, ItemInfo> _byId;
 
     public ItemCatalog(IEnumerable<ItemInfo> items)
     {
         _byId = items.ToDictionary(i => i.Id);
-        Legendaries = _byId.Values.Where(i => i.Kind == ItemKind.Legendary).OrderBy(i => i.Id).ToList();
-        Boots = _byId.Values.Where(i => i.Kind == ItemKind.Boots).OrderBy(i => i.Id).ToList();
     }
 
-    public IReadOnlyList<ItemInfo> Legendaries { get; }
-    public IReadOnlyList<ItemInfo> Boots { get; }
+    /// <summary>Summoner's Rift legendaries.</summary>
+    public IReadOnlyList<ItemInfo> Legendaries => LegendariesOn(GameModes.SummonersRiftMap);
+
+    /// <summary>Summoner's Rift tier 2 boots.</summary>
+    public IReadOnlyList<ItemInfo> Boots => BootsOn(GameModes.SummonersRiftMap);
+
     public IEnumerable<ItemInfo> All => _byId.Values;
+
+    public IReadOnlyList<ItemInfo> LegendariesOn(int map) => OfKind(ItemKind.Legendary, map);
+
+    public IReadOnlyList<ItemInfo> BootsOn(int map) => OfKind(ItemKind.Boots, map);
+
+    private IReadOnlyList<ItemInfo> OfKind(ItemKind kind, int map) =>
+        _byId.Values.Where(i => i.Kind == kind && i.Maps.Contains(map)).OrderBy(i => i.Id).ToList();
 
     public ItemInfo? Get(int id) => _byId.GetValueOrDefault(id);
 
     public ItemInfo? FindByName(string name) =>
-        _byId.Values.Where(i => i.Id <= MaxSummonersRiftItemId).FirstOrDefault(i => string.Equals(i.Name, name, StringComparison.OrdinalIgnoreCase));
+        _byId.Values.Where(i => i.Id <= MaxStandardItemId).FirstOrDefault(i => string.Equals(i.Name, name, StringComparison.OrdinalIgnoreCase));
 
     /// <summary>Parses Data Dragon's item.json.</summary>
     public static ItemCatalog Parse(string itemJson)
@@ -138,18 +150,23 @@ public sealed partial class ItemCatalog
             Tags = tags,
             Passives = PassiveRegex().Matches(description).Select(m => m.Groups[1].Value.Trim()).ToHashSet(StringComparer.OrdinalIgnoreCase),
             BuildsFrom = from,
+            Maps = ParseMaps(json),
         };
     }
+
+    private static HashSet<int> ParseMaps(JsonElement json) =>
+        json.TryGetProperty("maps", out var maps)
+            ? maps.EnumerateObject().Where(m => m.Value.GetBoolean() && int.TryParse(m.Name, out _)).Select(m => int.Parse(m.Name)).ToHashSet()
+            : [];
 
     private static ItemKind ClassifyKind(int id, JsonElement json, HashSet<string> tags, List<int> from)
     {
         var gold = json.GetProperty("gold");
-        var onRift = json.TryGetProperty("maps", out var maps) && maps.TryGetProperty(SummonersRiftMapId, out var rift) && rift.GetBoolean();
         var purchasable = gold.GetProperty("purchasable").GetBoolean();
         var inStore = !json.TryGetProperty("inStore", out var store) || store.GetBoolean();
         var restricted = json.TryGetProperty("requiredChampion", out _) || json.TryGetProperty("requiredAlly", out _);
 
-        if (!onRift || !purchasable || !inStore || restricted || id > MaxSummonersRiftItemId)
+        if (!purchasable || !inStore || restricted || id > MaxStandardItemId)
             return ItemKind.Other;
         if (tags.Contains("Consumable") || tags.Contains("Trinket"))
             return ItemKind.Other;

@@ -91,10 +91,11 @@ public sealed class RecommendationEngine(StaticGameData data, IReadOnlyList<IBui
             .Aggregate(1.0, (weight, item) => s.Score(item) >= ScoredItem.MinReasonPoints ? weight * OwnedDecay : weight));
 
         var mine = game.Me.Stats;
-        var candidates = data.Items.Legendaries.Where(Available).Where(i => profile.BaseScore(i, mine) >= profile.MinFit).ToList();
+        var map = game.Mode.MapId();
+        var candidates = data.Items.LegendariesOn(map).Where(Available).Where(i => profile.BaseScore(i, mine) >= profile.MinFit).ToList();
         var boots = owned.Any(i => i.IsBoots && i.Id != BasicBootsId)
             ? []
-            : data.Items.Boots.Select(i => Score(i, profile, mine, situations, weights)).OrderByDescending(s => s.Total).ToList();
+            : data.Items.BootsOn(map).Select(i => Score(i, profile, mine, situations, weights)).OrderByDescending(s => s.Total).ToList();
 
         // Greedy ranking with diminishing returns: once an item answers "enemy is AP", the next MR item is worth less.
         // Without this, a strong situation fills all six slots with the same kind of item.

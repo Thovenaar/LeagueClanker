@@ -8,8 +8,13 @@ namespace LeagueClanker.Core.StaticData;
 /// <param name="Attack">Riot's 0-10 rating of physical damage.</param>
 /// <param name="Magic">Riot's 0-10 rating of magic damage.</param>
 /// <param name="BaseStats">Level 1 stats and growth. Null for unknown champions.</param>
-public sealed record ChampionInfo(string Id, string Name, IReadOnlyList<string> Tags, int Attack, int Defense, int Magic, ChampionStats? BaseStats = null)
+/// <param name="Resource">"Mana", "Energy", "None", "Fury", ...</param>
+public sealed record ChampionInfo(
+    string Id, string Name, IReadOnlyList<string> Tags, int Attack, int Defense, int Magic,
+    ChampionStats? BaseStats = null, string Resource = "Mana")
 {
+    public bool UsesMana => Resource.Equals("Mana", StringComparison.OrdinalIgnoreCase);
+
     public string PrimaryTag => Tags.Count > 0 ? Tags[0] : "";
     public string SecondaryTag => Tags.Count > 1 ? Tags[1] : "";
     public ChampionStats Stats => BaseStats ?? ChampionStats.Typical;
@@ -107,7 +112,8 @@ public sealed class ChampionCatalog
                     AttackSpeedPerLevel = stats.GetProperty("attackspeedperlevel").GetDouble(),
                     MoveSpeed = stats.GetProperty("movespeed").GetDouble(),
                     AttackRange = stats.GetProperty("attackrange").GetDouble(),
-                });
+                },
+                c.GetStringOrEmpty("partype"));
         });
         return new ChampionCatalog(champions);
     }

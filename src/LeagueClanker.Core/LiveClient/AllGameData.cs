@@ -78,6 +78,11 @@ public sealed class LiveScores
 
 public sealed class LiveGameInfo
 {
+    /// <summary>"CLASSIC", "ARAM", "KIWI" (ARAM: Mayhem), "CHERRY" (Arena), ...</summary>
     public string? GameMode { get; init; }
+
+    /// <summary>11 = Summoner's Rift, 12 = Howling Abyss.</summary>
+    public int MapNumber { get; init; }
+
     public double GameTime { get; init; }
 }

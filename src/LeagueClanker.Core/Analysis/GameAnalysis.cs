@@ -105,6 +105,8 @@ public sealed class TeamProfile(IReadOnlyList<PlayerProfile> players)
 
 public sealed record GameAnalysis(PlayerProfile Me, TeamProfile Allies, TeamProfile Enemies, double GameTimeSeconds)
 {
+    public GameMode Mode { get; init; } = GameMode.SummonersRift;
+
     /// <summary>My team including me.</summary>
     public TeamProfile MyTeam => new([Me, .. Allies.Players]);
 }
@@ -125,7 +127,10 @@ public static class GameAnalyzer
         var allies = data.AllPlayers.Where(p => p != me && p.Team == me.Team).Select(p => Profile(p, staticData)).ToList();
         var enemies = data.AllPlayers.Where(p => p.Team != me.Team).Select(p => Profile(p, staticData)).ToList();
         var myProfile = Profile(me, staticData, active.ChampionStats);
-        return new GameAnalysis(myProfile, new TeamProfile(allies), new TeamProfile(enemies), data.GameData?.GameTime ?? 0);
+        return new GameAnalysis(myProfile, new TeamProfile(allies), new TeamProfile(enemies), data.GameData?.GameTime ?? 0)
+        {
+            Mode = GameModes.Detect(data.GameData?.GameMode, data.GameData?.MapNumber ?? 0),
+        };
     }
 
     public static PlayerProfile Profile(LivePlayer player, StaticGameData staticData, LiveChampionStats? realStats = null)

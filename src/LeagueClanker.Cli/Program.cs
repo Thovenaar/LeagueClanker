@@ -1,5 +1,6 @@
 using LeagueClanker.Core;
 using LeagueClanker.Core.Analysis;
+using LeagueClanker.Core.Augments;
 using LeagueClanker.Core.LiveClient;
 using LeagueClanker.Core.Recommendation;
 using LeagueClanker.Core.StaticData;
@@ -23,6 +24,54 @@ if (args is ["--items"])
 {
     foreach (var item in data.Items.Legendaries.Concat(data.Items.Boots))
         Console.WriteLine($"{item.Id,5} {item.Name,-30} {item.TotalGold,5}g  {item.Traits,-40} {string.Join(", ", item.Stats.Select(s => $"{s.Key} {s.Value}"))}");
+    return;
+}
+
+if (args is ["--augments"])
+{
+    var augments = await new AugmentDataClient().LoadMayhemAsync(data.Items, cts.Token);
+    Console.WriteLine($"{augments.All.Count} Mayhem augments ({augments.Offerable.Count()} offerable). {AugmentDataClient.Attribution}\n");
+    foreach (var a in augments.All)
+    {
+        var flags = string.Join(" ", new[] { a.IsDisabled ? "DISABLED" : "", a.IsQuest ? "quest" : "", a.HasDrawback ? "drawback" : "", a.IsRandom ? "random" : "" }.Where(f => f != ""));
+        Console.WriteLine($"{a.Tier.ToString()[0]} {a.Name,-28} gives [{a.Effects}] needs [{a.Triggers}]" +
+            (a.MentionedItems.Count > 0 ? $" items [{string.Join(", ", a.MentionedItems.Select(i => i.Name))}]" : "") + (flags != "" ? $" {flags}" : ""));
+    }
+    return;
+}
+
+if (args is ["--mayhem", var gamePath, ..])
+{
+    string[] NamesAfter(string flag) =>
+        args.SkipWhile(a => a != flag).Skip(1).FirstOrDefault()?.Split(';', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries) ?? [];
+
+    var rec = await RecommendAsync(gamePath) ?? throw new InvalidOperationException("Could not find the active player.");
+    var augments = await new AugmentDataClient().LoadMayhemAsync(data.Items, cts.Token);
+    AugmentInfo Resolve(string name) => augments.Find(name) ?? throw new ArgumentException($"Unknown augment '{name}'. Run --augments for the list.");
+
+    var offer = NamesAfter("--offer").Select(Resolve).ToList();
+    var ctx = new AugmentContext(rec.Game)
+    {
+        Picked = NamesAfter("--picked").Select(Resolve).ToList(),
+        PlannedItems = rec.Items.Select(i => i.Item).ToList(),
+        Situations = rec.Situations,
+    };
+
+    var advice = new AugmentAdvisor(augments).Rank(offer, ctx);
+    var me = rec.Game.Me;
+    Console.WriteLine($"=== {me.Name} ({me.Archetype.DisplayName()}), {rec.Game.Mode.DisplayName()} ===");
+    Console.WriteLine($"Picked: {(ctx.Picked.Count == 0 ? "nothing yet" : string.Join(", ", ctx.Picked))}");
+    Console.WriteLine($"Items: {string.Join(", ", me.Items.Where(i => i.Kind is ItemKind.Legendary or ItemKind.Boots))} (planned: {string.Join(", ", ctx.PlannedItems.Take(3))})\n");
+    var rank = 1;
+    foreach (var option in advice.Ranked)
+    {
+        Console.WriteLine($"{rank++}. {option.Augment.Name} ({option.Augment.Tier})  now {option.Now:0.0}  with future picks {option.Expected:0.0}");
+        foreach (var reason in option.Reasons.OrderByDescending(r => Math.Abs(r.Points)))
+            Console.WriteLine($"     {(reason.Points < 0 ? "-" : "+")} {reason.Text}");
+        if (option.Partners.Count > 0)
+            Console.WriteLine($"     combos later: {string.Join(", ", option.Partners)}");
+    }
+    Console.WriteLine($"\n{advice.Text}\n{AugmentDataClient.Attribution}");
     return;
 }
 
