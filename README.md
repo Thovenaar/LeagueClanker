@@ -20,7 +20,11 @@ In ARAM: Mayhem an Augments tab ranks the cards you're offered:
 
 The screenshots come from the demo snapshots in `samples/`, not a live game.
 
-## Running it
+## Download
+
+Get `LeagueClanker.exe` from the [latest release](https://github.com/Thovenaar/LeagueClanker/releases/latest). It runs on Windows 10 and 11 without installing anything. The exe isn't code-signed, so Windows SmartScreen may warn the first time: click *More info*, then *Run anyway*.
+
+## Running it from source
 
 You need Windows and the .NET 10 SDK. The first launch downloads item and champion data from Riot's Data Dragon CDN and caches it per patch in `%LOCALAPPDATA%\LeagueClanker`.
 
@@ -79,6 +83,16 @@ To turn one of your own games into a sample, save the API response while in a ma
 ```bash
 curl -k https://127.0.0.1:2999/liveclientdata/allgamedata -o samples/my-game.json
 ```
+
+## Releasing
+
+The Release workflow tests the code, builds a single self-contained `LeagueClanker.exe` and publishes it as a GitHub release. Start it from the Actions tab (*Release*, then *Run workflow*) with a version number, or from the command line:
+
+```bash
+gh workflow run release.yml -f version=0.2.0
+```
+
+Tick *dry run* (or add `-f dry_run=true`) to build and test without publishing. The exe is then kept as a workflow artifact.
 
 ## Is it allowed
 

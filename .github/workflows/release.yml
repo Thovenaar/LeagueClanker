@@ -1,0 +1,63 @@
+name: Release
+
+# Start it from the Actions tab (Release > Run workflow), or:
+#   gh workflow run release.yml -f version=0.2.0
+# It tests, builds a single self-contained LeagueClanker.exe and publishes it as GitHub release v<version>.
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version number, e.g. 0.2.0
+        required: true
+      dry_run:
+        description: Build and test only; keep the exe as a workflow artifact instead of publishing a release
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    env:
+      VERSION: ${{ inputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Check version
+        shell: pwsh
+        run: |
+          if ($env:VERSION -notmatch '^\d+\.\d+\.\d+$') { throw "Version must look like 1.2.3, got '$env:VERSION'" }
+          if (git ls-remote --tags origin "v$env:VERSION") { throw "Release v$env:VERSION already exists" }
+
+      - name: Test
+        run: dotnet test tests/LeagueClanker.Core.Tests -c Release
+
+      - name: Build exe
+        shell: pwsh
+        run: |
+          dotnet publish src/LeagueClanker.App -c Release -r win-x64 --self-contained true `
+            -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true `
+            -p:DebugType=none -p:Version=$env:VERSION -o publish
+          Move-Item publish/LeagueClanker.App.exe LeagueClanker.exe
+
+      - name: Keep the exe (dry run)
+        if: inputs.dry_run
+        uses: actions/upload-artifact@v4
+        with:
+          name: LeagueClanker-${{ inputs.version }}
+          path: LeagueClanker.exe
+
+      - name: Publish release
+        if: ${{ !inputs.dry_run }}
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "v$env:VERSION" LeagueClanker.exe `
+            --title "LeagueClanker $env:VERSION" --target $env:GITHUB_SHA --generate-notes

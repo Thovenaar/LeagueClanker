@@ -1,4 +1,5 @@
 using System.IO;
+using System.Reflection;
 using System.Net.Http;
 using System.Windows;
 using LeagueClanker.Core;
@@ -38,7 +39,7 @@ public partial class App : Application
         {
             viewModel.Status = "Loading item data...";
             var data = await new DataDragonClient().LoadAsync(_cts.Token);
-            viewModel.Footer = demoPath is null ? $"Patch {data.Version}" : $"Patch {data.Version} · demo: {Path.GetFileName(demoPath)}";
+            viewModel.Footer = demoPath is null ? $"v{AppVersion} · Patch {data.Version}" : $"v{AppVersion} · Patch {data.Version} · demo: {Path.GetFileName(demoPath)}";
             if (await LoadAugmentsAsync(viewModel.Augments, data) is { } augments)
                 _ = RunScannerAsync(viewModel.Augments, new AugmentScreenReader(augments), scanImage);
 
@@ -114,6 +115,10 @@ public partial class App : Application
         _cts.Cancel();
         base.OnExit(e);
     }
+
+    // "0.2.0" in releases, "0.0.0-dev" in local builds; the build adds "+<commit>", which isn't shown.
+    private static string AppVersion =>
+        typeof(App).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion.Split('+')[0] ?? "?";
 
     private static string? ResolvePath(string[] args, string flag)
     {
