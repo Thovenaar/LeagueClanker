@@ -50,6 +50,9 @@ public sealed record OpggChampion(IReadOnlyList<OpggPage> Pages, IReadOnlyList<O
 
     public IReadOnlyList<OpggChoice> Boots { get; init; } = [];
 
+    /// <summary>Single items bought after the core (fourth to sixth item), most played first.</summary>
+    public IReadOnlyList<OpggChoice> LaterItems { get; init; } = [];
+
     public OpggSkillOrder? SkillOrder { get; init; }
 }
 
@@ -177,6 +180,7 @@ public sealed class OpggClient : IMatchupData
             StarterItems = Choices("starter_items"),
             CoreItems = Choices("core_items"),
             Boots = Choices("boots"),
+            LaterItems = Choices("last_items"),
             SkillOrder = skillOrder,
         };
     }

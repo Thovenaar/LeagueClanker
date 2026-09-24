@@ -10,6 +10,7 @@ using LeagueClanker.Core.LeagueClient;
 using LeagueClanker.Core.LiveClient;
 using LeagueClanker.Core.Matchups;
 using LeagueClanker.Core.Opgg;
+using LeagueClanker.Core.Recommendation;
 using LeagueClanker.Core.Runes;
 using LeagueClanker.Core.Spells;
 using LeagueClanker.Core.StaticData;
@@ -121,9 +122,11 @@ public partial class App : Application
                 var champion = useOpgg ? await LoadOpggChampionAsync(opgg, game) : null;
                 if (liveGame != game)
                     return; // another game or champion by now
-                advisor.PopularItems = champion is not null && viewModel.Settings.UsePopularItems
-                    ? champion.CoreItems.Take(2).SelectMany(c => c.Ids).Where(id => data.Items.Get(id)?.Kind == ItemKind.Legendary).ToHashSet()
+                var useMeta = champion is not null && viewModel.Settings.UsePopularItems;
+                advisor.PopularItems = useMeta
+                    ? champion!.CoreItems.Take(2).SelectMany(c => c.Ids).Where(id => data.Items.Get(id)?.Kind == ItemKind.Legendary).ToHashSet()
                     : new HashSet<int>();
+                advisor.MetaBuilds = useMeta ? MetaBuilds.From(champion!, data.Items, game.Mode) : [];
                 viewModel.SetOpggChampion(champion);
             }
             // arammayhem.com's win rates for Mayhem cards, and the cards players of your champion take most.

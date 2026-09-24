@@ -49,6 +49,9 @@ public sealed record BuildRecommendation(
     /// <summary>Your finished legendaries, scored like the candidates. Used to suggest swaps once your build is full.</summary>
     public IReadOnlyList<ScoredItem> Owned { get; init; } = [];
 
+    /// <summary>The op.gg build this recommendation follows, or null when it comes from item scores alone.</summary>
+    public MetaChoice? Meta { get; init; }
+
     public ScoredItem? Find(int itemId) => Ranked.FirstOrDefault(s => s.Item.Id == itemId);
 
     public string DamageSummary =>
@@ -63,6 +66,9 @@ public sealed class RecommendationEngine(StaticGameData data, IReadOnlyList<IBui
 {
     private const double RepeatDecay = 0.5;
     private const double OwnedDecay = 0.6;
+
+    /// <summary>A meta build's later item is only swapped for an item whose game-situation points are this much higher.</summary>
+    public const double SwapMargin = 1.0;
 
     // Effects worth rushing a component for, e.g. Oblivion Orb before Morellonomicon.
     private const ItemTraits RushableTraits =
@@ -109,6 +115,8 @@ public sealed class RecommendationEngine(StaticGameData data, IReadOnlyList<IBui
             ? []
             : data.Items.BootsFor(game.Mode).Select(i => Score(i, profile, mine, situations, weights)).OrderByDescending(s => s.Total).ToList();
 
+        var freshWeights = new Dictionary<Situation, double>(weights);
+
         // Greedy ranking with diminishing returns: once an item answers "enemy is AP", the next MR item is worth less.
         // Without this, a strong situation fills all six slots with the same kind of item.
         var ranked = new List<ScoredItem>();
@@ -126,7 +134,29 @@ public sealed class RecommendationEngine(StaticGameData data, IReadOnlyList<IBui
             .OfType<Advice>()
             .ToList();
 
-        return new BuildRecommendation(game, ranked.Take(maxItems).ToList(), boots.FirstOrDefault(), situations, advice) { Ranked = ranked, Owned = ownedScores };
+        // With op.gg's builds, the plan is one of them, in its buy order, with at most one later item swapped for this game.
+        MetaChoice? meta = null;
+        if (game.MetaBuilds.Count > 0 && MetaBuilds.Choose(game.MetaBuilds, game, situations, game.KeepMeta) is { } choice)
+        {
+            meta = choice;
+            var build = choice.Build.Items.Where(Available).Select(i => Score(i, profile, mine, situations, freshWeights)).ToList();
+            var core = choice.Build.Core.Select(i => i.Id).ToHashSet();
+            double Points(ScoredItem s) => s.Contributions.Sum(c => c.Points);
+            if (build.Where(s => !core.Contains(s.Item.Id)).MinBy(Points) is { } weakest
+                && ranked.Where(s => build.All(b => b.Item.Id != s.Item.Id) && s.Reasons.Any(r => r.Points >= BuildPlanner.MinReasonPoints)).MaxBy(Points) is { } better
+                && Points(better) >= Points(weakest) + SwapMargin)
+            {
+                build[build.IndexOf(weakest)] = better;
+                var why = better.Reasons.First().Situation.Description;
+                meta = choice with { Swap = $"{better.Item.Name} instead of {weakest.Item.Name}: {char.ToLowerInvariant(why[0])}{why[1..]}" };
+            }
+            ranked = [.. build, .. ranked.Where(s => build.All(b => b.Item.Id != s.Item.Id))];
+        }
+
+        return new BuildRecommendation(game, ranked.Take(maxItems).ToList(), boots.FirstOrDefault(), situations, advice)
+        {
+            Ranked = ranked, Owned = ownedScores, Meta = meta,
+        };
     }
 
     private static ScoredItem Score(ItemInfo item, ArchetypeProfile profile, StatBlock mine, IReadOnlyList<Situation> situations, Dictionary<Situation, double> weights) =>

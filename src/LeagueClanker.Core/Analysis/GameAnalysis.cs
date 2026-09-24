@@ -131,6 +131,18 @@ public sealed record GameAnalysis(PlayerProfile Me, TeamProfile Allies, TeamProf
     /// <summary>Items players of your champion buy most on op.gg. <see cref="PopularItemsRule"/> nudges them up. Empty to ignore.</summary>
     public IReadOnlySet<int> PopularItems { get; init; } = new HashSet<int>();
 
+    /// <summary>op.gg's builds for your champion. When there are any, the build comes from one of them. Empty uses item scores alone.</summary>
+    public IReadOnlyList<Recommendation.MetaBuild> MetaBuilds { get; init; } = [];
+
+    /// <summary>The playstyle you picked yourself, or null when the app decides (from the meta build, or the champion's class).</summary>
+    public Archetype? ChosenPlaystyle { get; init; }
+
+    /// <summary>The meta build chosen on the previous update, which gets a small nudge to stay.</summary>
+    public string? KeepMeta { get; init; }
+
+    /// <summary>A meta build already chosen for this update, when the game is analyzed again as that build's playstyle.</summary>
+    public string? ForcedMeta { get; init; }
+
     /// <summary>My team including me.</summary>
     public TeamProfile MyTeam => new([Me, .. Allies.Players]);
 }

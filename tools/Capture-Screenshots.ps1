@@ -117,6 +117,10 @@ $shots = [ordered]@{
         $p
     }
     pivot = {
+        # With op.gg's builds, the enemy going AP swaps a later item instead of the first three, so no pivot shows up.
+        # The pivot shots use the item scores alone.
+        New-Item -ItemType Directory -Force $env:LEAGUECLANKER_DATA | Out-Null
+        '{ "UsePopularItems": false }' | Set-Content (Join-Path $env:LEAGUECLANKER_DATA "settings.json")
         $p = Start-App "--demo", "samples/pivot-demo"
         Start-Sleep -Seconds 14
         Save-Window $p "pivot-suggested.png"
@@ -126,6 +130,7 @@ $shots = [ordered]@{
         Start-Sleep -Seconds 8
         Select-Tab $p "Players"
         Save-Window $p "players.png"
+        Remove-Item (Join-Path $env:LEAGUECLANKER_DATA "settings.json")
         $p
     }
     augments = {

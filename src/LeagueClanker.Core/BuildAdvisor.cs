@@ -30,6 +30,11 @@ public sealed class BuildAdvisor(IGameDataSource source, StaticGameData data)
     /// <summary>op.gg's most played items for your champion, or empty. Changing them triggers a new recommendation.</summary>
     public IReadOnlySet<int> PopularItems { get; set; } = new HashSet<int>();
 
+    /// <summary>op.gg's builds for your champion. The build then follows one of them, and so does your playstyle.</summary>
+    public IReadOnlyList<MetaBuild> MetaBuilds { get; set; } = [];
+
+    private string? _keepMeta;
+
     // Gold changes a little every second; buying advice only needs to follow it in steps.
     private const int GoldStep = 50;
 
@@ -57,11 +62,13 @@ public sealed class BuildAdvisor(IGameDataSource source, StaticGameData data)
             }
 
             var gold = game!.ActivePlayer?.CurrentGold ?? 0;
-            var fingerprint = Fingerprint(game) + "|" + string.Join(",", augments.Select(a => a.Name)) + "|" + playstyle + "|" + string.Join(",", popular.Order());
+            var metaBuilds = MetaBuilds;
+            var fingerprint = Fingerprint(game) + "|" + string.Join(",", augments.Select(a => a.Name)) + "|" + playstyle + "|" + string.Join(",", popular.Order())
+                              + "|" + string.Join(",", metaBuilds.Select(b => b.Key));
             if (fingerprint != lastFingerprint)
             {
                 lastFingerprint = fingerprint;
-                last = _engine.Recommend(analysis);
+                last = Recommend(game, analysis, augments, playstyle, popular, metaBuilds);
                 lastGoldStep = (int)gold / GoldStep;
                 yield return new AdvisorUpdate(AdvisorState.Live, last, gold);
             }
@@ -76,7 +83,28 @@ public sealed class BuildAdvisor(IGameDataSource source, StaticGameData data)
     }
 
     public BuildRecommendation? RecommendOnce(AllGameData game) =>
-        GameAnalyzer.Analyze(game, data, Augments, Playstyle, PopularItems) is { } analysis ? _engine.Recommend(analysis) : null;
+        GameAnalyzer.Analyze(game, data, Augments, Playstyle, PopularItems) is { } analysis
+            ? Recommend(game, analysis, Augments, Playstyle, PopularItems, MetaBuilds)
+            : null;
+
+    /// <summary>
+    /// Picks the meta build for this game, then analyzes the game again as that build's playstyle (on-hit Katarina),
+    /// so augments and later updates see the style the build is for. A playstyle you picked yourself stays.
+    /// </summary>
+    private BuildRecommendation Recommend(AllGameData game, GameAnalysis analysis, IReadOnlyList<AugmentInfo> augments, Archetype? playstyle,
+        IReadOnlySet<int> popular, IReadOnlyList<MetaBuild> metaBuilds)
+    {
+        var withMeta = analysis with { MetaBuilds = metaBuilds, ChosenPlaystyle = playstyle, KeepMeta = _keepMeta };
+        var rec = _engine.Recommend(withMeta);
+        if (playstyle is null && rec.Meta is { } meta && meta.Build.Style != analysis.Me.Archetype
+            && GameAnalyzer.Analyze(game, data, augments, meta.Build.Style, popular) is { } restyled)
+        {
+            var again = _engine.Recommend(restyled with { MetaBuilds = metaBuilds, KeepMeta = _keepMeta, ForcedMeta = meta.Build.Key });
+            rec = again with { Meta = again.Meta is { } m ? meta with { Swap = m.Swap } : meta };
+        }
+        _keepMeta = rec.Meta?.Build.Key;
+        return rec;
+    }
 
     // Recompute whenever something that moves stats or threat changes: items, levels, kills and deaths.
     // Gold ticks alone don't change the build.

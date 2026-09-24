@@ -201,6 +201,11 @@ public sealed class MainViewModel : INotifyPropertyChanged
     /// <summary>"Marksman ▾": opens the playstyle menu in game.</summary>
     public string PlaystyleLabel { get => _playstyleLabel; private set => Set(ref _playstyleLabel, value); }
 
+    private string _buildSource = "";
+
+    /// <summary>Where the build comes from: "Build: op.gg's on-hit build (56.8% win rate over 444 games), over the AP burst build (43.7%)."</summary>
+    public string BuildSource { get => _buildSource; private set => Set(ref _buildSource, value); }
+
     public IReadOnlyList<PlaystyleOption> LivePlaystyles { get => _livePlaystyles; private set => Set(ref _livePlaystyles, value); }
 
     /// <summary>Looks up your lane matchup in game. Set by the app.</summary>
@@ -385,7 +390,10 @@ public sealed class MainViewModel : INotifyPropertyChanged
         // A new playstyle is your decision, not the game's: take its build right away instead of suggesting a pivot.
         // The same goes for op.gg's popular items arriving just after the game starts, or being switched on or off.
         if (_planner.Latest?.Game is { } previous && previous.Me.Champion.Id == rec.Game.Me.Champion.Id
-            && (previous.Me.Archetype != rec.Game.Me.Archetype || !previous.PopularItems.SetEquals(rec.Game.PopularItems)))
+            && (previous.ChosenPlaystyle != rec.Game.ChosenPlaystyle
+                || (previous.ChosenPlaystyle is null && previous.MetaBuilds.Count == 0 && previous.Me.Archetype != rec.Game.Me.Archetype)
+                || !previous.PopularItems.SetEquals(rec.Game.PopularItems)
+                || previous.MetaBuilds.Count != rec.Game.MetaBuilds.Count))
             _planner.Reset();
 
         _planner.Items = data.Items;
@@ -425,7 +433,11 @@ public sealed class MainViewModel : INotifyPropertyChanged
         Raise(nameof(ShowChampSelect), nameof(ShowFullLive), nameof(ShowCompactLive), nameof(ShowHistory));
         Status = $"Live · {TimeSpan.FromSeconds(rec.Game.GameTimeSeconds):mm\\:ss} · {rec.Game.Mode.DisplayName()}";
         ChampionLine = me.Name;
-        PlaystyleLabel = $"{me.Archetype.DisplayName()} ▾";
+        // When the app picked the style from op.gg's builds, name the build: "Crit build" says more than "Marksman" for a Garen.
+        PlaystyleLabel = rec.Meta is { } picked && rec.Game.ChosenPlaystyle is null
+            ? $"{char.ToUpperInvariant(picked.Build.Name[0])}{picked.Build.Name[1..]} ▾"
+            : $"{me.Archetype.DisplayName()} ▾";
+        BuildSource = rec.Meta is { } meta ? $"Build: {meta.Text}{(meta.Swap is null ? "" : $" For this game: {meta.Swap}.")}" : "";
         LivePlaystyles = Playstyles.All.Select(a => new PlaystyleOption(a, a.DisplayName(), a == me.Archetype)).ToList();
         _ = ShowMatchupAsync(rec.Game);
 

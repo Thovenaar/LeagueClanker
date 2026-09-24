@@ -1,6 +1,6 @@
 # LeagueClanker
 
-A local Windows app that watches your League of Legends game and ranks what to buy next. It works out every player's stats from their champion, level and items, and recomputes whenever anyone's items, level or K/D change, every 2 seconds at most.
+A local Windows app that watches your League of Legends game and tells you what to buy next. It takes the builds players actually use for your champion on op.gg and picks the one that fits this game: on-hit Katarina against three tanks, AP burst against squishies. It works out every player's stats from their champion, level and items, and recomputes whenever anyone's items, level or K/D change, every 2 seconds at most.
 
 The window shows the build you accepted, and what your gold buys toward the next item right now. When the game shifts enough that a different build would clearly be better, it suggests a pivot, and you choose. Decline, and it won't nag about those items again, but "Switch anyway" stays one click away.
 
@@ -80,7 +80,7 @@ dotnet run --project src/LeagueClanker.App -- --champselect samples/champselect/
 
 `samples/champselect/top-vs-darius.json` is a top laner who hasn't locked in yet, against a Darius, so it shows counter picks. `samples/champselect/ban-phase.json` is the same player during bans, with an all-AD team. `samples/champselect/swiftplay.json` is a Swiftplay lobby with two champions.
 
-`samples/arena/jinx-round5.json` is an Arena game and `samples/mayhem/ashe-classic.json` an ARAM: Mayhem Classic game.
+`samples/arena/jinx-round5.json` is an Arena game and `samples/mayhem/ashe-classic.json` an ARAM: Mayhem Classic game. `samples/mayhem/katarina-vs-tanks.json` is Katarina against three tanks and a healer, where op.gg's on-hit build wins over the AP one.
 
 `--games` shows a copy of a saved game history instead of your own, so the recap and your champions appear without playing. It combines with `--champselect`:
 
@@ -94,7 +94,7 @@ Point it at a folder to replay snapshots in order, one every 10 seconds. `sample
 dotnet run --project src/LeagueClanker.App -- --demo samples/pivot-demo
 ```
 
-The CLI prints the same output as text, which is faster when tuning rules:
+The CLI prints the same output as text, which is faster when tuning rules. It follows op.gg's builds like the app, unless you add `--no-meta`:
 
 ```bash
 dotnet run --project src/LeagueClanker.Cli -- samples/three-tanks.json
@@ -253,12 +253,23 @@ The same source decides the rest of what *Apply* writes. The settings choose whi
 - **Skill order.** Which ability to max first and the first six levels, from op.gg's most played order.
 - **Item set.** A set named "LeagueClanker Jinx" in the shop's recommended tab. It has starting items (op.gg's most played start, or a Doran's item, jungle pet or World Atlas), the item advisor's core build for this game with your playstyle against the enemies you can see, boots, situational items, and op.gg's most played three-item core. Your own item sets are read first and written back untouched. Only a set LeagueClanker wrote for the same champion gets replaced.
 
+### Builds: op.gg's builds, picked for each game
+
+Scoring every item on its own gave builds that looked random: full AP Katarina into three tanks, when Blade of the Ruined King and Kraken Slayer were clearly better. So the build now starts from what players build. `MetaBuilds` takes op.gg's core builds (the first three items) for your champion in your role, or in ARAM:
+
+1. **Styles.** Cores with at least 50 games are grouped by the playstyle their items belong to: on-hit, AP, crit, bruiser, tank and so on, at most four. Each style gets its most played core, plus up to three later items that players of that style finish with. Stormsurge is popular on Katarina, but it isn't an on-hit item, so the on-hit build doesn't get it.
+2. **Choosing.** Each style scores its win rate (0.2 points per percentage point above or below 50%, trusted by sample size: games divided by games plus 200), how well its items answer this game's situations (the same rules as below: tanks, healing, damage split), 1 point for each item of it you already own, and 0.5 for the build chosen last time so close builds don't swap back and forth.
+3. **Your playstyle follows.** The chosen build's style becomes your playstyle, in game and in champ select, so runes and augment advice match it. You don't need to pick on-hit by hand. A playstyle you pick yourself stays, and limits the choice to builds of that kind.
+4. **One swap at most.** A later item (never the first three) is swapped when another item answers this game at least 1 point better, with a real reason, like anti-heal against healers. The window says so: "For this game: Chempunk Chainsword instead of Terminus: enemy has heavy healing".
+
+The window shows which build it follows and why: "Build: op.gg's on-hit build (56.8% win rate over 444 games), over the AP burst build (43.7%)." When the chosen build changes mid-game, it's a pivot you accept, like any other. Without op.gg's data (Arena, League Classic, a rare pick, op.gg down, or the setting off), items are scored one by one as before.
+
 ### In game: what to buy, tips and compact mode
 
 - **Buy now.** The card above your build turns your current gold into a purchase toward your next item. The shop only charges for the parts you don't own yet, so it counts those. When the whole item is affordable it says so ("Buy Black Cleaver now: 1,100g with the parts you have"). Otherwise it picks the parts that spend the most of your gold, bigger parts first: "1,450 gold: buy Spectre's Cowl (1,250g) toward Kaenic Rookern (2,900g left)". When nothing fits, it says how much to save up. It follows your gold in steps of 50.
 - **Starting items.** In the first two minutes of a Summoner's Rift game, before you buy anything, it shows what to start with: op.gg's most played start, or a Doran's item, a jungle pet or World Atlas.
 - **Tips.** Once all six item slots hold finished items, it suggests swapping your weakest item when a new one scores at least a point higher for this game. From 25 minutes, with 500 gold spare, it suggests an elixir for your playstyle. Supports, junglers and full builds get a reminder to carry a Control Ward.
-- **op.gg's popular items.** With op.gg as the stats source, the two most played cores for your champion get a small nudge in the ranking (the `PopularItemsRule`). The game's situations still decide, so a popular item that doesn't fit this game stays low. You can turn this off in the settings.
+- **op.gg's builds.** With op.gg as the stats source, your build is one that players actually use. See *Builds* below.
 - **Your items and slots.** A "You have" row shows your finished items and boots. The plan below it only lists what fits in your remaining slots, and when all six are full it points to the swap tips.
 - **Other ways to go.** Under your plan, up to 3 alternatives each take the build a different way: an answer to the game ("Vs tanks: Void Staff") or a different kind of item ("Tankier: Zhonya's Hourglass", "More AP: Rabadon's Deathcap").
 - **Finishing what you started.** When you own parts worth at least a quarter of an item in your plan (`BuildPlanner.StartedShare`), that item comes next, and a pivot won't drop it. An item also needs to outscore the one ahead of it by 0.5 (`ReorderMargin`) to move ahead, so two close items don't swap places every time your stats change.
@@ -276,7 +287,7 @@ In champ select, counter picks you've played at least 3 times (`PersonalStats.Mi
 
 ### Settings, logs and snapshots
 
-The gear in the title bar opens the settings: the stats source, what *Apply* writes, *Apply automatically*, compact mode, op.gg's popular items, arammayhem.com's augment win rates, sounds, and the update check. Settings are saved in `%LOCALAPPDATA%\LeagueClanker\settings.json`.
+The gear in the title bar opens the settings: the stats source, what *Apply* writes, *Apply automatically*, compact mode, following op.gg's builds, arammayhem.com's augment win rates, sounds, and the update check. Settings are saved in `%LOCALAPPDATA%\LeagueClanker\settings.json`.
 
 <img src="docs/screenshots/settings.png" alt="Settings" width="400">
 
@@ -399,6 +410,7 @@ To add a rule, implement `IBuildRule`, return a `Situation` with a label, a sent
 - Only stats, keyword traits and the passives `ItemScaling` can read count. Stacks without a number in the description (Heartsteel's health, Mejai's Glory) and mana-based passives (Archangel's Staff, Manamune) are invisible to the scorer. The core-item bonus papers over some of this.
 - "Buy now" plans toward your next item only. It doesn't pick up a cheap part of a later item when your gold doesn't fit the next one.
 - Your own archetype comes from Riot's class tags plus a short override list. Off-meta picks like AP Shaco get the wrong item pool. A manual archetype picker in the window would fix it.
+- ARAM: Mayhem builds use op.gg's ARAM data; augments can change what's best. Later items come from op.gg's list for the champion as a whole, filtered by style, not from the players of that exact core.
 - Community win rates cover Mayhem only. Arena cards still score from their effects alone. The win rates are over all champions; only "a top pick on your champion" is champion-specific.
 - In Arena the whole lobby counts as enemies, because the API doesn't show your duo partner. Rules that count enemies (tanks, healers) fire more easily with 15 of them.
 - Swiftplay slot writing has been tested against a simulated client only, like the rest of what *Apply* writes.

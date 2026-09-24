@@ -406,6 +406,8 @@
                         <Button Style="{StaticResource LinkButton}" Content="{Binding PlaystyleLabel}" Margin="5,0,0,0" Click="OnPlaystyleMenu"
                                 ToolTip="Change how you play this champion, e.g. AP instead of AD" AutomationProperties.Name="Change playstyle" />
                     </StackPanel>
+                    <TextBlock Text="{Binding BuildSource}" Foreground="{StaticResource MutedBrush}" FontSize="11" TextWrapping="Wrap" Margin="0,0,0,6"
+                               Visibility="{Binding BuildSource, Converter={StaticResource HasContent}}" />
                     <TextBlock Text="{Binding MatchupLine}" Foreground="{StaticResource MutedBrush}" FontSize="11" TextTrimming="CharacterEllipsis" Margin="0,0,0,8"
                                Visibility="{Binding MatchupLine, Converter={StaticResource HasContent}}" ToolTip="Your lane matchup on op.gg, all ranks" />
                     <TextBlock Text="{Binding MatchupNote}" Foreground="{StaticResource AccentBrush}" FontSize="11" TextWrapping="Wrap" Margin="0,-4,0,8"
@@ -784,7 +786,7 @@
                         <TextBlock Text="Compact mode: only the next item, what to buy and the matchup" TextWrapping="Wrap" />
                     </CheckBox>
                     <CheckBox Style="{StaticResource SettingCheck}" IsChecked="{Binding UsePopularItems}">
-                        <TextBlock Text="Favor op.gg's most played items for your champion (needs op.gg as the stats source)" TextWrapping="Wrap" />
+                        <TextBlock Text="Follow op.gg's builds for your champion, picked for each game (needs op.gg as the stats source)" TextWrapping="Wrap" />
                     </CheckBox>
                     <CheckBox Style="{StaticResource SettingCheck}" IsChecked="{Binding UseCommunityAugments}">
                         <TextBlock Text="Start Mayhem augment scores from arammayhem.com's win rates and your champion's most taken cards" TextWrapping="Wrap" />

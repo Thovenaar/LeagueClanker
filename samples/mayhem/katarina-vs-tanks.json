@@ -1,0 +1,753 @@
+{
+ "activePlayer": {
+  "abilities": {
+   "E": {
+    "abilityLevel": 4,
+    "displayName": "Judgment",
+    "id": "GarenE",
+    "rawDescription": "GeneratedTip_Spell_GarenE_Description",
+    "rawDisplayName": "GeneratedTip_Spell_GarenE_DisplayName"
+   },
+   "Passive": {
+    "displayName": "Perseverance",
+    "id": "GarenPassive",
+    "rawDescription": "GeneratedTip_Passive_GarenPassive_Description",
+    "rawDisplayName": "GeneratedTip_Passive_GarenPassive_DisplayName"
+   },
+   "Q": {
+    "abilityLevel": 2,
+    "displayName": "Decisive Strike",
+    "id": "GarenQ",
+    "rawDescription": "GeneratedTip_Spell_GarenQ_Description",
+    "rawDisplayName": "GeneratedTip_Spell_GarenQ_DisplayName"
+   },
+   "R": {
+    "abilityLevel": 1,
+    "displayName": "Demacian Justice",
+    "id": "GarenR",
+    "rawDescription": "GeneratedTip_Spell_GarenR_Description",
+    "rawDisplayName": "GeneratedTip_Spell_GarenR_DisplayName"
+   },
+   "W": {
+    "abilityLevel": 1,
+    "displayName": "Courage",
+    "id": "GarenW",
+    "rawDescription": "GeneratedTip_Spell_GarenW_Description",
+    "rawDisplayName": "GeneratedTip_Spell_GarenW_DisplayName"
+   }
+  },
+  "championStats": {
+   "abilityHaste": 10.0,
+   "abilityPower": 60.0,
+   "armor": 85.30799865722656,
+   "armorPenetrationFlat": 0.0,
+   "armorPenetrationPercent": 1.0,
+   "attackDamage": 90.0,
+   "attackRange": 175.0,
+   "attackSpeed": 0.7787562608718872,
+   "bonusArmorPenetrationPercent": 1.0,
+   "bonusMagicPenetrationPercent": 1.0,
+   "critChance": 0.0,
+   "critDamage": 200.0,
+   "currentHealth": 1500.0,
+   "healShieldPower": 0.0,
+   "healthRegenRate": 28.493919372558594,
+   "lifeSteal": 0.0,
+   "magicLethality": 0.0,
+   "magicPenetrationFlat": 0.0,
+   "magicPenetrationPercent": 1.0,
+   "magicResist": 141.44699096679688,
+   "maxHealth": 1500.0,
+   "moveSpeed": 365.0,
+   "omnivamp": 0.0,
+   "physicalLethality": 0.0,
+   "physicalVamp": 0.0,
+   "resourceMax": 0.0,
+   "resourceRegenRate": 0.0,
+   "resourceType": "NONE",
+   "resourceValue": 0.0,
+   "spellVamp": 0.0,
+   "tenacity": 5.0
+  },
+  "currentGold": 1200.0,
+  "fullRunes": {},
+  "level": 9,
+  "riotId": "Player1#EUW",
+  "riotIdGameName": "Player1",
+  "riotIdTagLine": "EUW",
+  "summonerName": "Player1",
+  "teamRelativeColors": true
+ },
+ "allPlayers": [
+  {
+   "championName": "Katarina",
+   "isBot": false,
+   "isDead": false,
+   "items": [
+    {
+     "canUse": false,
+     "consumable": false,
+     "count": 1,
+     "displayName": "Sorcerer's Shoes",
+     "itemID": 3020,
+     "price": 1100,
+     "rawDescription": "GeneratedTip_Item_3020_Description",
+     "rawDisplayName": "Item_3020_Name",
+     "slot": 0
+    },
+    {
+     "canUse": false,
+     "consumable": false,
+     "count": 1,
+     "displayName": "Amplifying Tome",
+     "itemID": 1052,
+     "price": 400,
+     "rawDescription": "GeneratedTip_Item_1052_Description",
+     "rawDisplayName": "Item_1052_Name",
+     "slot": 1
+    },
+    {
+     "canUse": false,
+     "consumable": false,
+     "count": 1,
+     "displayName": "Poro-Snax",
+     "itemID": 2052,
+     "price": 0,
+     "rawDescription": "GeneratedTip_Item_2052_Description",
+     "rawDisplayName": "Item_2052_Name",
+     "slot": 2
+    }
+   ],
+   "level": 9,
+   "position": "",
+   "rawChampionName": "game_character_displayname_Katarina",
+   "rawSkinName": "game_character_skin_displayname_Katarina_0",
+   "respawnTimer": 0.0,
+   "riotId": "Player1#EUW",
+   "riotIdGameName": "Player1",
+   "riotIdTagLine": "EUW",
+   "runes": null,
+   "scores": {
+    "assists": 3,
+    "creepScore": 40,
+    "deaths": 2,
+    "kills": 2,
+    "wardScore": 0.0
+   },
+   "skinID": 0,
+   "skinName": "default",
+   "summonerName": "Player1",
+   "summonerSpells": {
+    "summonerSpellOne": {
+     "displayName": "Mark",
+     "rawDescription": "GeneratedTip_SummonerSpell_SummonerSnowball_Description",
+     "rawDisplayName": "GeneratedTip_SummonerSpell_SummonerSnowball_DisplayName"
+    },
+    "summonerSpellTwo": {
+     "displayName": "Flash",
+     "rawDescription": "GeneratedTip_SummonerSpell_SummonerFlash_Description",
+     "rawDisplayName": "GeneratedTip_SummonerSpell_SummonerFlash_DisplayName"
+    }
+   },
+   "team": "ORDER"
+  },
+  {
+   "championName": "Jinx",
+   "isBot": false,
+   "isDead": false,
+   "items": [
+    {
+     "canUse": false,
+     "consumable": false,
+     "count": 1,
+     "displayName": "Infinity Edge",
+     "itemID": 3031,
+     "price": 3500,
+     "rawDescription": "GeneratedTip_Item_3031_Description",
+     "rawDisplayName": "Item_3031_Name",
+     "slot": 0
+    },
+    {
+     "canUse": false,
+     "consumable": false,
+     "count": 1,
+     "displayName": "Berserker's Greaves",
+     "itemID": 3006,
+     "price": 1100,
+     "rawDescription": "GeneratedTip_Item_3006_Description",
+     "rawDisplayName": "Item_3006_Name",
+     "slot": 1
+    }
+   ],
+   "level": 9,
+   "position": "",
+   "rawChampionName": "game_character_displayname_Jinx",
+   "rawSkinName": "game_character_skin_displayname_Jinx_0",
+   "respawnTimer": 0.0,
+   "riotId": "Player2#EUW",
+   "riotIdGameName": "Player2",
+   "riotIdTagLine": "EUW",
+   "runes": null,
+   "scores": {
+    "assists": 3,
+    "creepScore": 40,
+    "deaths": 2,
+    "kills": 2,
+    "wardScore": 0.0
+   },
+   "skinID": 0,
+   "skinName": "default",
+   "summonerName": "Player2",
+   "summonerSpells": {
+    "summonerSpellOne": {
+     "displayName": "Mark",
+     "rawDescription": "GeneratedTip_SummonerSpell_SummonerSnowball_Description",
+     "rawDisplayName": "GeneratedTip_SummonerSpell_SummonerSnowball_DisplayName"
+    },
+    "summonerSpellTwo": {
+     "displayName": "Flash",
+     "rawDescription": "GeneratedTip_SummonerSpell_SummonerFlash_Description",
+     "rawDisplayName": "GeneratedTip_SummonerSpell_SummonerFlash_DisplayName"
+    }
+   },
+   "team": "ORDER"
+  },
+  {
+   "championName": "Lux",
+   "isBot": false,
+   "isDead": false,
+   "items": [
+    {
+     "canUse": false,
+     "consumable": false,
+     "count": 1,
+     "displayName": "Luden's Echo",
+     "itemID": 6655,
+     "price": 2750,
+     "rawDescription": "GeneratedTip_Item_6655_Description",
+     "rawDisplayName": "Item_6655_Name",
+     "slot": 0
+    },
+    {
+     "canUse": false,
+     "consumable": false,
+     "count": 1,
+     "displayName": "Sorcerer's Shoes",
+     "itemID": 3020,
+     "price": 1100,
+     "rawDescription": "GeneratedTip_Item_3020_Description",
+     "rawDisplayName": "Item_3020_Name",
+     "slot": 1
+    }
+   ],
+   "level": 9,
+   "position": "",
+   "rawChampionName": "game_character_displayname_Lux",
+   "rawSkinName": "game_character_skin_displayname_Lux_0",
+   "respawnTimer": 0.0,
+   "riotId": "Player3#EUW",
+   "riotIdGameName": "Player3",
+   "riotIdTagLine": "EUW",
+   "runes": null,
+   "scores": {
+    "assists": 3,
+    "creepScore": 40,
+    "deaths": 2,
+    "kills": 2,
+    "wardScore": 0.0
+   },
+   "skinID": 0,
+   "skinName": "default",
+   "summonerName": "Player3",
+   "summonerSpells": {
+    "summonerSpellOne": {
+     "displayName": "Mark",
+     "rawDescription": "GeneratedTip_SummonerSpell_SummonerSnowball_Description",
+     "rawDisplayName": "GeneratedTip_SummonerSpell_SummonerSnowball_DisplayName"
+    },
+    "summonerSpellTwo": {
+     "displayName": "Flash",
+     "rawDescription": "GeneratedTip_SummonerSpell_SummonerFlash_Description",
+     "rawDisplayName": "GeneratedTip_SummonerSpell_SummonerFlash_DisplayName"
+    }
+   },
+   "team": "ORDER"
+  },
+  {
+   "championName": "Garen",
+   "isBot": false,
+   "isDead": false,
+   "items": [
+    {
+     "canUse": false,
+     "consumable": false,
+     "count": 1,
+     "displayName": "Stridebreaker",
+     "itemID": 6631,
+     "price": 3300,
+     "rawDescription": "GeneratedTip_Item_6631_Description",
+     "rawDisplayName": "Item_6631_Name",
+     "slot": 0
+    },
+    {
+     "canUse": false,
+     "consumable": false,
+     "count": 1,
+     "displayName": "Plated Steelcaps",
+     "itemID": 3047,
+     "price": 1200,
+     "rawDescription": "GeneratedTip_Item_3047_Description",
+     "rawDisplayName": "Item_3047_Name",
+     "slot": 1
+    }
+   ],
+   "level": 9,
+   "position": "",
+   "rawChampionName": "game_character_displayname_Garen",
+   "rawSkinName": "game_character_skin_displayname_Garen_0",
+   "respawnTimer": 0.0,
+   "riotId": "Player4#EUW",
+   "riotIdGameName": "Player4",
+   "riotIdTagLine": "EUW",
+   "runes": null,
+   "scores": {
+    "assists": 3,
+    "creepScore": 40,
+    "deaths": 2,
+    "kills": 2,
+    "wardScore": 0.0
+   },
+   "skinID": 0,
+   "skinName": "default",
+   "summonerName": "Player4",
+   "summonerSpells": {
+    "summonerSpellOne": {
+     "displayName": "Mark",
+     "rawDescription": "GeneratedTip_SummonerSpell_SummonerSnowball_Description",
+     "rawDisplayName": "GeneratedTip_SummonerSpell_SummonerSnowball_DisplayName"
+    },
+    "summonerSpellTwo": {
+     "displayName": "Flash",
+     "rawDescription": "GeneratedTip_SummonerSpell_SummonerFlash_Description",
+     "rawDisplayName": "GeneratedTip_SummonerSpell_SummonerFlash_DisplayName"
+    }
+   },
+   "team": "ORDER"
+  },
+  {
+   "championName": "Thresh",
+   "isBot": false,
+   "isDead": false,
+   "items": [
+    {
+     "canUse": false,
+     "consumable": false,
+     "count": 1,
+     "displayName": "Locket of the Iron Solari",
+     "itemID": 3190,
+     "price": 2200,
+     "rawDescription": "GeneratedTip_Item_3190_Description",
+     "rawDisplayName": "Item_3190_Name",
+     "slot": 0
+    },
+    {
+     "canUse": false,
+     "consumable": false,
+     "count": 1,
+     "displayName": "Mercury's Treads",
+     "itemID": 3111,
+     "price": 1250,
+     "rawDescription": "GeneratedTip_Item_3111_Description",
+     "rawDisplayName": "Item_3111_Name",
+     "slot": 1
+    }
+   ],
+   "level": 9,
+   "position": "",
+   "rawChampionName": "game_character_displayname_Thresh",
+   "rawSkinName": "game_character_skin_displayname_Thresh_0",
+   "respawnTimer": 0.0,
+   "riotId": "Player5#EUW",
+   "riotIdGameName": "Player5",
+   "riotIdTagLine": "EUW",
+   "runes": null,
+   "scores": {
+    "assists": 3,
+    "creepScore": 40,
+    "deaths": 2,
+    "kills": 2,
+    "wardScore": 0.0
+   },
+   "skinID": 0,
+   "skinName": "default",
+   "summonerName": "Player5",
+   "summonerSpells": {
+    "summonerSpellOne": {
+     "displayName": "Mark",
+     "rawDescription": "GeneratedTip_SummonerSpell_SummonerSnowball_Description",
+     "rawDisplayName": "GeneratedTip_SummonerSpell_SummonerSnowball_DisplayName"
+    },
+    "summonerSpellTwo": {
+     "displayName": "Flash",
+     "rawDescription": "GeneratedTip_SummonerSpell_SummonerFlash_Description",
+     "rawDisplayName": "GeneratedTip_SummonerSpell_SummonerFlash_DisplayName"
+    }
+   },
+   "team": "ORDER"
+  },
+  {
+   "championName": "Amumu",
+   "isBot": false,
+   "isDead": false,
+   "items": [
+    {
+     "canUse": false,
+     "consumable": false,
+     "count": 1,
+     "displayName": "Sunfire Aegis",
+     "itemID": 3068,
+     "price": 2800,
+     "rawDescription": "GeneratedTip_Item_3068_Description",
+     "rawDisplayName": "Item_3068_Name",
+     "slot": 0
+    },
+    {
+     "canUse": false,
+     "consumable": false,
+     "count": 1,
+     "displayName": "Mercury's Treads",
+     "itemID": 3111,
+     "price": 1250,
+     "rawDescription": "GeneratedTip_Item_3111_Description",
+     "rawDisplayName": "Item_3111_Name",
+     "slot": 1
+    },
+    {
+     "canUse": false,
+     "consumable": false,
+     "count": 1,
+     "displayName": "Randuin's Omen",
+     "itemID": 3143,
+     "price": 2700,
+     "rawDescription": "GeneratedTip_Item_3143_Description",
+     "rawDisplayName": "Item_3143_Name",
+     "slot": 2
+    }
+   ],
+   "level": 9,
+   "position": "",
+   "rawChampionName": "game_character_displayname_Amumu",
+   "rawSkinName": "game_character_skin_displayname_Amumu_0",
+   "respawnTimer": 0.0,
+   "riotId": "Player6#EUW",
+   "riotIdGameName": "Player6",
+   "riotIdTagLine": "EUW",
+   "runes": null,
+   "scores": {
+    "assists": 3,
+    "creepScore": 40,
+    "deaths": 2,
+    "kills": 2,
+    "wardScore": 0.0
+   },
+   "skinID": 0,
+   "skinName": "default",
+   "summonerName": "Player6",
+   "summonerSpells": {
+    "summonerSpellOne": {
+     "displayName": "Mark",
+     "rawDescription": "GeneratedTip_SummonerSpell_SummonerSnowball_Description",
+     "rawDisplayName": "GeneratedTip_SummonerSpell_SummonerSnowball_DisplayName"
+    },
+    "summonerSpellTwo": {
+     "displayName": "Flash",
+     "rawDescription": "GeneratedTip_SummonerSpell_SummonerFlash_Description",
+     "rawDisplayName": "GeneratedTip_SummonerSpell_SummonerFlash_DisplayName"
+    }
+   },
+   "team": "CHAOS"
+  },
+  {
+   "championName": "Illaoi",
+   "isBot": false,
+   "isDead": false,
+   "items": [
+    {
+     "canUse": false,
+     "consumable": false,
+     "count": 1,
+     "displayName": "Sundered Sky",
+     "itemID": 6610,
+     "price": 3100,
+     "rawDescription": "GeneratedTip_Item_6610_Description",
+     "rawDisplayName": "Item_6610_Name",
+     "slot": 0
+    },
+    {
+     "canUse": false,
+     "consumable": false,
+     "count": 1,
+     "displayName": "Plated Steelcaps",
+     "itemID": 3047,
+     "price": 1200,
+     "rawDescription": "GeneratedTip_Item_3047_Description",
+     "rawDisplayName": "Item_3047_Name",
+     "slot": 1
+    },
+    {
+     "canUse": false,
+     "consumable": false,
+     "count": 1,
+     "displayName": "Spirit Visage",
+     "itemID": 3065,
+     "price": 2700,
+     "rawDescription": "GeneratedTip_Item_3065_Description",
+     "rawDisplayName": "Item_3065_Name",
+     "slot": 2
+    }
+   ],
+   "level": 9,
+   "position": "",
+   "rawChampionName": "game_character_displayname_Illaoi",
+   "rawSkinName": "game_character_skin_displayname_Illaoi_0",
+   "respawnTimer": 0.0,
+   "riotId": "Player7#EUW",
+   "riotIdGameName": "Player7",
+   "riotIdTagLine": "EUW",
+   "runes": null,
+   "scores": {
+    "assists": 3,
+    "creepScore": 40,
+    "deaths": 2,
+    "kills": 2,
+    "wardScore": 0.0
+   },
+   "skinID": 0,
+   "skinName": "default",
+   "summonerName": "Player7",
+   "summonerSpells": {
+    "summonerSpellOne": {
+     "displayName": "Mark",
+     "rawDescription": "GeneratedTip_SummonerSpell_SummonerSnowball_Description",
+     "rawDisplayName": "GeneratedTip_SummonerSpell_SummonerSnowball_DisplayName"
+    },
+    "summonerSpellTwo": {
+     "displayName": "Flash",
+     "rawDescription": "GeneratedTip_SummonerSpell_SummonerFlash_Description",
+     "rawDisplayName": "GeneratedTip_SummonerSpell_SummonerFlash_DisplayName"
+    }
+   },
+   "team": "CHAOS"
+  },
+  {
+   "championName": "Alistar",
+   "isBot": false,
+   "isDead": false,
+   "items": [
+    {
+     "canUse": false,
+     "consumable": false,
+     "count": 1,
+     "displayName": "Locket of the Iron Solari",
+     "itemID": 3190,
+     "price": 2200,
+     "rawDescription": "GeneratedTip_Item_3190_Description",
+     "rawDisplayName": "Item_3190_Name",
+     "slot": 0
+    },
+    {
+     "canUse": false,
+     "consumable": false,
+     "count": 1,
+     "displayName": "Plated Steelcaps",
+     "itemID": 3047,
+     "price": 1200,
+     "rawDescription": "GeneratedTip_Item_3047_Description",
+     "rawDisplayName": "Item_3047_Name",
+     "slot": 1
+    },
+    {
+     "canUse": false,
+     "consumable": false,
+     "count": 1,
+     "displayName": "Thornmail",
+     "itemID": 3075,
+     "price": 2450,
+     "rawDescription": "GeneratedTip_Item_3075_Description",
+     "rawDisplayName": "Item_3075_Name",
+     "slot": 2
+    }
+   ],
+   "level": 9,
+   "position": "",
+   "rawChampionName": "game_character_displayname_Alistar",
+   "rawSkinName": "game_character_skin_displayname_Alistar_0",
+   "respawnTimer": 0.0,
+   "riotId": "Player8#EUW",
+   "riotIdGameName": "Player8",
+   "riotIdTagLine": "EUW",
+   "runes": null,
+   "scores": {
+    "assists": 3,
+    "creepScore": 40,
+    "deaths": 2,
+    "kills": 2,
+    "wardScore": 0.0
+   },
+   "skinID": 0,
+   "skinName": "default",
+   "summonerName": "Player8",
+   "summonerSpells": {
+    "summonerSpellOne": {
+     "displayName": "Mark",
+     "rawDescription": "GeneratedTip_SummonerSpell_SummonerSnowball_Description",
+     "rawDisplayName": "GeneratedTip_SummonerSpell_SummonerSnowball_DisplayName"
+    },
+    "summonerSpellTwo": {
+     "displayName": "Flash",
+     "rawDescription": "GeneratedTip_SummonerSpell_SummonerFlash_Description",
+     "rawDisplayName": "GeneratedTip_SummonerSpell_SummonerFlash_DisplayName"
+    }
+   },
+   "team": "CHAOS"
+  },
+  {
+   "championName": "Soraka",
+   "isBot": false,
+   "isDead": false,
+   "items": [
+    {
+     "canUse": false,
+     "consumable": false,
+     "count": 1,
+     "displayName": "Moonstone Renewer",
+     "itemID": 6617,
+     "price": 2200,
+     "rawDescription": "GeneratedTip_Item_6617_Description",
+     "rawDisplayName": "Item_6617_Name",
+     "slot": 0
+    },
+    {
+     "canUse": false,
+     "consumable": false,
+     "count": 1,
+     "displayName": "Ionian Boots of Lucidity",
+     "itemID": 3158,
+     "price": 900,
+     "rawDescription": "GeneratedTip_Item_3158_Description",
+     "rawDisplayName": "Item_3158_Name",
+     "slot": 1
+    }
+   ],
+   "level": 9,
+   "position": "",
+   "rawChampionName": "game_character_displayname_Soraka",
+   "rawSkinName": "game_character_skin_displayname_Soraka_0",
+   "respawnTimer": 0.0,
+   "riotId": "Player9#EUW",
+   "riotIdGameName": "Player9",
+   "riotIdTagLine": "EUW",
+   "runes": null,
+   "scores": {
+    "assists": 3,
+    "creepScore": 40,
+    "deaths": 2,
+    "kills": 2,
+    "wardScore": 0.0
+   },
+   "skinID": 0,
+   "skinName": "default",
+   "summonerName": "Player9",
+   "summonerSpells": {
+    "summonerSpellOne": {
+     "displayName": "Mark",
+     "rawDescription": "GeneratedTip_SummonerSpell_SummonerSnowball_Description",
+     "rawDisplayName": "GeneratedTip_SummonerSpell_SummonerSnowball_DisplayName"
+    },
+    "summonerSpellTwo": {
+     "displayName": "Flash",
+     "rawDescription": "GeneratedTip_SummonerSpell_SummonerFlash_Description",
+     "rawDisplayName": "GeneratedTip_SummonerSpell_SummonerFlash_DisplayName"
+    }
+   },
+   "team": "CHAOS"
+  },
+  {
+   "championName": "Xerath",
+   "isBot": false,
+   "isDead": false,
+   "items": [
+    {
+     "canUse": false,
+     "consumable": false,
+     "count": 1,
+     "displayName": "Luden's Echo",
+     "itemID": 6655,
+     "price": 2750,
+     "rawDescription": "GeneratedTip_Item_6655_Description",
+     "rawDisplayName": "Item_6655_Name",
+     "slot": 0
+    },
+    {
+     "canUse": false,
+     "consumable": false,
+     "count": 1,
+     "displayName": "Sorcerer's Shoes",
+     "itemID": 3020,
+     "price": 1100,
+     "rawDescription": "GeneratedTip_Item_3020_Description",
+     "rawDisplayName": "Item_3020_Name",
+     "slot": 1
+    }
+   ],
+   "level": 9,
+   "position": "",
+   "rawChampionName": "game_character_displayname_Xerath",
+   "rawSkinName": "game_character_skin_displayname_Xerath_0",
+   "respawnTimer": 0.0,
+   "riotId": "Player10#EUW",
+   "riotIdGameName": "Player10",
+   "riotIdTagLine": "EUW",
+   "runes": null,
+   "scores": {
+    "assists": 3,
+    "creepScore": 40,
+    "deaths": 2,
+    "kills": 2,
+    "wardScore": 0.0
+   },
+   "skinID": 0,
+   "skinName": "default",
+   "summonerName": "Player10",
+   "summonerSpells": {
+    "summonerSpellOne": {
+     "displayName": "Mark",
+     "rawDescription": "GeneratedTip_SummonerSpell_SummonerSnowball_Description",
+     "rawDisplayName": "GeneratedTip_SummonerSpell_SummonerSnowball_DisplayName"
+    },
+    "summonerSpellTwo": {
+     "displayName": "Flash",
+     "rawDescription": "GeneratedTip_SummonerSpell_SummonerFlash_Description",
+     "rawDisplayName": "GeneratedTip_SummonerSpell_SummonerFlash_DisplayName"
+    }
+   },
+   "team": "CHAOS"
+  }
+ ],
+ "events": {
+  "Events": [
+   {
+    "EventID": 0,
+    "EventName": "GameStart",
+    "EventTime": 0.1
+   }
+  ]
+ },
+ "gameData": {
+  "gameMode": "KIWI",
+  "gameTime": 447.9970397949219,
+  "mapName": "Map12",
+  "mapNumber": 12,
+  "mapTerrain": "Default"
+ }
+}

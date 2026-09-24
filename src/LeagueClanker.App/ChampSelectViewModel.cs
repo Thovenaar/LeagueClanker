@@ -45,6 +45,11 @@ public sealed class ChampSelectViewModel : INotifyPropertyChanged
     private RuneRecommendation? _runes;
     private SpellRecommendation? _spells;
     private OpggChampion? _opgg;
+    private IReadOnlyList<MetaBuild> _metaBuilds = [];
+    private MetaChoice? _meta;
+
+    // Champions whose default playstyle already followed op.gg's builds. Once per champion, so it can't flip back and forth.
+    private readonly HashSet<string> _metaStyled = [];
     private int _requestVersion;
     private int _matchupVersion;
     private int _draftVersion;
@@ -341,8 +346,21 @@ public sealed class ChampSelectViewModel : INotifyPropertyChanged
     {
         if (_services is null || state.ToGameData() is not { } game || GameAnalyzer.Analyze(game, _services.Data, playstyle: SelectedPlaystyle) is not { } analysis)
             return null;
-        var recommendation = new RecommendationEngine(_services.Data).Recommend(analysis);
+        var chosen = state.Champion is { } champion && _chosen.ContainsKey(champion.Id) ? SelectedPlaystyle : null;
+        var recommendation = new RecommendationEngine(_services.Data).Recommend(analysis with
+        {
+            MetaBuilds = _metaBuilds, ChosenPlaystyle = chosen, ForcedMeta = _meta?.Build.Key,
+        });
         return ItemSetBuilder.Build(recommendation, _services.Data.Items, _opgg);
+    }
+
+    /// <summary>The op.gg build for the game ahead, from the enemies you can see. Null without op.gg's builds.</summary>
+    private MetaChoice? ChooseMeta(ChampSelectState state)
+    {
+        if (_metaBuilds.Count == 0 || _services is null || state.ToGameData() is not { } game || GameAnalyzer.Analyze(game, _services.Data) is not { } analysis)
+            return null;
+        var chosen = state.Champion is { } champion && _chosen.ContainsKey(champion.Id) ? SelectedPlaystyle : null;
+        return new RecommendationEngine(_services.Data).Recommend(analysis with { MetaBuilds = _metaBuilds, ChosenPlaystyle = chosen }).Meta;
     }
 
     private void ShowPlaystyle(Archetype selected)
@@ -375,7 +393,20 @@ public sealed class ChampSelectViewModel : INotifyPropertyChanged
         _runes = runes;
         _spells = spells;
         _opgg = opgg;
+
+        // op.gg's builds decide the default playstyle, like in game: on-hit Katarina against tanks. Your own pick stays.
+        _metaBuilds = opgg is not null && Settings.UsePopularItems ? MetaBuilds.From(opgg, services.Data.Items, state.Mode) : [];
+        _meta = ChooseMeta(state);
+        if (_meta is { } meta && !_chosen.ContainsKey(champion.Id) && _metaStyled.Add(champion.Id) && meta.Build.Style != playstyle)
+        {
+            ShowPlaystyle(meta.Build.Style);
+            _ = RecomputeAsync();
+            return;
+        }
+
         ShowPage(runes, services.Data.Runes);
+        if (_meta is { } chosenBuild)
+            Reasons = [$"Build: {chosenBuild.Text}", .. Reasons];
         ShowSpells(spells, services.Data);
         ShowSkills(opgg?.SkillOrder);
         CanApply = Writer is not null;

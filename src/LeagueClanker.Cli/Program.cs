@@ -15,7 +15,7 @@ using LeagueClanker.Vision;
 
 // Usage:
 //   LeagueClanker.Cli                         watch the live game and print a new build whenever it changes
-//   LeagueClanker.Cli <game.json>             analyze a saved allgamedata snapshot once
+//   LeagueClanker.Cli <game.json> [--no-meta] analyze a saved allgamedata snapshot once, following op.gg's builds unless --no-meta
 //   LeagueClanker.Cli <folder | a.json b.json> [--decline]
 //                                             replay snapshots through the pivot planner, accepting pivots (or declining)
 //   LeagueClanker.Cli --items [map]           list the item catalog with detected traits (map 453 = League Classic)
@@ -339,7 +339,25 @@ async Task<BuildRecommendation?> RecommendAsync(string path, IReadOnlyList<Augme
 {
     var game = await new FileGameDataSource(path).TryGetAsync(cts.Token)
         ?? throw new InvalidOperationException($"{path} does not contain a playable game.");
-    return new BuildAdvisor(new FileGameDataSource(path), data) { Augments = augments ?? [] }.RecommendOnce(game);
+    var advisor = new BuildAdvisor(new FileGameDataSource(path), data) { Augments = augments ?? [] };
+
+    // op.gg's builds for the champion, unless --no-meta. The same as the app does in a live game.
+    if (!args.Contains("--no-meta") && GameAnalyzer.Analyze(game, data) is { Mode: GameMode.SummonersRift or GameMode.Aram or GameMode.AramMayhem } analysis)
+    {
+        try
+        {
+            var aram = analysis.Mode is GameMode.Aram or GameMode.AramMayhem;
+            var champion = await opgg.GetChampionAsync(analysis.Me.Champion.Key, aram, OpggClient.RoleFor(analysis.Me.Position, analysis.Me.Archetype), cts.Token);
+            advisor.MetaBuilds = champion is null ? [] : MetaBuilds.From(champion, data.Items, analysis.Mode);
+            foreach (var build in advisor.MetaBuilds)
+                Console.WriteLine($"op.gg {build.Name}: {string.Join(", ", build.Core.Select(i => i.Name))} | later {string.Join(", ", build.Later.Select(i => i.Name))} | {build.WinRate:P1} over {build.Games:N0} games");
+        }
+        catch (HttpRequestException ex)
+        {
+            Console.WriteLine($"op.gg didn't answer ({ex.Message}), so the build comes from item scores alone.");
+        }
+    }
+    return advisor.RecommendOnce(game);
 }
 
 RuneAdvisor RuneAdvisorFor() => new(new RuleRuneSource(data.Runes), new OpggRuneSource(data.Runes, opgg));
@@ -461,6 +479,15 @@ static void Print(BuildRecommendation? rec, double? gold = null, ItemCatalog? it
     Console.WriteLine(rec.DamageSummary);
     PrintTeam("Your team", [me, .. rec.Game.Allies.Players]);
     PrintTeam("Enemies", rec.Game.Enemies.Players);
+
+    if (rec.Meta is { } meta)
+    {
+        Console.WriteLine($"\nBuild: {meta.Text}");
+        foreach (var (other, score) in meta.Others)
+            Console.WriteLine($"  (score {meta.Score:0.0} against {score:0.0} for the {other.Name})");
+        if (meta.Swap is not null)
+            Console.WriteLine($"  Swapped for this game: {meta.Swap}");
+    }
 
     Console.WriteLine("\nBuy next (most important first):");
     var rank = 1;
