@@ -14,6 +14,10 @@ It explains itself in plain sentences:
 |---|---|---|---|
 | ![Build tab](docs/screenshots/build.png) | ![Pivot suggestion](docs/screenshots/pivot-suggested.png) | ![Pivot declined](docs/screenshots/pivot-declined.png) | ![Players tab](docs/screenshots/players.png) |
 
+In ARAM: Mayhem an Augments tab ranks the cards you're offered:
+
+<img src="docs/screenshots/augments.png" alt="Augments tab" width="400">
+
 The screenshots come from the demo snapshots in `samples/`, not a live game.
 
 ## Running it
@@ -30,6 +34,12 @@ To try it without a game, point it at a saved snapshot:
 
 ```bash
 dotnet run --project src/LeagueClanker.App -- --demo samples/ap-heavy.json
+```
+
+`samples/mayhem/jinx-level7.json` is an ARAM: Mayhem game, so the Augments tab shows up. Add `--scan-image` to have it read the offer from a screenshot instead of the game, e.g. the mock one in the samples:
+
+```bash
+dotnet run --project src/LeagueClanker.App -- --demo samples/mayhem/jinx-level7.json --scan-image samples/mayhem/offer-mock.png
 ```
 
 Point it at a folder to replay snapshots in order, one every 10 seconds. `samples/pivot-demo` is a Garen game where the enemy team switches from AD to AP items, which triggers a pivot suggestion:
@@ -56,7 +66,11 @@ For ARAM: Mayhem augments, give it a snapshot, the offered cards, and the cards 
 dotnet run --project src/LeagueClanker.Cli -- --mayhem samples/mayhem/jinx-level7.json --picked "It's Critical" --offer "Critical Rhythm;Recursion;Celestial Body"
 ```
 
-`--augments` lists all 225 augments with the tags the parser gave them.
+`--augments` lists all 225 augments with the tags the parser gave them. `--scan` reads an offer from a screenshot, or from the running game with `--scan screen`. Add `--verbose` to see every line of text it recognized:
+
+```bash
+dotnet run --project src/LeagueClanker.Cli -- --scan samples/mayhem/offer-mock.png --verbose
+```
 
 To turn one of your own games into a sample, save the API response while in a match:
 
@@ -99,6 +113,12 @@ The advisor reads `gameMode` and the map number from the live game. Summoner's R
 
 ### ARAM: Mayhem augments
 
+The app reads the offer off your screen. Once you reach a pick level (3, 7, 11 or 15) without having taken that many cards, it screenshots the League window every 2 seconds and runs Windows' built-in text recognition on it. That takes about 130 ms. It only looks at the middle of the screen, which skips chat and the HUD, and it blacks out its own window so it never reads its own suggestions. `AugmentTextMatcher` matches the text against the card names by edit distance. That way OCR slips like "CRITICA1" and names that wrap over two lines still count, and a stray card name of another tier elsewhere on screen is ignored. When cards show up, the app switches to the Augments tab with a chime. A reroll changes the offer, and the ranking follows.
+
+It can't see which card you click, only that the cards disappeared, so it asks. Press *I picked this* on the card you took and it joins your cards for the next offer.
+
+You can always type cards instead: type part of a name and mark each match as *Offered* (on screen now) or *Picked* (you already have it). Enter adds the top match to the offer. That covers misread names, cards you picked before starting the app, and exclusive fullscreen, where screenshots come back black.
+
 `Augments/` ranks the three cards in an augment offer by the best final set of four they lead to, without win rates:
 
 1. `AugmentDataClient` downloads the wiki's augment data (225 cards) and caches it for a day. Riot's own data has no Mayhem augments.
@@ -138,7 +158,9 @@ To add a rule, implement `IBuildRule`, return a `Situation` with a label, a sent
 - Your own archetype comes from Riot's class tags plus a short override list. Off-meta picks like AP Shaco get the wrong item pool. A manual archetype picker in the window would fix it.
 - Arena isn't supported. Riot's policy also rules out showing win rates for augments and Arena items, so the augment advisor reasons from card effects only.
 - Augment tags come from description text. Expect some cards to be tagged wrong until they've been reviewed with `--augments`.
-- The app window doesn't show augment advice yet. Reading the offered cards from the screen is the next step.
+- Card names are matched in English, so screen reading needs the League client in English.
+- Screen reading has only been tested on a mock screenshot, not on real games yet.
+- Picked augments don't change the item advice yet, e.g. a crit augment should push crit items up.
 - The core-item lists and weights are my best guess for patch 16.18. Real win-rate data per matchup would beat them.
 
 ## Legal

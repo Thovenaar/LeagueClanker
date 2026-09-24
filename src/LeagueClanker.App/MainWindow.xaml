@@ -84,10 +84,12 @@
                 <StackPanel>
                     <DockPanel Margin="0,2,0,8">
                         <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Bottom">
-                            <RadioButton Style="{StaticResource TabButton}" Content="Build" GroupName="Tabs" IsChecked="{Binding ShowBuild}" />
-                            <RadioButton Style="{StaticResource TabButton}" Content="Players" GroupName="Tabs" IsChecked="{Binding ShowPlayers}" Margin="0" />
+                            <RadioButton Style="{StaticResource TabButton}" Content="Build" GroupName="Tabs" IsChecked="{Binding IsBuildTab}" />
+                            <RadioButton Style="{StaticResource TabButton}" Content="Augments" GroupName="Tabs" IsChecked="{Binding IsAugmentsTab}"
+                                         Visibility="{Binding HasAugments, Converter={StaticResource BoolToVisibility}}" />
+                            <RadioButton Style="{StaticResource TabButton}" Content="Players" GroupName="Tabs" IsChecked="{Binding IsPlayersTab}" Margin="0" />
                         </StackPanel>
-                        <TextBlock Text="{Binding ChampionLine}" FontSize="16" FontWeight="SemiBold" />
+                        <TextBlock Text="{Binding ChampionLine}" FontSize="16" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" Margin="0,0,12,0" />
                     </DockPanel>
 
                     <!-- Enemy damage split bar -->
@@ -102,7 +104,7 @@
                     </Grid>
 
                     <!-- ===== Build tab ===== -->
-                    <StackPanel Visibility="{Binding ShowBuild, Converter={StaticResource BoolToVisibility}}">
+                    <StackPanel Visibility="{Binding IsBuildTab, Converter={StaticResource BoolToVisibility}}">
 
                         <!-- Pivot suggestion: accept or keep your build -->
                         <Border Visibility="{Binding HasPivot, Converter={StaticResource BoolToVisibility}}"
@@ -204,8 +206,124 @@
                         </ItemsControl>
                     </StackPanel>
 
+                    <!-- ===== Augments tab (ARAM: Mayhem) ===== -->
+                    <Grid Visibility="{Binding IsAugmentsTab, Converter={StaticResource BoolToVisibility}}">
+                    <StackPanel DataContext="{Binding Augments}" Margin="0,0,0,8">
+                        <TextBlock Text="{Binding Status}" Foreground="{StaticResource MutedBrush}" FontSize="11" TextWrapping="Wrap" Margin="0,12,0,0" />
+
+                        <TextBlock Style="{StaticResource SectionHeader}" Text="YOUR CARDS" />
+                        <TextBlock Text="None yet" Foreground="{StaticResource MutedBrush}" FontSize="11"
+                                   Visibility="{Binding Picked, Converter={StaticResource HasContent}, ConverterParameter=invert}" />
+                        <ItemsControl ItemsSource="{Binding Picked}">
+                            <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate DataType="{x:Type local:AugmentRow}">
+                                    <Border Background="{StaticResource CardBrush}" CornerRadius="4" Padding="8,3,4,3" Margin="0,0,6,6" ToolTip="{Binding Description}">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Style="{StaticResource TierName}" Text="{Binding Name}" FontSize="12" />
+                                            <Button Style="{StaticResource RemoveButton}" Content="✕" ToolTip="Remove" Click="OnRemovePicked"
+                                                    AutomationProperties.Name="{Binding Name, StringFormat=Remove picked {0}}" />
+                                        </StackPanel>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+
+                        <TextBlock Style="{StaticResource SectionHeader}" Text="OFFERED NOW" />
+                        <ItemsControl ItemsSource="{Binding Offer}">
+                            <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate DataType="{x:Type local:AugmentRow}">
+                                    <Border BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="4" Padding="8,3,4,3" Margin="0,0,6,6" ToolTip="{Binding Description}">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Style="{StaticResource TierName}" Text="{Binding Name}" FontSize="12" />
+                                            <Button Style="{StaticResource RemoveButton}" Content="✕" ToolTip="Remove" Click="OnRemoveOffer"
+                                                    AutomationProperties.Name="{Binding Name, StringFormat=Remove offered {0}}" />
+                                        </StackPanel>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+
+                        <!-- Search: Enter adds the top match to the offer -->
+                        <Grid Margin="0,2,0,4">
+                            <TextBox x:Name="AugmentSearch" Style="{StaticResource SearchBox}" AutomationProperties.AutomationId="AugmentSearch"
+                                     Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}" KeyDown="OnAugmentSearchKeyDown"
+                                     IsEnabled="{Binding IsAvailable}" />
+                            <TextBlock Text="Type a card name, e.g. crit" IsHitTestVisible="False" Foreground="{StaticResource MutedBrush}"
+                                       FontSize="12" Margin="10,0,0,0" VerticalAlignment="Center"
+                                       Visibility="{Binding SearchText, Converter={StaticResource HasContent}, ConverterParameter=invert}" />
+                        </Grid>
+                        <ItemsControl ItemsSource="{Binding Suggestions}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate DataType="{x:Type local:AugmentRow}">
+                                    <Border Background="{StaticResource CardBrush}" CornerRadius="4" Padding="8,4" Margin="0,0,0,3" ToolTip="{Binding Description}">
+                                        <DockPanel>
+                                            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                                                <Button Style="{StaticResource SmallButton}" Content="Offered" Click="OnOfferSuggestion"
+                                                        ToolTip="It's in the offer on screen" AutomationProperties.Name="{Binding Name, StringFormat=Offer {0}}" />
+                                                <Button Style="{StaticResource SmallButton}" Content="Picked" Click="OnPickedSuggestion" Margin="4,0,0,0"
+                                                        ToolTip="You already have it" AutomationProperties.Name="{Binding Name, StringFormat=Have {0}}" />
+                                            </StackPanel>
+                                            <TextBlock Text="{Binding Tier}" Foreground="{StaticResource MutedBrush}" FontSize="10" DockPanel.Dock="Right" VerticalAlignment="Center" Margin="0,0,8,0" />
+                                            <TextBlock Style="{StaticResource TierName}" Text="{Binding Name}" FontSize="12" />
+                                        </DockPanel>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+
+                        <!-- Suggestion, same look as the pivot card -->
+                        <Border Visibility="{Binding AdviceText, Converter={StaticResource HasContent}}"
+                                BorderBrush="{StaticResource AccentBrush}" BorderThickness="1" CornerRadius="6"
+                                Background="#1FC8AA6E" Padding="10,8" Margin="0,10,0,6">
+                            <StackPanel>
+                                <TextBlock Text="SUGGESTED PICK" Foreground="{StaticResource AccentBrush}" FontSize="10" FontWeight="Bold" />
+                                <TextBlock Text="{Binding AdviceText}" TextWrapping="Wrap" FontSize="12" Margin="0,3,0,0" />
+                            </StackPanel>
+                        </Border>
+                        <TextBlock Text="Simulating future picks..." Foreground="{StaticResource MutedBrush}" FontSize="11"
+                                   Visibility="{Binding IsRanking, Converter={StaticResource BoolToVisibility}}" />
+
+                        <ItemsControl ItemsSource="{Binding Ranked}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate DataType="{x:Type local:AugmentOptionRow}">
+                                    <Border Background="{StaticResource CardBrush}" CornerRadius="6" Padding="8,6" Margin="0,0,0,4" ToolTip="{Binding Description}">
+                                        <StackPanel>
+                                            <DockPanel>
+                                                <Button DockPanel.Dock="Right" Style="{StaticResource SmallButton}" Content="I picked this" Click="OnPickOption"
+                                                        AutomationProperties.Name="{Binding Name, StringFormat=I picked {0}}" />
+                                                <StackPanel Orientation="Horizontal">
+                                                    <TextBlock Text="{Binding Rank}" Foreground="{StaticResource AccentBrush}" FontWeight="Bold" Width="18" VerticalAlignment="Center" />
+                                                    <TextBlock Style="{StaticResource TierName}" Text="{Binding Name}" FontSize="13" />
+                                                    <Border Background="{StaticResource AccentBrush}" CornerRadius="3" Padding="4,0" Margin="6,0,0,0" VerticalAlignment="Center"
+                                                            Visibility="{Binding IsBest, Converter={StaticResource BoolToVisibility}}">
+                                                        <TextBlock Text="BEST" FontSize="9" FontWeight="Bold" Foreground="#FF0E1217" />
+                                                    </Border>
+                                                </StackPanel>
+                                            </DockPanel>
+                                            <TextBlock Text="{Binding Scores}" Foreground="{StaticResource MutedBrush}" FontSize="10" Margin="18,1,0,2" />
+                                            <ItemsControl ItemsSource="{Binding Reasons}" Margin="18,0,0,0">
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <TextBlock Text="{Binding}" FontSize="11" TextWrapping="Wrap" />
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                            <TextBlock Text="{Binding Combos}" Foreground="{StaticResource MutedBrush}" FontSize="11" TextWrapping="Wrap" Margin="18,2,0,0"
+                                                       Visibility="{Binding Combos, Converter={StaticResource HasContent}}" />
+                                        </StackPanel>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+
+                        <TextBlock Text="{Binding Attribution}" Foreground="{StaticResource MutedBrush}" FontSize="10" Margin="0,6,0,0" />
+                    </StackPanel>
+                    </Grid>
+
                     <!-- ===== Players tab ===== -->
-                    <StackPanel Visibility="{Binding ShowPlayers, Converter={StaticResource BoolToVisibility}}" Margin="0,0,0,8">
+                    <StackPanel Visibility="{Binding IsPlayersTab, Converter={StaticResource BoolToVisibility}}" Margin="0,0,0,8">
                         <TextBlock Style="{StaticResource SectionHeader}" Text="ENEMIES" />
                         <ContentControl Template="{StaticResource PlayerHeader}" />
                         <ItemsControl ItemsSource="{Binding Enemies}" ItemTemplate="{StaticResource PlayerRowTemplate}" />

@@ -4,6 +4,7 @@ using LeagueClanker.Core.Augments;
 using LeagueClanker.Core.LiveClient;
 using LeagueClanker.Core.Recommendation;
 using LeagueClanker.Core.StaticData;
+using LeagueClanker.Vision;
 
 // Usage:
 //   LeagueClanker.Cli                         watch the live game and print a new build whenever it changes
@@ -72,6 +73,27 @@ if (args is ["--mayhem", var gamePath, ..])
             Console.WriteLine($"     combos later: {string.Join(", ", option.Partners)}");
     }
     Console.WriteLine($"\n{advice.Text}\n{AugmentDataClient.Attribution}");
+    return;
+}
+
+if (args is ["--scan", var source, ..])
+{
+    var augments = await new AugmentDataClient().LoadMayhemAsync(data.Items, cts.Token);
+    var reader = new AugmentScreenReader(augments);
+    Console.WriteLine($"OCR language: {reader.OcrLanguage}");
+
+    var started = DateTime.UtcNow;
+    var scan = source == "screen" ? await reader.ScanScreenAsync() : await reader.ScanFileAsync(source);
+    Console.WriteLine($"Scanned in {(DateTime.UtcNow - started).TotalMilliseconds:0} ms.");
+    if (scan.Problem is not null)
+        Console.WriteLine(scan.Problem);
+    if (args.Contains("--verbose"))
+        foreach (var line in scan.Lines)
+            Console.WriteLine($"   text at ({line.X:0},{line.Y:0}): {line.Text}");
+
+    Console.WriteLine(scan.Offer.Count == 0
+        ? "No augment offer found."
+        : $"Offer: {string.Join(", ", scan.Offer.Select(d => $"{d.Augment.Name} ({d.Augment.Tier}, {d.Confidence:P0})"))}");
     return;
 }
 

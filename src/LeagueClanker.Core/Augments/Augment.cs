@@ -151,5 +151,6 @@ public sealed class AugmentCatalog
         return new AugmentCatalog(augments);
     }
 
-    internal static string Key(string name) => new(name.Where(char.IsLetterOrDigit).Select(char.ToLowerInvariant).ToArray());
+    /// <summary>Lowercase letters and digits only: the form names are compared in.</summary>
+    public static string Key(string name) => new(name.Where(char.IsLetterOrDigit).Select(char.ToLowerInvariant).ToArray());
 }

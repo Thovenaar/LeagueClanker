@@ -24,4 +24,30 @@ public partial class MainWindow : Window
     private void OnDeclinePivot(object sender, RoutedEventArgs e) => ViewModel.DeclinePivot();
 
     private void OnSwitchToLatest(object sender, RoutedEventArgs e) => ViewModel.SwitchToLatest();
+
+    // Augment picker rows carry their card as DataContext.
+    private static string CardName(object sender) => ((FrameworkElement)sender).DataContext switch
+    {
+        AugmentRow row => row.Name,
+        AugmentOptionRow option => option.Name,
+        _ => "",
+    };
+
+    private void OnOfferSuggestion(object sender, RoutedEventArgs e) => ViewModel.Augments.AddToOffer(CardName(sender));
+
+    private void OnPickedSuggestion(object sender, RoutedEventArgs e) => ViewModel.Augments.AddToPicked(CardName(sender));
+
+    private void OnRemoveOffer(object sender, RoutedEventArgs e) => ViewModel.Augments.RemoveFromOffer(CardName(sender));
+
+    private void OnRemovePicked(object sender, RoutedEventArgs e) => ViewModel.Augments.RemoveFromPicked(CardName(sender));
+
+    private void OnPickOption(object sender, RoutedEventArgs e) => ViewModel.Augments.Pick(CardName(sender));
+
+    private void OnAugmentSearchKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Enter)
+            ViewModel.Augments.AddTopSuggestion();
+        else if (e.Key == Key.Escape)
+            ViewModel.Augments.SearchText = "";
+    }
 }

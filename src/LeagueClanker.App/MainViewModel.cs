@@ -15,6 +15,13 @@ public sealed record PlayerRow(
     string Name, string IconUrl, int Level, bool IsMe, string Note,
     double AttackDamage, double AbilityPower, double Armor, double MagicResist, double Health, double AttackSpeed, double CritChance);
 
+public enum Tab
+{
+    Build,
+    Augments,
+    Players,
+}
+
 public sealed class MainViewModel : INotifyPropertyChanged
 {
     private readonly BuildPlanner _planner = new();
@@ -23,7 +30,8 @@ public sealed class MainViewModel : INotifyPropertyChanged
 
     private string _status = "Starting...";
     private bool _isLive;
-    private bool _showPlayers;
+    private Tab _tab = Tab.Build;
+    private bool _hasAugments;
     private string _championLine = "";
     private string _damageSummary = "";
     private GridLength _adShare = new(1, GridUnitType.Star);
@@ -59,17 +67,25 @@ public sealed class MainViewModel : INotifyPropertyChanged
     public bool ShowSwitchHint { get => _showSwitchHint; private set => Set(ref _showSwitchHint, value); }
     public string SwitchHint { get => _switchHint; private set => Set(ref _switchHint, value); }
 
-    public bool ShowPlayers
+    public MainViewModel()
     {
-        get => _showPlayers;
-        set
+        // A card offer on screen needs your attention now, so bring its tab forward.
+        Augments.OfferDetected += (_, _) =>
         {
-            Set(ref _showPlayers, value);
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(ShowBuild)));
-        }
+            SelectTab(Tab.Augments);
+            SystemSounds.Asterisk.Play();
+        };
     }
 
-    public bool ShowBuild { get => !_showPlayers; set => ShowPlayers = !value; }
+    /// <summary>Card picker for ARAM: Mayhem. Its tab only shows in modes with augments.</summary>
+    public AugmentPickerViewModel Augments { get; } = new();
+
+    public bool HasAugments { get => _hasAugments; private set => Set(ref _hasAugments, value); }
+
+    // Radio buttons bind to these; a radio being unchecked sets false, which is ignored.
+    public bool IsBuildTab { get => _tab == Tab.Build; set { if (value) SelectTab(Tab.Build); } }
+    public bool IsAugmentsTab { get => _tab == Tab.Augments; set { if (value) SelectTab(Tab.Augments); } }
+    public bool IsPlayersTab { get => _tab == Tab.Players; set { if (value) SelectTab(Tab.Players); } }
     public IReadOnlyList<PlayerRow> Enemies { get => _enemies; private set => Set(ref _enemies, value); }
     public IReadOnlyList<PlayerRow> Team { get => _team; private set => Set(ref _team, value); }
 
@@ -79,6 +95,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
         if (update is not { State: AdvisorState.Live, Recommendation: { } rec })
         {
             _planner.Reset();
+            Augments.Reset();
             _lastPivotSummary = null;
             IsLive = false;
             Status = "Waiting for a game... (Practice Tool works too)";
@@ -114,10 +131,8 @@ public sealed class MainViewModel : INotifyPropertyChanged
 
         var me = rec.Game.Me;
         IsLive = true;
-        Status = $"Live · {TimeSpan.FromSeconds(rec.Game.GameTimeSeconds):mm\\:ss}";
-        ChampionLine = rec.Game.Mode == GameMode.SummonersRift
-            ? $"{me.Name} · {me.Archetype.DisplayName()}"
-            : $"{me.Name} · {me.Archetype.DisplayName()} · {rec.Game.Mode.DisplayName()}";
+        Status = $"Live · {TimeSpan.FromSeconds(rec.Game.GameTimeSeconds):mm\\:ss} · {rec.Game.Mode.DisplayName()}";
+        ChampionLine = $"{me.Name} · {me.Archetype.DisplayName()}";
         DamageSummary = rec.DamageSummary;
         AdShare = new GridLength(rec.Game.Enemies.PhysicalShare, GridUnitType.Star);
         ApShare = new GridLength(rec.Game.Enemies.MagicShare, GridUnitType.Star);
@@ -140,6 +155,19 @@ public sealed class MainViewModel : INotifyPropertyChanged
 
         Team = new[] { me }.Concat(rec.Game.Allies.Players).Select(p => ToRow(p, p == me, data)).ToList();
         Enemies = rec.Game.Enemies.Players.Select(p => ToRow(p, false, data)).ToList();
+
+        HasAugments = rec.Game.Mode.HasAugments();
+        if (HasAugments)
+            Augments.SetGame(rec, _planner.Upcoming.Select(i => i.Item).ToList());
+        else if (_tab == Tab.Augments)
+            SelectTab(Tab.Build);
+    }
+
+    private void SelectTab(Tab tab)
+    {
+        _tab = tab;
+        foreach (var name in new[] { nameof(IsBuildTab), nameof(IsAugmentsTab), nameof(IsPlayersTab) })
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
     }
 
     private static ItemRow ToRow(ScoredItem item, int rank, StaticGameData data) =>
