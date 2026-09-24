@@ -60,7 +60,7 @@ public static class StatEstimator
     {
         double Sum(string stat) => items.Sum(i => i.Stat(stat));
 
-        var classic = mode == GameMode.LeagueClassic;
+        var classic = mode.UsesClassicItems();
         var bonusAttackSpeed = champion.BonusAttackSpeedAt(level, classic) + Sum(Stat.AttackSpeed);
         return new StatBlock
         {

@@ -28,6 +28,23 @@ public sealed record ChampSelectState(
     /// <summary>Banned champions, by key.</summary>
     public IReadOnlySet<int> Bans { get; init; } = new HashSet<int>();
 
+    /// <summary>Swiftplay's champion picks from the lobby. Empty in champ select.</summary>
+    public IReadOnlyList<(ChampionInfo Champion, Position Position, (int First, int Second) Spells)> SwiftplaySlots { get; init; } = [];
+
+    /// <summary>Which Swiftplay slot <see cref="Champion"/> is. Null in champ select.</summary>
+    public int? SwiftplaySlot { get; init; }
+
+    public bool IsSwiftplay => SwiftplaySlot is not null;
+
+    /// <summary>The same Swiftplay lobby, looking at another of your champions.</summary>
+    public ChampSelectState ForSwiftplaySlot(int slot)
+    {
+        if (!IsSwiftplay || slot < 0 || slot >= SwiftplaySlots.Count)
+            return this;
+        var (champion, position, spells) = SwiftplaySlots[slot];
+        return this with { Champion = champion, Position = position, Spells = spells, SwiftplaySlot = slot };
+    }
+
     /// <summary>
     /// The game as it will look at the start: everyone at level 1 without items. The item advisor can then recommend a
     /// build before the game, for the shop's item set. Your playstyle is passed to the analyzer separately.
@@ -65,13 +82,33 @@ public sealed record ChampSelectState(
 
     /// <summary>Changes when anything that affects the rune page, the matchup or the draft advice changes.</summary>
     public string Fingerprint =>
-        $"{Champion?.Id}|{IsLocked}|{Position}|{Mode}|{HasPendingBan}|{string.Join(',', Enemies.Select(e => e.Id))}"
+        $"{Champion?.Id}|{IsLocked}|{Position}|{Mode}|{HasPendingBan}|{SwiftplaySlot}|{string.Join(',', Enemies.Select(e => e.Id))}"
         + $"|{string.Join(',', Allies.Select(a => a.Id))}|{string.Join(',', Bans.Order())}";
+
+    // Swiftplay: your champions are chosen, with no enemies or teammates to see yet. The first slot is shown first.
+    private static ChampSelectState? FromSwiftplay(Lobby lobby, ChampionCatalog champions)
+    {
+        var slots = lobby.LocalMember!.PlayerSlots
+            .Select(s => (Champion: champions.GetByKey(s.ChampionId), Position: Positions.Parse(s.PositionPreference), Spells: (s.Spell1, s.Spell2)))
+            .Where(s => s.Champion is not null)
+            .Select(s => (s.Champion!, s.Position, s.Spells))
+            .ToList();
+        if (slots.Count == 0)
+            return null;
+        var (champion, position, spells) = slots[0];
+        return new ChampSelectState(champion, position, GameMode.SummonersRift, [], [])
+        {
+            IsLocked = true,
+            Spells = spells,
+            SwiftplaySlots = slots,
+            SwiftplaySlot = 0,
+        };
+    }
 
     public static ChampSelectState? From(ClientSnapshot snapshot, ChampionCatalog champions)
     {
         if (snapshot.ChampSelect is not { } session)
-            return null;
+            return snapshot.Lobby is { IsSwiftplay: true } lobby ? FromSwiftplay(lobby, champions) : null;
 
         var me = session.MyTeam.FirstOrDefault(p => p.CellId == session.LocalPlayerCellId);
         var championKey = me is null ? 0 : me.ChampionId != 0 ? me.ChampionId : me.ChampionPickIntent;
@@ -113,6 +150,8 @@ public sealed record ChampSelectState(
 }
 
 public sealed record ApplyResult(bool Success, string Message);
+
+
 
 /// <summary>
 /// Writes a rune page into the client. It overwrites your current page when the client allows that. Preset pages can't

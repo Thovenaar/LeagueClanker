@@ -97,15 +97,14 @@ public sealed class RecommendationEngine(StaticGameData data, IReadOnlyList<IBui
 
         var mine = AugmentRules.WithAugmentStats(game.Me.Stats, game.Augments);
         var ownedScores = owned.Where(i => i.Kind == ItemKind.Legendary).Select(i => Score(i, profile, mine, situations, weights)).ToList();
-        var map = game.Mode.MapId();
-        var candidates = data.Items.LegendariesOn(map)
+        var candidates = data.Items.LegendariesFor(game.Mode)
             .Where(Available)
             .Where(i => !i.IsJungleItem || game.Me.HasSmite)
             .Where(i => profile.BaseScore(i, mine) >= profile.MinFit)
             .ToList();
         var boots = owned.Any(i => i.IsBoots && !ItemCatalog.BasicBootsIds.Contains(i.Id))
             ? []
-            : data.Items.BootsOn(map).Select(i => Score(i, profile, mine, situations, weights)).OrderByDescending(s => s.Total).ToList();
+            : data.Items.BootsFor(game.Mode).Select(i => Score(i, profile, mine, situations, weights)).OrderByDescending(s => s.Total).ToList();
 
         // Greedy ranking with diminishing returns: once an item answers "enemy is AP", the next MR item is worth less.
         // Without this, a strong situation fills all six slots with the same kind of item.

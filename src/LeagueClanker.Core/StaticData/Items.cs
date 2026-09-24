@@ -81,8 +81,11 @@ public sealed record ItemInfo
 
     public bool IsBoots => Tags.Contains("Boots");
 
+    /// <summary>Which mode's copy of the item this is. Arena and League Classic sell their own copies.</summary>
+    public ItemVariant Variant => ItemCatalog.VariantOf(Id);
+
     /// <summary>League Classic's version of the item, sold on map 453.</summary>
-    public bool IsClassic => ItemCatalog.IsClassicId(Id);
+    public bool IsClassic => Variant == ItemVariant.Classic;
 
     /// <summary>Classic jungle items (Spirit of the ..., Wriggle's Lantern). Only worth it with Smite.</summary>
     public bool IsJungleItem => Tags.Contains("Jungle") || Passives.Contains("Butcher");
@@ -116,6 +119,18 @@ public sealed partial class ItemCatalog
 
     public static bool IsClassicId(int id) => id is >= ClassicMinId and <= ClassicMaxId;
 
+    /// <summary>
+    /// Standard items have ids up to 9999. League Classic sells 77xxxx copies, and Arena sells 22xxxx copies plus its
+    /// 44xxxx prismatic items. Other 6-digit ids are copies for modes the advisor doesn't use.
+    /// </summary>
+    public static ItemVariant VariantOf(int id) => id switch
+    {
+        <= MaxStandardItemId => ItemVariant.Standard,
+        >= ClassicMinId and <= ClassicMaxId => ItemVariant.Classic,
+        (>= 220000 and <= 229999) or (>= 440000 and <= 449999) => ItemVariant.Arena,
+        _ => ItemVariant.Other,
+    };
+
     private readonly Dictionary<int, ItemInfo> _byId;
 
     public ItemCatalog(IEnumerable<ItemInfo> items)
@@ -135,9 +150,25 @@ public sealed partial class ItemCatalog
 
     public IReadOnlyList<ItemInfo> BootsOn(int map) => OfKind(ItemKind.Boots, map);
 
-    // Classic items are also flagged for Howling Abyss (for a Classic ARAM variant), so the id range decides, not just the map.
-    private IReadOnlyList<ItemInfo> OfKind(ItemKind kind, int map) =>
-        _byId.Values.Where(i => i.Kind == kind && i.Maps.Contains(map) && i.IsClassic == (map == GameModes.LeagueClassicMap)).OrderBy(i => i.Id).ToList();
+    /// <summary>The legendaries a mode's shop sells: its map, and its copies of the items.</summary>
+    public IReadOnlyList<ItemInfo> LegendariesFor(GameMode mode) => OfKind(ItemKind.Legendary, mode.MapId(), mode.ItemVariant());
+
+    public IReadOnlyList<ItemInfo> BootsFor(GameMode mode) => OfKind(ItemKind.Boots, mode.MapId(), mode.ItemVariant());
+
+    // Classic items are also flagged for Howling Abyss (for ARAM: Mayhem Classic), so the variant decides, not just the map.
+    private IReadOnlyList<ItemInfo> OfKind(ItemKind kind, int map) => OfKind(kind, map, map switch
+    {
+        GameModes.LeagueClassicMap => ItemVariant.Classic,
+        GameModes.ArenaMap => ItemVariant.Arena,
+        _ => ItemVariant.Standard,
+    });
+
+    // Arena's shop has a few standard items besides its own copies.
+    private IReadOnlyList<ItemInfo> OfKind(ItemKind kind, int map, ItemVariant variant) =>
+        _byId.Values
+            .Where(i => i.Kind == kind && i.Maps.Contains(map) && (i.Variant == variant || (variant == ItemVariant.Arena && i.Variant == ItemVariant.Standard)))
+            .OrderBy(i => i.Id)
+            .ToList();
 
     public ItemInfo? Get(int id) => _byId.GetValueOrDefault(id);
 
@@ -198,14 +229,16 @@ public sealed partial class ItemCatalog
         var restricted = json.TryGetProperty("requiredChampion", out _) || json.TryGetProperty("requiredAlly", out _);
 
         var soldSomewhere = json.TryGetProperty("maps", out var maps) && maps.EnumerateObject().Any(m => m.Value.GetBoolean());
-        if (!purchasable || !inStore || restricted || !soldSomewhere || (id > MaxStandardItemId && !IsClassicId(id)))
+        if (!purchasable || !inStore || restricted || !soldSomewhere || VariantOf(id) == ItemVariant.Other)
             return ItemKind.Other;
         if (tags.Contains("Consumable") || tags.Contains("Trinket"))
             return ItemKind.Other;
 
-        // Tier 2 boots build out of basic Boots. Tier 3 upgrades build out of tier 2.
+        // Tier 2 boots build out of basic Boots; tier 3 upgrades build out of tier 2. Arena sells its boots outright.
         if (tags.Contains("Boots"))
-            return from.Any(BasicBootsIds.Contains) ? ItemKind.Boots : ItemKind.Other;
+            return from.Any(BasicBootsIds.Contains) || (VariantOf(id) == ItemVariant.Arena && !json.GetStringArray("into").Any())
+                ? ItemKind.Boots
+                : ItemKind.Other;
 
         if (json.GetStringArray("into").Any())
             return ItemKind.Component;

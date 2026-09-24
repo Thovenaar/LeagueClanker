@@ -1,0 +1,261 @@
+{
+  "activePlayer": {
+    "riotId": "You#EUW",
+    "riotIdGameName": "You",
+    "riotIdTagLine": "EUW",
+    "summonerName": "You#EUW",
+    "level": 7,
+    "currentGold": 1200.0
+  },
+  "allPlayers": [
+    {
+      "championName": "Ashe",
+      "rawChampionName": "game_character_displayname_Ashe",
+      "riotId": "You#EUW",
+      "riotIdGameName": "You",
+      "riotIdTagLine": "EUW",
+      "summonerName": "You#EUW",
+      "team": "ORDER",
+      "position": "",
+      "level": 7,
+      "isBot": false,
+      "isDead": false,
+      "items": [
+        {
+          "itemID": 773006,
+          "displayName": "Berserker's Greaves",
+          "count": 1,
+          "slot": 0,
+          "canUse": false,
+          "consumable": false,
+          "price": 0
+        },
+        {
+          "itemID": 773031,
+          "displayName": "Infinity Edge",
+          "count": 1,
+          "slot": 1,
+          "canUse": false,
+          "consumable": false,
+          "price": 0
+        }
+      ],
+      "scores": {
+        "kills": 3,
+        "deaths": 1,
+        "assists": 2,
+        "creepScore": 0,
+        "wardScore": 0.0
+      }
+    },
+    {
+      "championName": "Garen",
+      "rawChampionName": "game_character_displayname_Garen",
+      "riotId": "Ally1#EUW",
+      "riotIdGameName": "Ally1",
+      "riotIdTagLine": "EUW",
+      "summonerName": "Ally1#EUW",
+      "team": "ORDER",
+      "position": "",
+      "level": 7,
+      "isBot": false,
+      "isDead": false,
+      "items": [
+        {
+          "itemID": 773111,
+          "displayName": "Mercury's Treads",
+          "count": 1,
+          "slot": 0,
+          "canUse": false,
+          "consumable": false,
+          "price": 0
+        },
+        {
+          "itemID": 773068,
+          "displayName": "Sunfire Cape",
+          "count": 1,
+          "slot": 1,
+          "canUse": false,
+          "consumable": false,
+          "price": 0
+        }
+      ],
+      "scores": {
+        "kills": 1,
+        "deaths": 2,
+        "assists": 3,
+        "creepScore": 0,
+        "wardScore": 0.0
+      }
+    },
+    {
+      "championName": "Annie",
+      "rawChampionName": "game_character_displayname_Annie",
+      "riotId": "Ally2#EUW",
+      "riotIdGameName": "Ally2",
+      "riotIdTagLine": "EUW",
+      "summonerName": "Ally2#EUW",
+      "team": "ORDER",
+      "position": "",
+      "level": 7,
+      "isBot": false,
+      "isDead": false,
+      "items": [
+        {
+          "itemID": 773020,
+          "displayName": "Sorcerer's Shoes",
+          "count": 1,
+          "slot": 0,
+          "canUse": false,
+          "consumable": false,
+          "price": 0
+        },
+        {
+          "itemID": 773027,
+          "displayName": "Rod of Ages",
+          "count": 1,
+          "slot": 1,
+          "canUse": false,
+          "consumable": false,
+          "price": 0
+        }
+      ],
+      "scores": {
+        "kills": 2,
+        "deaths": 1,
+        "assists": 4,
+        "creepScore": 0,
+        "wardScore": 0.0
+      }
+    },
+    {
+      "championName": "Malphite",
+      "rawChampionName": "game_character_displayname_Malphite",
+      "riotId": "Enemy1#EUW",
+      "riotIdGameName": "Enemy1",
+      "riotIdTagLine": "EUW",
+      "summonerName": "Enemy1#EUW",
+      "team": "CHAOS",
+      "position": "",
+      "level": 7,
+      "isBot": false,
+      "isDead": false,
+      "items": [
+        {
+          "itemID": 773047,
+          "displayName": "Ninja Tabi",
+          "count": 1,
+          "slot": 0,
+          "canUse": false,
+          "consumable": false,
+          "price": 0
+        },
+        {
+          "itemID": 773068,
+          "displayName": "Sunfire Cape",
+          "count": 1,
+          "slot": 1,
+          "canUse": false,
+          "consumable": false,
+          "price": 0
+        }
+      ],
+      "scores": {
+        "kills": 1,
+        "deaths": 2,
+        "assists": 2,
+        "creepScore": 0,
+        "wardScore": 0.0
+      }
+    },
+    {
+      "championName": "Twisted Fate",
+      "rawChampionName": "game_character_displayname_TwistedFate",
+      "riotId": "Enemy2#EUW",
+      "riotIdGameName": "Enemy2",
+      "riotIdTagLine": "EUW",
+      "summonerName": "Enemy2#EUW",
+      "team": "CHAOS",
+      "position": "",
+      "level": 7,
+      "isBot": false,
+      "isDead": false,
+      "items": [
+        {
+          "itemID": 773020,
+          "displayName": "Sorcerer's Shoes",
+          "count": 1,
+          "slot": 0,
+          "canUse": false,
+          "consumable": false,
+          "price": 0
+        },
+        {
+          "itemID": 773100,
+          "displayName": "Lich Bane",
+          "count": 1,
+          "slot": 1,
+          "canUse": false,
+          "consumable": false,
+          "price": 0
+        }
+      ],
+      "scores": {
+        "kills": 3,
+        "deaths": 2,
+        "assists": 1,
+        "creepScore": 0,
+        "wardScore": 0.0
+      }
+    },
+    {
+      "championName": "Sivir",
+      "rawChampionName": "game_character_displayname_Sivir",
+      "riotId": "Enemy3#EUW",
+      "riotIdGameName": "Enemy3",
+      "riotIdTagLine": "EUW",
+      "summonerName": "Enemy3#EUW",
+      "team": "CHAOS",
+      "position": "",
+      "level": 7,
+      "isBot": false,
+      "isDead": false,
+      "items": [
+        {
+          "itemID": 773006,
+          "displayName": "Berserker's Greaves",
+          "count": 1,
+          "slot": 0,
+          "canUse": false,
+          "consumable": false,
+          "price": 0
+        },
+        {
+          "itemID": 773072,
+          "displayName": "The Bloodthirster",
+          "count": 1,
+          "slot": 1,
+          "canUse": false,
+          "consumable": false,
+          "price": 0
+        }
+      ],
+      "scores": {
+        "kills": 2,
+        "deaths": 2,
+        "assists": 2,
+        "creepScore": 0,
+        "wardScore": 0.0
+      }
+    }
+  ],
+  "events": {
+    "Events": []
+  },
+  "gameData": {
+    "gameMode": "KIWI_JADE",
+    "gameTime": 540.0,
+    "mapNumber": 12,
+    "mapTerrain": "Default"
+  }
+}

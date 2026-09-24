@@ -23,6 +23,8 @@ public sealed record CounterRow(string Name, string IconUrl, string WinRate, str
 
 public sealed record BanRow(string Name, string IconUrl, string Reason);
 
+public sealed record SlotOption(int Index, string Label, bool IsSelected);
+
 /// <summary>Everything the champ select panel needs, handed over once the static data is loaded.</summary>
 public sealed record ChampSelectServices(
     StaticGameData Data, RuneAdvisor Runes, MatchupAdvisor Matchups, SpellAdvisor Spells, OpggClient Opgg, DraftAdvisor Draft, MatchupNotes Notes);
@@ -45,6 +47,8 @@ public sealed class ChampSelectViewModel : INotifyPropertyChanged
     private int _matchupVersion;
     private int _draftVersion;
     private string? _autoAppliedFor;
+    private int _swiftplaySlot;
+    private IReadOnlyList<SlotOption> _swiftplaySlots = [];
     private ChampionInfo? _opponent;
     private IReadOnlyList<BanRow> _bans = [];
     private IReadOnlyList<string> _teamWarnings = [];
@@ -105,6 +109,9 @@ public sealed class ChampSelectViewModel : INotifyPropertyChanged
     public IChampSelectWriter? Writer { get; set; }
 
     public bool IsActive { get => _isActive; private set => Set(ref _isActive, value); }
+
+    /// <summary>A Swiftplay lobby rather than champ select.</summary>
+    public bool IsSwiftplay => _state?.IsSwiftplay == true;
     public bool HasChampion => _state?.Champion is not null;
     public string ChampionName { get => _championName; private set => Set(ref _championName, value); }
     public string ChampionIconUrl { get => _championIconUrl; private set => Set(ref _championIconUrl, value); }
@@ -178,6 +185,20 @@ public sealed class ChampSelectViewModel : INotifyPropertyChanged
 
     public bool HasOpponent => _opponent is not null;
 
+    /// <summary>Swiftplay: one chip per champion you picked in the lobby. Empty in champ select.</summary>
+    public IReadOnlyList<SlotOption> SwiftplaySlots { get => _swiftplaySlots; private set => Set(ref _swiftplaySlots, value); }
+
+    /// <summary>Swiftplay: look at another of your champions. Apply writes into that champion's slot.</summary>
+    public void SelectSwiftplaySlot(int slot)
+    {
+        if (slot == _swiftplaySlot || _state is not { IsSwiftplay: true } state)
+            return;
+        _swiftplaySlot = slot;
+        var current = _state;
+        _state = null; // force a full refresh for the other champion
+        Update(current.ForSwiftplaySlot(slot));
+    }
+
     public string NoteLabel => _opponent is null ? "" : $"YOUR NOTES VS {_opponent.Name.ToUpperInvariant()}";
 
     /// <summary>Your note on the lane opponent. Saved as you type and shown whenever you face them again.</summary>
@@ -207,6 +228,18 @@ public sealed class ChampSelectViewModel : INotifyPropertyChanged
         }
 
         IsActive = true;
+        if (state.IsSwiftplay)
+        {
+            state = state.ForSwiftplaySlot(Math.Min(_swiftplaySlot, state.SwiftplaySlots.Count - 1));
+            SwiftplaySlots = state.SwiftplaySlots
+                .Select((s, i) => new SlotOption(i, $"{s.Champion.Name} \u00b7 {s.Position.DisplayName().ToLowerInvariant()}", i == state.SwiftplaySlot))
+                .ToList();
+        }
+        else
+        {
+            _swiftplaySlot = 0;
+            SwiftplaySlots = [];
+        }
         var changed = _state?.Fingerprint != state.Fingerprint;
         var championChanged = _state?.Champion?.Id != state.Champion?.Id || _state?.Position != state.Position;
         _state = state;
@@ -272,9 +305,18 @@ public sealed class ChampSelectViewModel : INotifyPropertyChanged
             }
         }
 
-        await Try("rune page", () => Writer.WriteRunesAsync(runes.Page, RunePageWriter.PageName(champion), default));
-        if (Settings.ApplySpells && _spells is { } spells)
-            await Try("summoner spells", () => Writer.WriteSpellsAsync(spells.First, spells.Second, default));
+        if (state.SwiftplaySlot is { } slot)
+        {
+            // Swiftplay keeps runes and spells per champion slot in the lobby; spells stay as they are without a suggestion.
+            var (spell1, spell2) = Settings.ApplySpells && _spells is { } s ? (s.First, s.Second) : state.Spells;
+            await Try("Swiftplay slot", () => Writer.WriteSwiftplaySlotAsync(slot, runes.Page, spell1, spell2, default));
+        }
+        else
+        {
+            await Try("rune page", () => Writer.WriteRunesAsync(runes.Page, RunePageWriter.PageName(champion), default));
+            if (Settings.ApplySpells && _spells is { } spells)
+                await Try("summoner spells", () => Writer.WriteSpellsAsync(spells.First, spells.Second, default));
+        }
         if (Settings.ApplyItemSet && BuildItemSet(state) is { } set)
             await Try("item set", () => Writer.WriteItemSetAsync(set, default));
 
@@ -374,6 +416,11 @@ public sealed class ChampSelectViewModel : INotifyPropertyChanged
     {
         if (_state is not { } state || _services is not { } services)
             return;
+        if (state.IsSwiftplay)
+        {
+            ShowMatchup(null, state, services.Data); // no enemy picks before a Swiftplay game
+            return;
+        }
 
         var version = ++_matchupVersion;
         var request = new MatchupRequest(state.Champion, state.IsLocked, state.Position, state.Mode, state.Enemies)
@@ -468,6 +515,7 @@ public sealed class ChampSelectViewModel : INotifyPropertyChanged
 
     private static string SituationText(ChampSelectState state) => state.Mode switch
     {
+        _ when state.IsSwiftplay => $"Swiftplay \u00b7 {state.Position.DisplayName()}",
         GameMode.Aram or GameMode.AramMayhem => state.Mode.DisplayName(),
         _ when state.Position == Position.None => $"No role assigned · {state.Mode.DisplayName()}",
         _ => $"{state.Position.DisplayName()} · {state.Mode.DisplayName()}",

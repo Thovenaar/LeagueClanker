@@ -115,6 +115,9 @@ public sealed class DemoWriter : IChampSelectWriter
 
     public Task<ApplyResult> WriteItemSetAsync(ItemSetDefinition set, CancellationToken ct) =>
         Task.FromResult(new ApplyResult(true, $"Demo: would add the item set \"{set.Title}\" with {set.Blocks.Count} blocks."));
+
+    public Task<ApplyResult> WriteSwiftplaySlotAsync(int slot, RunePage page, int spell1, int spell2, CancellationToken ct) =>
+        Task.FromResult(new ApplyResult(true, $"Demo: would set the runes and spells of Swiftplay champion {slot + 1}."));
 }
 
 /// <summary>Writes through whichever client connection is current; the connection changes when the client restarts.</summary>
@@ -130,4 +133,7 @@ public sealed class ClientWriter(Func<IChampSelectWriter?> client) : IChampSelec
 
     public Task<ApplyResult> WriteItemSetAsync(ItemSetDefinition set, CancellationToken ct) =>
         client()?.WriteItemSetAsync(set, ct) ?? Task.FromResult(NoClient);
+
+    public Task<ApplyResult> WriteSwiftplaySlotAsync(int slot, RunePage page, int spell1, int spell2, CancellationToken ct) =>
+        client()?.WriteSwiftplaySlotAsync(slot, page, spell1, spell2, ct) ?? Task.FromResult(NoClient);
 }

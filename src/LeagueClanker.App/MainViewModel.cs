@@ -108,11 +108,13 @@ public sealed class MainViewModel : INotifyPropertyChanged
                 return;
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(ShowChampSelect)));
             if (!IsLive)
-                Status = ChampSelect.IsActive ? "Champ select" : WaitingStatus;
+                Status = ChampSelectStatus;
         };
     }
 
     private const string WaitingStatus = "Waiting for a game... (Practice Tool works too)";
+
+    private string ChampSelectStatus => !ChampSelect.IsActive ? WaitingStatus : ChampSelect.IsSwiftplay ? "Swiftplay lobby" : "Champ select";
 
     public SettingsViewModel Settings { get; }
 
@@ -266,7 +268,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
             _opggChampion = null;
             IsLive = false;
             Raise(nameof(ShowChampSelect), nameof(ShowFullLive), nameof(ShowCompactLive));
-            Status = ChampSelect.IsActive ? "Champ select" : WaitingStatus;
+            Status = ChampSelectStatus;
             return;
         }
 

@@ -134,6 +134,22 @@
                         </StackPanel>
                     </DockPanel>
 
+                    <!-- Swiftplay: one chip per champion picked in the lobby -->
+                    <ItemsControl ItemsSource="{Binding SwiftplaySlots}" Margin="0,8,0,0"
+                                  Visibility="{Binding SwiftplaySlots, Converter={StaticResource HasContent}}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <WrapPanel />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate DataType="{x:Type local:SlotOption}">
+                                <RadioButton Style="{StaticResource ChipButton}" GroupName="SwiftplaySlot" Content="{Binding Label}" Margin="0,0,6,6"
+                                             IsChecked="{Binding IsSelected, Mode=OneWay}" Checked="OnSwiftplaySlotChecked" />
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
                     <!-- Bans: while your ban is still to come -->
                     <StackPanel Visibility="{Binding Bans, Converter={StaticResource HasContent}}">
                         <TextBlock Style="{StaticResource SectionHeader}" Text="BAN SUGGESTIONS" />

@@ -1,0 +1,43 @@
+{
+  "champSelect": null,
+  "gameflow": null,
+  "lobby": {
+    "gameConfig": {
+      "gameMode": "SWIFTPLAY",
+      "queueId": 480
+    },
+    "localMember": {
+      "firstPositionPreference": "TOP",
+      "playerSlots": [
+        {
+          "championId": 86,
+          "positionPreference": "TOP",
+          "perks": "",
+          "spell1": 4,
+          "spell2": 12,
+          "skinId": 86000
+        },
+        {
+          "championId": 222,
+          "positionPreference": "BOTTOM",
+          "perks": "",
+          "spell1": 4,
+          "spell2": 7,
+          "skinId": 222000
+        }
+      ]
+    }
+  },
+  "pickableChampionIds": [
+    86,
+    222,
+    54,
+    17
+  ],
+  "mastery": [
+    {
+      "championId": 86,
+      "championPoints": 152300
+    }
+  ]
+}

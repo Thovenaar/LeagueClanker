@@ -68,6 +68,12 @@ public partial class MainWindow : Window
 
     private void OnToggleSettings(object sender, RoutedEventArgs e) => ViewModel.ToggleSettings();
 
+    private void OnSwiftplaySlotChecked(object sender, RoutedEventArgs e)
+    {
+        if (sender is RadioButton { DataContext: SlotOption { IsSelected: false } slot })
+            ViewModel.ChampSelect.SelectSwiftplaySlot(slot.Index);
+    }
+
     private void OnToggleCompact(object sender, RoutedEventArgs e) => ViewModel.ToggleCompact();
 
     private void OnSaveSnapshot(object sender, RoutedEventArgs e) => ViewModel.SaveSnapshot();

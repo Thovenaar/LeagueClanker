@@ -11,7 +11,10 @@ public class GameModeTests
     [InlineData("ARAM", 12, GameMode.Aram)]
     [InlineData("KIWI", 12, GameMode.AramMayhem)]
     [InlineData(null, 12, GameMode.Aram)]
-    [InlineData("CHERRY", 30, GameMode.Unsupported)]
+    [InlineData("CHERRY", 30, GameMode.Arena)]
+    [InlineData("KIWI_JADE", 12, GameMode.MayhemClassic)]
+    [InlineData("SWIFTPLAY", 11, GameMode.SummonersRift)]
+    [InlineData("URF", 11, GameMode.Unsupported)]
     public void Detect_ReadsTheLiveGameMode(string? gameMode, int map, GameMode expected)
     {
         Assert.Equal(expected, GameModes.Detect(gameMode, map));

@@ -50,7 +50,8 @@ public class ItemCatalogTests
         Assert.Equal(ItemKind.Boots, items.Get(TestData.ArmorBoots)!.Kind);
         Assert.Equal(ItemKind.Other, items.Get(1001)!.Kind); // Basic boots are never a recommendation
         Assert.Equal(ItemKind.Component, items.Get(TestData.WoundComponent)!.Kind);
-        Assert.Equal(ItemKind.Other, items.Get(223001)!.Kind); // Arena copy
-        Assert.DoesNotContain(items.Legendaries, i => i.Id == 223001);
+        Assert.Equal(ItemVariant.Arena, items.Get(223001)!.Variant); // Arena's copy of Plate
+        Assert.DoesNotContain(items.Legendaries, i => i.Id == 223001);   // not sold on the Rift
+        Assert.Equal(ItemVariant.Other, ItemCatalog.VariantOf(323001));  // a copy for a mode the advisor doesn't use
     }
 }

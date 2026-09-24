@@ -1,0 +1,243 @@
+{
+  "activePlayer": {
+    "riotId": "You#EUW",
+    "riotIdGameName": "You",
+    "riotIdTagLine": "EUW",
+    "summonerName": "You#EUW",
+    "level": 9,
+    "currentGold": 1500.0
+  },
+  "allPlayers": [
+    {
+      "championName": "Jinx",
+      "rawChampionName": "game_character_displayname_Jinx",
+      "riotId": "You#EUW",
+      "riotIdGameName": "You",
+      "riotIdTagLine": "EUW",
+      "summonerName": "You#EUW",
+      "team": "ORDER",
+      "position": "",
+      "level": 9,
+      "isBot": false,
+      "isDead": false,
+      "items": [
+        {
+          "itemID": 223031,
+          "displayName": "Infinity Edge",
+          "count": 1,
+          "slot": 0,
+          "canUse": false,
+          "consumable": false,
+          "price": 0
+        },
+        {
+          "itemID": 223006,
+          "displayName": "Berserker's Greaves",
+          "count": 1,
+          "slot": 1,
+          "canUse": false,
+          "consumable": false,
+          "price": 0
+        }
+      ],
+      "scores": {
+        "kills": 4,
+        "deaths": 2,
+        "assists": 1,
+        "creepScore": 0,
+        "wardScore": 0.0
+      }
+    },
+    {
+      "championName": "Braum",
+      "rawChampionName": "game_character_displayname_Braum",
+      "riotId": "Partner#EUW",
+      "riotIdGameName": "Partner",
+      "riotIdTagLine": "EUW",
+      "summonerName": "Partner#EUW",
+      "team": "ORDER",
+      "position": "",
+      "level": 9,
+      "isBot": false,
+      "isDead": false,
+      "items": [
+        {
+          "itemID": 222502,
+          "displayName": "Unending Despair",
+          "count": 1,
+          "slot": 0,
+          "canUse": false,
+          "consumable": false,
+          "price": 0
+        },
+        {
+          "itemID": 223047,
+          "displayName": "Plated Steelcaps",
+          "count": 1,
+          "slot": 1,
+          "canUse": false,
+          "consumable": false,
+          "price": 0
+        }
+      ],
+      "scores": {
+        "kills": 1,
+        "deaths": 2,
+        "assists": 5,
+        "creepScore": 0,
+        "wardScore": 0.0
+      }
+    },
+    {
+      "championName": "Syndra",
+      "rawChampionName": "game_character_displayname_Syndra",
+      "riotId": "Enemy1#EUW",
+      "riotIdGameName": "Enemy1",
+      "riotIdTagLine": "EUW",
+      "summonerName": "Enemy1#EUW",
+      "team": "CHAOS",
+      "position": "",
+      "level": 9,
+      "isBot": false,
+      "isDead": false,
+      "items": [
+        {
+          "itemID": 223089,
+          "displayName": "Rabadon's Deathcap",
+          "count": 1,
+          "slot": 0,
+          "canUse": false,
+          "consumable": false,
+          "price": 0
+        },
+        {
+          "itemID": 223020,
+          "displayName": "Sorcerer's Shoes",
+          "count": 1,
+          "slot": 1,
+          "canUse": false,
+          "consumable": false,
+          "price": 0
+        }
+      ],
+      "scores": {
+        "kills": 5,
+        "deaths": 1,
+        "assists": 1,
+        "creepScore": 0,
+        "wardScore": 0.0
+      }
+    },
+    {
+      "championName": "Ahri",
+      "rawChampionName": "game_character_displayname_Ahri",
+      "riotId": "Enemy2#EUW",
+      "riotIdGameName": "Enemy2",
+      "riotIdTagLine": "EUW",
+      "summonerName": "Enemy2#EUW",
+      "team": "CHAOS",
+      "position": "",
+      "level": 9,
+      "isBot": false,
+      "isDead": false,
+      "items": [
+        {
+          "itemID": 223100,
+          "displayName": "Lich Bane",
+          "count": 1,
+          "slot": 0,
+          "canUse": false,
+          "consumable": false,
+          "price": 0
+        },
+        {
+          "itemID": 223020,
+          "displayName": "Sorcerer's Shoes",
+          "count": 1,
+          "slot": 1,
+          "canUse": false,
+          "consumable": false,
+          "price": 0
+        }
+      ],
+      "scores": {
+        "kills": 3,
+        "deaths": 3,
+        "assists": 2,
+        "creepScore": 0,
+        "wardScore": 0.0
+      }
+    },
+    {
+      "championName": "Lux",
+      "rawChampionName": "game_character_displayname_Lux",
+      "riotId": "Enemy3#EUW",
+      "riotIdGameName": "Enemy3",
+      "riotIdTagLine": "EUW",
+      "summonerName": "Enemy3#EUW",
+      "team": "ORDER",
+      "position": "",
+      "level": 9,
+      "isBot": false,
+      "isDead": false,
+      "items": [
+        {
+          "itemID": 222503,
+          "displayName": "Blackfire Torch",
+          "count": 1,
+          "slot": 0,
+          "canUse": false,
+          "consumable": false,
+          "price": 0
+        }
+      ],
+      "scores": {
+        "kills": 2,
+        "deaths": 2,
+        "assists": 3,
+        "creepScore": 0,
+        "wardScore": 0.0
+      }
+    },
+    {
+      "championName": "Soraka",
+      "rawChampionName": "game_character_displayname_Soraka",
+      "riotId": "Enemy4#EUW",
+      "riotIdGameName": "Enemy4",
+      "riotIdTagLine": "EUW",
+      "summonerName": "Enemy4#EUW",
+      "team": "CHAOS",
+      "position": "",
+      "level": 9,
+      "isBot": false,
+      "isDead": false,
+      "items": [
+        {
+          "itemID": 223107,
+          "displayName": "Redemption",
+          "count": 1,
+          "slot": 0,
+          "canUse": false,
+          "consumable": false,
+          "price": 0
+        }
+      ],
+      "scores": {
+        "kills": 0,
+        "deaths": 3,
+        "assists": 6,
+        "creepScore": 0,
+        "wardScore": 0.0
+      }
+    }
+  ],
+  "events": {
+    "Events": []
+  },
+  "gameData": {
+    "gameMode": "CHERRY",
+    "gameTime": 780.0,
+    "mapNumber": 30,
+    "mapTerrain": "Default"
+  }
+}

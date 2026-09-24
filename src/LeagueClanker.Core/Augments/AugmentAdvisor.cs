@@ -78,7 +78,8 @@ public sealed record AugmentAdvice(IReadOnlyList<AugmentOption> Ranked)
 /// cards to reroll first. Future ARAM: Mayhem selections are simulated with the real rules: same tier for all
 /// three offerings, random tier per selection (first two never both Silver), and one reroll per offering.
 /// </summary>
-public sealed class AugmentAdvisor(AugmentCatalog catalog, AugmentScorer? scorer = null, int simulations = 1500)
+/// <param name="augmentSet">Mayhem never offers Silver twice in a row at the start; Arena has no such rule.</param>
+public sealed class AugmentAdvisor(AugmentCatalog catalog, AugmentScorer? scorer = null, int simulations = 1500, AugmentSet augmentSet = AugmentSet.Mayhem)
 {
     private const int TotalSelections = 4;
     private const int OfferSize = 3;
@@ -263,7 +264,7 @@ public sealed class AugmentAdvisor(AugmentCatalog catalog, AugmentScorer? scorer
             var set = new List<AugmentInfo>(picked) { option };
             for (var j = 0; j < remaining; j++)
             {
-                var tier = SampleTier(selectionIndex + j, firstTier, rng);
+                var tier = SampleTier(selectionIndex + j, firstTier, rng, augmentSet);
                 var choice = PickFromOffer(pools[tier], set, session, rng);
                 if (choice is null)
                     continue;
@@ -296,11 +297,11 @@ public sealed class AugmentAdvisor(AugmentCatalog catalog, AugmentScorer? scorer
         return rerolls.Append(best).MaxBy(a => session.Value(a, set));
     }
 
-    /// <param name="selection">0-based selection number (0 = level 3, 3 = level 15).</param>
-    internal static AugmentTier SampleTier(int selection, AugmentTier firstTier, Random rng)
+    /// <param name="selection">0-based selection number (0 = level 3, 3 = level 15 in Mayhem).</param>
+    internal static AugmentTier SampleTier(int selection, AugmentTier firstTier, Random rng, AugmentSet set = AugmentSet.Mayhem)
     {
-        // Tier odds aren't published; assume they're even. The second selection can't be Silver after a Silver first.
-        var noSilver = selection == 1 && firstTier == AugmentTier.Silver;
+        // Tier odds aren't published; assume they're even. In Mayhem the second selection can't be Silver after a Silver first.
+        var noSilver = set == AugmentSet.Mayhem && selection == 1 && firstTier == AugmentTier.Silver;
         return noSilver
             ? (rng.Next(2) == 0 ? AugmentTier.Gold : AugmentTier.Prismatic)
             : (AugmentTier)rng.Next(3);

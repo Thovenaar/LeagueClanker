@@ -143,8 +143,9 @@ public static class GameAnalyzer
             return null;
 
         var mode = DetectMode(data);
-        var allies = data.AllPlayers.Where(p => p != me && p.Team == me.Team).Select(p => Profile(p, staticData, mode: mode)).ToList();
-        var enemies = data.AllPlayers.Where(p => p.Team != me.Team).Select(p => Profile(p, staticData, mode: mode)).ToList();
+        // Arena has eight duos, and the Live Client API doesn't say who your partner is. So the whole lobby counts as enemies.
+        var allies = mode == GameMode.Arena ? [] : data.AllPlayers.Where(p => p != me && p.Team == me.Team).Select(p => Profile(p, staticData, mode: mode)).ToList();
+        var enemies = data.AllPlayers.Where(p => p != me && (mode == GameMode.Arena || p.Team != me.Team)).Select(p => Profile(p, staticData, mode: mode)).ToList();
         var myProfile = Profile(me, staticData, active.ChampionStats, mode, playstyle);
         return new GameAnalysis(myProfile, new TeamProfile(allies), new TeamProfile(enemies), data.GameData?.GameTime ?? 0)
         {
@@ -155,14 +156,20 @@ public static class GameAnalyzer
     }
 
     /// <summary>
-    /// The mode the game reports. League Classic's mode string is unconfirmed, so a Summoner's Rift or unknown game where
-    /// anyone holds a Classic item (77xxxx id, including the starting Doran's items) counts as League Classic too.
+    /// The mode the game reports. League Classic's mode string is unconfirmed, so a game where anyone holds a Classic item
+    /// (77xxxx id, including the starting Doran's items) counts as League Classic on the Rift, and as ARAM: Mayhem Classic
+    /// in Mayhem.
     /// </summary>
     public static GameMode DetectMode(AllGameData data)
     {
         var mode = GameModes.Detect(data.GameData?.GameMode, data.GameData?.MapNumber ?? 0);
         var holdsClassicItems = data.AllPlayers.Any(p => p.Items.Any(i => ItemCatalog.IsClassicId(i.ItemID)));
-        return mode is GameMode.SummonersRift or GameMode.Unsupported && holdsClassicItems ? GameMode.LeagueClassic : mode;
+        return (mode, holdsClassicItems) switch
+        {
+            (GameMode.SummonersRift or GameMode.Unsupported, true) => GameMode.LeagueClassic,
+            (GameMode.AramMayhem, true) => GameMode.MayhemClassic,
+            _ => mode,
+        };
     }
 
     public static PlayerProfile Profile(

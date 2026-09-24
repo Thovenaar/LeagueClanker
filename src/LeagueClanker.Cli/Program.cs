@@ -18,7 +18,7 @@ using LeagueClanker.Vision;
 //   LeagueClanker.Cli <folder | a.json b.json> [--decline]
 //                                             replay snapshots through the pivot planner, accepting pivots (or declining)
 //   LeagueClanker.Cli --items [map]           list the item catalog with detected traits (map 453 = League Classic)
-//   LeagueClanker.Cli --augments              list Mayhem augments with their tags
+//   LeagueClanker.Cli --augments [arena]      list Mayhem (or Arena) augments with their tags
 //   LeagueClanker.Cli --mayhem <game.json> --offer "A;B;C" [--picked "X;Y"] [--rerolled "A"] [--golden "B"]
 //                                             rank an augment offer and say which cards to reroll
 //   LeagueClanker.Cli --scan <image.png | screen> [--verbose]
@@ -49,10 +49,11 @@ if (args is ["--items", ..])
     return;
 }
 
-if (args is ["--augments"])
+if (args is ["--augments", ..])
 {
-    var augments = await new AugmentDataClient().LoadMayhemAsync(data.Items, cts.Token);
-    Console.WriteLine($"{augments.All.Count} Mayhem augments ({augments.Offerable.Count()} offerable). {AugmentDataClient.Attribution}\n");
+    var set = args.Contains("arena") ? AugmentSet.Arena : AugmentSet.Mayhem;
+    var augments = await new AugmentDataClient().LoadAsync(set, data.Items, cts.Token);
+    Console.WriteLine($"{augments.All.Count} {set} augments ({augments.Offerable.Count()} offerable). {AugmentDataClient.Attribution}\n");
     foreach (var a in augments.All)
     {
         var flags = string.Join(" ", new[] { a.IsDisabled ? "DISABLED" : "", a.IsQuest ? "quest" : "", a.HasDrawback ? "drawback" : "", a.IsRandom ? "random" : "" }.Where(f => f != ""));

@@ -58,8 +58,11 @@ public partial class App : Application
             viewModel.Status = "Loading item data...";
             var data = await new DataDragonClient().LoadAsync(_cts.Token);
             viewModel.Footer = demoPath is null ? $"v{AppVersion} · Patch {data.Version}" : $"v{AppVersion} · Patch {data.Version} · demo: {Path.GetFileName(demoPath)}";
-            if (await LoadAugmentsAsync(viewModel.Augments, data) is { } augments)
-                _ = RunScannerAsync(viewModel.Augments, new AugmentScreenReader(augments), scanImage);
+            var readers = new Dictionary<AugmentSet, AugmentScreenReader>();
+            foreach (var set in Enum.GetValues<AugmentSet>())
+                if (await LoadAugmentsAsync(viewModel.Augments, set, data) is { } augments)
+                    readers[set] = new AugmentScreenReader(augments);
+            _ = RunScannerAsync(viewModel.Augments, () => readers.GetValueOrDefault(viewModel.Augments.CurrentSet), scanImage);
 
             var advisor = new BuildAdvisor(source, data);
             viewModel.Augments.PickedChanged += (_, picked) => advisor.Augments = picked;
@@ -221,19 +224,19 @@ public partial class App : Application
         }
     }
 
-    // Augments only matter in ARAM: Mayhem, so a failure here must not stop the build advisor.
-    private async Task<AugmentCatalog?> LoadAugmentsAsync(AugmentPickerViewModel picker, StaticGameData data)
+    // Augments only matter in ARAM: Mayhem and Arena, so a failure here must not stop the build advisor.
+    private async Task<AugmentCatalog?> LoadAugmentsAsync(AugmentPickerViewModel picker, AugmentSet set, StaticGameData data)
     {
         try
         {
-            var catalog = await new AugmentDataClient().LoadMayhemAsync(data.Items, _cts.Token);
-            picker.SetCatalog(catalog);
+            var catalog = await new AugmentDataClient().LoadAsync(set, data.Items, _cts.Token);
+            picker.SetCatalog(set, catalog);
             return catalog;
         }
         catch (Exception ex) when (ex is HttpRequestException or FormatException or IOException)
         {
-            Log.Error("Loading augment data", ex);
-            picker.SetCatalog(null, $"Couldn't load augment data: {ex.Message}");
+            Log.Error($"Loading {set} augment data", ex);
+            picker.SetCatalog(set, null, $"Couldn't load augment data: {ex.Message}");
             return null;
         }
     }
@@ -242,7 +245,7 @@ public partial class App : Application
     /// Reads the augment offer off the screen while a pick is due. Capture and OCR run off the UI thread;
     /// results are applied on it. With <paramref name="imagePath"/> it reads that screenshot instead (demo).
     /// </summary>
-    private async Task RunScannerAsync(AugmentPickerViewModel picker, AugmentScreenReader reader, string? imagePath)
+    private async Task RunScannerAsync(AugmentPickerViewModel picker, Func<AugmentScreenReader?> readerForGame, string? imagePath)
     {
         using var timer = new PeriodicTimer(ScanInterval);
         var ownWindow = new WindowInteropHelper(MainWindow).Handle;
@@ -250,7 +253,7 @@ public partial class App : Application
         {
             while (await timer.WaitForNextTickAsync(_cts.Token))
             {
-                if (!picker.WantsScan)
+                if (!picker.WantsScan || readerForGame() is not { } reader)
                     continue;
                 try
                 {

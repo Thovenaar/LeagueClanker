@@ -143,6 +143,18 @@ $shots = [ordered]@{
         Save-Window $p "classic.png"
         $p
     }
+    arena = {
+        $p = Start-App "--demo", "samples/arena/jinx-round5.json"
+        Start-Sleep -Seconds 6
+        Save-Window $p "arena.png"
+        $p
+    }
+    swiftplay = {
+        $p = Start-App "--champselect", "samples/champselect/swiftplay.json"
+        Start-Sleep -Seconds 8
+        Save-Window $p "swiftplay.png"
+        $p
+    }
     champselect = {
         $p = Start-App "--champselect", "samples/champselect/top-vs-darius.json"
         Start-Sleep -Seconds 8

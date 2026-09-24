@@ -3,44 +3,48 @@ using LeagueClanker.Core.StaticData;
 namespace LeagueClanker.Core.Augments;
 
 /// <summary>
-/// Downloads ARAM: Mayhem augment data from the League of Legends Wiki (CC BY-SA 3.0) and caches it for a day.
-/// Riot's own static data has no Mayhem augments.
+/// Downloads ARAM: Mayhem and Arena augment data from the League of Legends Wiki (CC BY-SA 3.0) and caches it for a day.
+/// Riot's own static data has neither.
 /// </summary>
 public sealed class AugmentDataClient(HttpClient? http = null, string? cacheDirectory = null)
 {
     public const string MayhemModuleUrl = "https://wiki.leagueoflegends.com/en-us/Module:MayhemAugmentData/data?action=raw";
+    public const string ArenaModuleUrl = "https://wiki.leagueoflegends.com/en-us/Module:ArenaAugmentData/data?action=raw";
     public const string Attribution = "Augment data: League of Legends Wiki (CC BY-SA 3.0)";
 
     private static readonly TimeSpan MaxAge = TimeSpan.FromDays(1);
 
     private readonly HttpClient _http = http ?? CreateHttpClient();
 
-    private readonly string _cachePath = Path.Combine(
-        cacheDirectory ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "LeagueClanker", "augments"),
-        "mayhem.lua");
+    private readonly string _cacheDirectory =
+        cacheDirectory ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "LeagueClanker", "augments");
 
-    public async Task<AugmentCatalog> LoadMayhemAsync(ItemCatalog? items = null, CancellationToken ct = default)
+    public Task<AugmentCatalog> LoadMayhemAsync(ItemCatalog? items = null, CancellationToken ct = default) => LoadAsync(AugmentSet.Mayhem, items, ct);
+
+    public async Task<AugmentCatalog> LoadAsync(AugmentSet set, ItemCatalog? items = null, CancellationToken ct = default)
     {
-        var source = await GetSourceAsync(ct);
+        var source = await GetSourceAsync(set, ct);
         return AugmentCatalog.ParseWikiModule(source, items);
     }
 
-    private async Task<string> GetSourceAsync(CancellationToken ct)
+    private async Task<string> GetSourceAsync(AugmentSet set, CancellationToken ct)
     {
-        var cached = File.Exists(_cachePath);
-        if (cached && DateTime.UtcNow - File.GetLastWriteTimeUtc(_cachePath) < MaxAge)
-            return await File.ReadAllTextAsync(_cachePath, ct);
+        var (url, file) = set == AugmentSet.Arena ? (ArenaModuleUrl, "arena.lua") : (MayhemModuleUrl, "mayhem.lua");
+        var path = Path.Combine(_cacheDirectory, file);
+        var cached = File.Exists(path);
+        if (cached && DateTime.UtcNow - File.GetLastWriteTimeUtc(path) < MaxAge)
+            return await File.ReadAllTextAsync(path, ct);
 
         try
         {
-            var source = await _http.GetStringAsync(MayhemModuleUrl, ct);
-            Directory.CreateDirectory(Path.GetDirectoryName(_cachePath)!);
-            await File.WriteAllTextAsync(_cachePath, source, ct);
+            var source = await _http.GetStringAsync(url, ct);
+            Directory.CreateDirectory(_cacheDirectory);
+            await File.WriteAllTextAsync(path, source, ct);
             return source;
         }
         catch (HttpRequestException) when (cached)
         {
-            return await File.ReadAllTextAsync(_cachePath, ct); // offline: a stale copy beats nothing
+            return await File.ReadAllTextAsync(path, ct); // offline: a stale copy beats nothing
         }
     }
 

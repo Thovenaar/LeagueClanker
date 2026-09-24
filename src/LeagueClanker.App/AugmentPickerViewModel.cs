@@ -26,6 +26,10 @@ public sealed class AugmentPickerViewModel : INotifyPropertyChanged
     private const int MaxPicked = 4;
     private const int MaxSuggestions = 8;
 
+    // One catalog per augment list; the game's mode decides which one is in use.
+    private readonly Dictionary<AugmentSet, AugmentCatalog?> _catalogs = [];
+    private readonly Dictionary<AugmentSet, string?> _errors = [];
+    private AugmentSet _set = AugmentSet.Mayhem;
     private AugmentCatalog? _catalog;
     private AugmentAdvisor? _advisor;
     private BuildRecommendation? _game;
@@ -86,20 +90,38 @@ public sealed class AugmentPickerViewModel : INotifyPropertyChanged
     public bool IsAvailable => _catalog is not null;
     public string Attribution => AugmentDataClient.Attribution;
 
-    /// <summary>You've reached a pick level (3, 7, 11, 15) without taking that many cards, so an offer can be on screen.</summary>
-    public bool WantsScan => _catalog is not null && _game is not null && _picked.Count < GameModes.MayhemAugmentLevels.Count(l => l <= _level);
+    /// <summary>
+    /// An offer can be on screen. In Mayhem that's once you reach a pick level (3, 7, 11, 15) without taking that many
+    /// cards. Arena offers them between rounds, which the game doesn't report, so it watches until you have four.
+    /// </summary>
+    public bool WantsScan => _catalog is not null && _game is not null
+        && _picked.Count < (_set == AugmentSet.Arena ? MaxPicked : GameModes.MayhemAugmentLevels.Count(l => l <= _level));
 
-    public void SetCatalog(AugmentCatalog? catalog, string? error = null)
+    /// <summary>The augment list the current game offers. The app reads the screen with this list's card names.</summary>
+    public AugmentSet CurrentSet => _set;
+
+    public void SetCatalog(AugmentSet set, AugmentCatalog? catalog, string? error = null)
     {
-        _catalog = catalog;
-        _advisor = catalog is null ? null : new AugmentAdvisor(catalog);
+        _catalogs[set] = catalog;
+        _errors[set] = error;
+        if (set == _set)
+            UseSet(set);
+    }
+
+    private void UseSet(AugmentSet set)
+    {
+        _set = set;
+        _catalog = _catalogs.GetValueOrDefault(set);
+        _advisor = _catalog is null ? null : new AugmentAdvisor(_catalog, augmentSet: set);
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsAvailable)));
-        UpdateStatus(error);
+        UpdateStatus(_errors.GetValueOrDefault(set));
     }
 
     /// <summary>Called on every game update: items, levels and enemies change the ranking.</summary>
     public void SetGame(BuildRecommendation game, IReadOnlyList<ItemInfo> plannedItems)
     {
+        if (game.Game.Mode.Augments() is { } set && set != _set)
+            UseSet(set);
         _game = game;
         _plannedItems = plannedItems;
         _level = game.Game.Me.Level;

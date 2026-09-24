@@ -85,12 +85,34 @@ public sealed class GameflowQueue
 public sealed class Lobby
 {
     public LobbyMember? LocalMember { get; init; }
+    public LobbyGameConfig? GameConfig { get; init; }
+
+    /// <summary>Swiftplay picks champions in the lobby, before the queue, so there's no champ select.</summary>
+    public bool IsSwiftplay => string.Equals(GameConfig?.GameMode, "SWIFTPLAY", StringComparison.OrdinalIgnoreCase)
+                               && LocalMember?.PlayerSlots.Any(s => s.ChampionId > 0) == true;
+}
+
+public sealed class LobbyGameConfig
+{
+    public string? GameMode { get; init; }
+    public int QueueId { get; init; }
 }
 
 public sealed class LobbyMember
 {
     /// <summary>The role you queued for: "TOP", "JUNGLE", "MIDDLE", "BOTTOM", "UTILITY", "FILL" or "UNSELECTED".</summary>
     public string? FirstPositionPreference { get; init; }
+
+    /// <summary>Swiftplay's champion picks, one per role you queue for, each with its own runes and spells.</summary>
+    public List<LobbyPlayerSlot> PlayerSlots { get; init; } = [];
+}
+
+public sealed class LobbyPlayerSlot
+{
+    public int ChampionId { get; init; }
+    public string? PositionPreference { get; init; }
+    public int Spell1 { get; init; }
+    public int Spell2 { get; init; }
 }
 
 public sealed class PerkPage
@@ -114,6 +136,9 @@ public interface IChampSelectWriter
     Task<ApplyResult> WriteRunesAsync(Runes.RunePage page, string pageName, CancellationToken ct);
     Task<ApplyResult> WriteSpellsAsync(int first, int second, CancellationToken ct);
     Task<ApplyResult> WriteItemSetAsync(ItemSetDefinition set, CancellationToken ct);
+
+    /// <summary>Swiftplay: the runes and spells live in the lobby's champion slot instead of a rune page.</summary>
+    Task<ApplyResult> WriteSwiftplaySlotAsync(int slot, Runes.RunePage page, int spell1, int spell2, CancellationToken ct);
 }
 
 /// <summary>The rune page calls, behind an interface so the overwrite logic can be tested without a client.</summary>
@@ -160,6 +185,9 @@ public sealed class LeagueClientApi : IClientSource, IRunePageStore, IChampSelec
     public LeagueClientApi(Lockfile lockfile) : this(lockfile.Port, lockfile.Password)
     {
     }
+
+    /// <summary>For tests: talk to a fake client.</summary>
+    internal LeagueClientApi(HttpClient http) => _http = http;
 
     private LeagueClientApi(int port, string password)
     {
@@ -230,7 +258,11 @@ public sealed class LeagueClientApi : IClientSource, IRunePageStore, IChampSelec
         _lastRaw.Clear();
         var session = await GetOrNullAsync<ChampSelectSession>("lol-champ-select/v1/session", ct);
         if (session is null)
-            return null;
+        {
+            // No champ select, but a Swiftplay lobby with champions picked works the same way.
+            var swiftplay = await GetOrNullAsync<Lobby>("lol-lobby/v2/lobby", ct);
+            return swiftplay is { IsSwiftplay: true } ? new ClientSnapshot(null, null, swiftplay) : null;
+        }
 
         var gameflow = await GetOrNullAsync<GameflowSession>("lol-gameflow/v1/session", ct);
         var lobby = await GetOrNullAsync<Lobby>("lol-lobby/v2/lobby", ct);
@@ -244,12 +276,12 @@ public sealed class LeagueClientApi : IClientSource, IRunePageStore, IChampSelec
     {
         get
         {
-            if (!_lastRaw.TryGetValue("lol-champ-select/v1/session", out var session))
+            if (!_lastRaw.ContainsKey("lol-champ-select/v1/session") && !_lastRaw.ContainsKey("lol-lobby/v2/lobby"))
                 return null;
             JsonNode? Node(string path) => _lastRaw.TryGetValue(path, out var raw) ? JsonNode.Parse(raw) : null;
             return new JsonObject
             {
-                ["champSelect"] = JsonNode.Parse(session),
+                ["champSelect"] = Node("lol-champ-select/v1/session"),
                 ["gameflow"] = Node("lol-gameflow/v1/session"),
                 ["lobby"] = Node("lol-lobby/v2/lobby"),
                 ["pickableChampionIds"] = Node("lol-champ-select/v1/pickable-champion-ids"),
@@ -283,6 +315,33 @@ public sealed class LeagueClientApi : IClientSource, IRunePageStore, IChampSelec
         using var putResponse = await _http.PutAsync(path, new StringContent(ItemSetBuilder.Merge(existing, set).ToJsonString(), Encoding.UTF8, "application/json"), ct);
         await EnsureSuccessAsync(putResponse, ct);
         return new ApplyResult(true, $"Added the item set \"{set.Title}\" to the shop.");
+    }
+
+    /// <summary>
+    /// Writes into one Swiftplay champion slot. The client stores the slot's runes as a JSON string. The slots are read
+    /// first and written back whole, so the other slot and fields we don't know stay as they are.
+    /// </summary>
+    public async Task<ApplyResult> WriteSwiftplaySlotAsync(int slot, Runes.RunePage page, int spell1, int spell2, CancellationToken ct)
+    {
+        using var lobbyResponse = await _http.GetAsync("lol-lobby/v2/lobby", ct);
+        if (!lobbyResponse.IsSuccessStatusCode
+            || JsonNode.Parse(await lobbyResponse.Content.ReadAsStringAsync(ct))?["localMember"]?["playerSlots"] is not JsonArray slots
+            || slot >= slots.Count || slots[slot] is not JsonObject target)
+            return new ApplyResult(false, "Couldn't read your Swiftplay champions from the lobby.");
+
+        target["perks"] = new JsonObject
+        {
+            ["perkIds"] = new JsonArray(page.PerkIds.Select(id => (JsonNode)id).ToArray()),
+            ["perkStyle"] = page.PrimaryStyleId,
+            ["perkSubStyle"] = page.SubStyleId,
+        }.ToJsonString();
+        target["spell1"] = spell1;
+        target["spell2"] = spell2;
+
+        using var response = await _http.PutAsync("lol-lobby/v1/lobby/members/localMember/player-slots",
+            new StringContent(slots.ToJsonString(), Encoding.UTF8, "application/json"), ct);
+        await EnsureSuccessAsync(response, ct);
+        return new ApplyResult(true, $"Set the runes and spells for your Swiftplay champion {slot + 1}.");
     }
 
     public Task<PerkPage?> GetCurrentPageAsync(CancellationToken ct) => GetOrNullAsync<PerkPage>("lol-perks/v1/currentpage", ct);

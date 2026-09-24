@@ -316,7 +316,8 @@ public sealed class NoFrontlineRule : IBuildRule
 {
     public Situation? Evaluate(GameAnalysis game)
     {
-        if (!game.Me.Archetype.IsFrontline() || game.Allies.Frontline.Count > 0)
+        // Needs teammates to talk about: in Arena, where your partner is unknown, there are none.
+        if (!game.Me.Archetype.IsFrontline() || game.Allies.Players.Count == 0 || game.Allies.Frontline.Count > 0)
             return null;
 
         return new Situation("frontline", "Your team has no other frontline", 0.8,
@@ -333,6 +334,8 @@ public sealed class TeamDamageSkewRule : IBuildRule
     {
         var damage = game.Me.Archetype.DamageTypeOf();
         var team = game.MyTeam;
+        if (game.Allies.Players.Count == 0)
+            return null; // a "team" of just you says nothing
 
         if (damage == DamageType.Physical && team.PhysicalShare >= Threshold)
             return new Situation("team AD", $"Your team is {BuildRules.Percent(team.PhysicalShare)} AD (enemies will stack armor)",

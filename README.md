@@ -14,7 +14,7 @@ It explains itself in plain sentences:
 |---|---|---|---|
 | ![Build tab](docs/screenshots/build.png) | ![Pivot suggestion](docs/screenshots/pivot-suggested.png) | ![Pivot declined](docs/screenshots/pivot-declined.png) | ![Players tab](docs/screenshots/players.png) |
 
-In ARAM: Mayhem an Augments tab ranks the cards you're offered:
+In ARAM: Mayhem and Arena an Augments tab ranks the cards you're offered:
 
 <img src="docs/screenshots/augments.png" alt="Augments tab" width="400">
 
@@ -27,6 +27,12 @@ In champ select it suggests bans, checks your team's comp, and shows your lane o
 | Picking | Banning |
 |---|---|
 | ![Champ select with lane matchup, playstyle and runes](docs/screenshots/champselect.png) | ![Ban phase with ban suggestions and team comp check](docs/screenshots/draft.png) |
+
+Arena gets its own item shop, and Swiftplay's two lobby champions get runes and spells before you queue:
+
+| Arena | Swiftplay |
+|---|---|
+| ![Arena build](docs/screenshots/arena.png) | ![Swiftplay lobby](docs/screenshots/swiftplay.png) |
 
 For playing on one screen there's a compact mode, with just the next item, what to buy and the matchup:
 
@@ -68,7 +74,9 @@ dotnet run --project src/LeagueClanker.App -- --demo samples/mayhem/jinx-level7.
 dotnet run --project src/LeagueClanker.App -- --champselect samples/champselect/leona-support.json
 ```
 
-`samples/champselect/top-vs-darius.json` is a top laner who hasn't locked in yet, against a Darius, so it shows counter picks. `samples/champselect/ban-phase.json` is the same player during bans, with an all-AD team.
+`samples/champselect/top-vs-darius.json` is a top laner who hasn't locked in yet, against a Darius, so it shows counter picks. `samples/champselect/ban-phase.json` is the same player during bans, with an all-AD team. `samples/champselect/swiftplay.json` is a Swiftplay lobby with two champions.
+
+`samples/arena/jinx-round5.json` is an Arena game and `samples/mayhem/ashe-classic.json` an ARAM: Mayhem Classic game.
 
 Point it at a folder to replay snapshots in order, one every 10 seconds. `samples/pivot-demo` is a Garen game where the enemy team switches from AD to AP items, which triggers a pivot suggestion:
 
@@ -82,7 +90,7 @@ The CLI prints the same output as text, which is faster when tuning rules:
 dotnet run --project src/LeagueClanker.Cli -- samples/three-tanks.json
 ```
 
-Run it with no arguments to watch the live game, or with `--items` to list every item and the traits the parser detected. `--items 12` lists the Howling Abyss items and `--items 453` the League Classic ones. Give it a folder to replay snapshots through the pivot planner. It accepts every pivot, or declines them with `--decline`:
+Run it with no arguments to watch the live game, or with `--items` to list every item and the traits the parser detected. `--items 12` lists the Howling Abyss items, `--items 30` the Arena ones and `--items 453` the League Classic ones. Give it a folder to replay snapshots through the pivot planner. It accepts every pivot, or declines them with `--decline`:
 
 ```bash
 dotnet run --project src/LeagueClanker.Cli -- samples/pivot-demo --decline
@@ -110,7 +118,7 @@ During champ select, `--champselect` does the same for your pick and adds your l
 dotnet run --project src/LeagueClanker.Cli -- --matchup - --position top --enemies "Darius;Amumu;Caitlyn"
 ```
 
-`--augments` lists all 225 augments with the tags the parser gave them. `--scan` reads an offer from a screenshot, or from the running game with `--scan screen`. Add `--verbose` to see every line of text it recognized:
+`--augments` lists the Mayhem augments with the tags the parser gave them, and `--augments arena` the Arena ones. `--scan` reads an offer from a screenshot, or from the running game with `--scan screen`. Add `--verbose` to see every line of text it recognized:
 
 ```bash
 dotnet run --project src/LeagueClanker.Cli -- --scan samples/mayhem/offer-mock.png --verbose
@@ -238,7 +246,14 @@ At startup the app asks GitHub for the latest release. When there's a newer vers
 
 ### Game modes
 
-The advisor reads `gameMode` and the map number from the live game. Summoner's Rift uses map 11 items. ARAM and ARAM: Mayhem (`KIWI`) use Howling Abyss items. League Classic uses its own shop, see below. Arena isn't supported.
+The advisor reads `gameMode` and the map number from the live game.
+
+- **Summoner's Rift** (`CLASSIC`, and `SWIFTPLAY`) uses map 11 items.
+- **ARAM** and **ARAM: Mayhem** (`KIWI`) use the Howling Abyss items.
+- **ARAM: Mayhem Classic** (`KIWI_JADE`) uses League Classic's items on Howling Abyss, with Mayhem's augments. A Mayhem game where someone holds a classic item counts too.
+- **League Classic** uses its own shop, see below.
+- **Arena** (`CHERRY`) uses Arena's shop. That's mostly Arena's own copies of the items (22xxxx ids, bought outright, boots included) and its prismatic items (44xxxx), plus a few standard items. Arena's augments get the Augments tab. The Live Client API doesn't say who your duo partner is, so the whole lobby counts as enemies, and the rules about your team stay quiet.
+- **Swiftplay** picks two champions in the lobby, before the queue, so there's no champ select. The app reads those lobby slots instead and shows the champ select panel for each champion, with a chip to switch between them. *Apply* writes the runes and spells into that champion's lobby slot, and adds the item set. There are no enemy picks to show yet, so there's no lane matchup.
 
 ### League Classic
 
@@ -259,9 +274,11 @@ What changes in League Classic:
 - **Jungle items.** Spirit of the Ancient Golem and the other jungle items only show up when you have Smite.
 - **Old item wording.** Zhonya's "Invulnerable and Untargetable" counts as stasis and Quicksilver's "Removes all debuffs" as a cleanse. Randuin's attack speed slow, Madred's %max health damage and Abyssal Scepter's magic resist aura are recognized too.
 
-### ARAM: Mayhem augments
+### ARAM: Mayhem and Arena augments
 
-The app reads the offer off your screen. Once you reach a pick level (3, 7, 11 or 15) without having taken that many cards, it screenshots the League window every 2 seconds and runs Windows' built-in text recognition on it. That takes about 130 ms. It only looks at the middle of the screen, which skips chat and the HUD, and it blacks out its own window so it never reads its own suggestions. `AugmentTextMatcher` matches the text against the card names by edit distance. That way OCR slips like "CRITICA1" and names that wrap over two lines still count, and a stray card name of another tier elsewhere on screen is ignored. When cards show up, the app switches to the Augments tab with a chime. A reroll changes the offer, and the ranking follows.
+The app reads the offer off your screen. In Mayhem, once you reach a pick level (3, 7, 11 or 15) without having taken that many cards, it screenshots the League window every 2 seconds and runs Windows' built-in text recognition on it. That takes about 130 ms. It only looks at the middle of the screen, which skips chat and the HUD, and it blacks out its own window so it never reads its own suggestions. `AugmentTextMatcher` matches the text against the card names by edit distance. That way OCR slips like "CRITICA1" and names that wrap over two lines still count, and a stray card name of another tier elsewhere on screen is ignored. When cards show up, the app switches to the Augments tab with a chime. A reroll changes the offer, and the ranking follows.
+
+Arena offers augments between rounds, and the game doesn't report rounds. So in Arena the app keeps watching the screen until you have four cards. Arena's card list comes from the wiki's Arena module. Its simulation has no rule against two Silver offers in a row, because that rule is Mayhem's.
 
 It can't see which card you click, only that the cards disappeared, so it asks. Press *I picked this* on the card you took and it joins your cards for the next offer. When one or two cards change while the rest stay, those were rerolls: they're marked as used up and the advice updates.
 
@@ -269,7 +286,7 @@ You can always type cards instead: type part of a name and mark each match as *O
 
 `Augments/` ranks the three cards in an augment offer by the best final set of four they lead to, without win rates:
 
-1. `AugmentDataClient` downloads the wiki's augment data (225 cards) and caches it for a day. Riot's own data has no Mayhem augments.
+1. `AugmentDataClient` downloads the wiki's augment data (225 Mayhem cards, 257 Arena cards) and caches it for a day. Riot's own data has neither.
 2. `AugmentTagger` tags each card with what it gives (attack speed, true damage, shields, ...) and what it needs or scales with (attacking, crits, pets, AP ratio, ...), from the description text. A short override list fixes cards the patterns misread.
 3. `AugmentScorer` values a card by its fit with your champion, its pairings with the cards you picked (a card that pays off on attacks wants attack speed), your items (on-hit items, "Upgrade Infinity Edge"), and the game situation from the item rules.
 4. `AugmentAdvisor` simulates your remaining picks 1,500 times per option with Mayhem's rules: picks at levels 3, 7, 11 and 15, one tier per offer, the first two offers never both Silver, one reroll per card. It ranks each option by the average value of the final set. That's how a weaker card that sets up combos can beat a stronger card that leads nowhere.
@@ -335,7 +352,10 @@ To add a rule, implement `IBuildRule`, return a `Situation` with a label, a sent
 - Only stats and keyword traits count. Rabadon's Deathcap's AP multiplier, for example, is invisible to the scorer. The core-item bonus papers over some of this.
 - "Buy now" plans toward your next item only. It doesn't pick up a cheap part of a later item when your gold doesn't fit the next one.
 - Your own archetype comes from Riot's class tags plus a short override list. Off-meta picks like AP Shaco get the wrong item pool. A manual archetype picker in the window would fix it.
-- Arena isn't supported. Riot's policy also rules out showing win rates for augments and Arena items, so the augment advisor reasons from card effects only.
+- Riot's policy rules out showing win rates for augments and Arena items, so the augment advisor reasons from card effects only.
+- In Arena the whole lobby counts as enemies, because the API doesn't show your duo partner. Rules that count enemies (tanks, healers) fire more easily with 15 of them.
+- Arena augments are tagged by the same patterns as Mayhem's. About 1 in 7 gets no tags yet, which makes it rank on its tier alone.
+- Swiftplay slot writing has been tested against a simulated client only, like the rest of what *Apply* writes.
 - Augment tags come from description text. Expect some cards to be tagged wrong until they've been reviewed with `--augments`.
 - Card names are matched in English, so screen reading needs the League client in English.
 - Screen reading has only been tested on a mock screenshot, not on real games yet.
@@ -352,7 +372,7 @@ To add a rule, implement `IBuildRule`, return a `Situation` with a label, a sent
 
 ## Legal
 
-Augment data comes from the [League of Legends Wiki](https://wiki.leagueoflegends.com/en-us/Module:MayhemAugmentData/data) under CC BY-SA 3.0.
+Augment data comes from the League of Legends Wiki under CC BY-SA 3.0: [Mayhem](https://wiki.leagueoflegends.com/en-us/Module:MayhemAugmentData/data) and [Arena](https://wiki.leagueoflegends.com/en-us/Module:ArenaAugmentData/data).
 
 Rune pages, summoner spells, skill orders, starting and core items, role play rates and matchups come from [op.gg](https://www.op.gg). LeagueClanker isn't affiliated with op.gg.
 

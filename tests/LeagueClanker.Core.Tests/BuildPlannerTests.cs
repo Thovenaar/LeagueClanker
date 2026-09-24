@@ -145,8 +145,9 @@ public class BuildPlannerTests
         Assert.Equal(planner.Latest!.Items[0].Item.Id, planner.Upcoming[0].Item.Id);
     }
 
+    // Garen with a marksman teammate: he's the team's only frontline, like in a real game.
     private static BuildRecommendation Garen((string, int[])[] enemies, params int[] owned) =>
-        Recommend([("Garen", owned)], enemies);
+        Recommend([("Garen", owned), ("Jinx", [])], enemies);
 
     private static BuildRecommendation Recommend((string, int[])[] allies, (string, int[])[] enemies) =>
         new RecommendationEngine(TestData.Static).Recommend(GameAnalyzer.Analyze(TestData.Game(allies, enemies), TestData.Static)!);

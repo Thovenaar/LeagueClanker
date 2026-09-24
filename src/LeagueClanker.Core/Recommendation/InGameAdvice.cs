@@ -38,9 +38,13 @@ public static class BuyAdvisor
         if (best.Items.Count == 0)
         {
             var cheapest = Leaves(tree).Where(p => !p.Owned).MinBy(p => p.Cost);
-            return cheapest is null
-                ? null
-                : new BuyAdvice($"Save up: {cheapest.Cost - budget:N0}g more for {cheapest.Item.Name}, {goal}.", [], 0);
+            if (cheapest is null)
+                return null;
+            // Items without parts (Arena sells finished items outright) are their own cheapest part.
+            var text = cheapest.Item.Id == next.Id
+                ? $"Save up: {cheapest.Cost - budget:N0}g more for {next.Name} ({tree.Cost:N0}g)."
+                : $"Save up: {cheapest.Cost - budget:N0}g more for {cheapest.Item.Name}, {goal}.";
+            return new BuyAdvice(text, [], 0);
         }
 
         var buy = best.Items.OrderByDescending(i => Cost(i, tree)).ToList();
