@@ -181,6 +181,14 @@ public sealed class MainViewModel : INotifyPropertyChanged
     /// <summary>"vs Caitlyn: 53.1% win rate over 2,484 games · favored". Empty without a lane.</summary>
     public string MatchupLine { get => _matchupLine; private set => Set(ref _matchupLine, value); }
 
+    /// <summary>Your own notes, shown for your lane opponent. Set by the app.</summary>
+    public MatchupNotes? Notes { get; set; }
+
+    private string _matchupNote = "";
+
+    /// <summary>Your note on the lane opponent, from champ select or an earlier game.</summary>
+    public string MatchupNote { get => _matchupNote; private set => Set(ref _matchupNote, value); }
+
     /// <summary>You picked another playstyle in game. The build follows on the next poll.</summary>
     public void ChangePlaystyle(Archetype playstyle)
     {
@@ -307,12 +315,14 @@ public sealed class MainViewModel : INotifyPropertyChanged
         if (request is null)
         {
             MatchupLine = "";
+            MatchupNote = "";
             return;
         }
 
         var report = await Matchups!.AnalyzeAsync(request);
         if (key != _matchupKey)
             return;
+        MatchupNote = report?.Opponent is { } lane && Notes?.Get(lane) is { Length: > 0 } note ? $"Your notes: {note}" : "";
         MatchupLine = report switch
         {
             { Matchup: { } m } => $"vs {m.Opponent.Name}: {m.WinRate:P1} win rate over {m.Games:N0} games \u00b7 {m.Verdict}",

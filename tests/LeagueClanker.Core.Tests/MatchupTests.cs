@@ -194,13 +194,17 @@ public class MatchupTests
             {"data": {"summary": {"positions": [{"name": "TOP"}, {"name": "JUNGLE"}]},
                       "counters": [{"champion_id": 86, "play": 2792, "win": 1375}]}}
             """);
-        var rates = OpggClient.ParseRoleRates("""
-            {"data": [{"id": 122, "positions": [{"name": "TOP", "stats": {"role_rate": 0.88}}, {"name": "JUNGLE", "stats": {"role_rate": 0.05}}]}]}
+        var stats = OpggClient.ParseRoleStats("""
+            {"data": [{"id": 122, "positions": [
+              {"name": "TOP", "stats": {"play": 12740, "win_rate": 0.494, "ban_rate": 0.115, "role_rate": 0.88, "tier_data": {"tier": 2, "rank": 15}}},
+              {"name": "JUNGLE", "stats": {"play": 500, "win_rate": 0.47, "ban_rate": null, "role_rate": 0.05}}]}]}
             """);
 
         Assert.Equal(Position.Top, champion.MainRole);
         Assert.Equal(new OpggMatchup(86, 2792, 1375), champion.Matchups.Single());
-        Assert.Equal(0.88, rates[122][Position.Top]);
+        Assert.Equal(new OpggRoleStats(0.88, 0.494, 0.115, 2, 15, 12740), stats[122][Position.Top]);
+        Assert.Equal(0, stats[122][Position.Jungle].BanRate); // op.gg sends null
+        Assert.Equal(5, stats[122][Position.Jungle].Tier);
     }
 
     private static MatchupAdvisor Advisor(FakeData data) => new(data, Champions);
@@ -210,8 +214,12 @@ public class MatchupTests
         public bool FailRates { get; init; }
         public bool FailMatchups { get; init; }
 
-        public Task<IReadOnlyDictionary<int, IReadOnlyDictionary<Position, double>>> GetRoleRatesAsync(CancellationToken ct) =>
-            FailRates ? throw new HttpRequestException("offline") : Task.FromResult<IReadOnlyDictionary<int, IReadOnlyDictionary<Position, double>>>(Rates);
+        public Task<IReadOnlyDictionary<int, IReadOnlyDictionary<Position, OpggRoleStats>>> GetRoleStatsAsync(CancellationToken ct) =>
+            FailRates
+                ? throw new HttpRequestException("offline")
+                : Task.FromResult<IReadOnlyDictionary<int, IReadOnlyDictionary<Position, OpggRoleStats>>>(Rates.ToDictionary(
+                    c => c.Key,
+                    c => (IReadOnlyDictionary<Position, OpggRoleStats>)c.Value.ToDictionary(r => r.Key, r => new OpggRoleStats(r.Value, 0.5, 0, 3, 50, 1000))));
 
         public Task<IReadOnlyList<OpggMatchup>> GetMatchupsAsync(int championKey, Position role, CancellationToken ct) =>
             FailMatchups ? throw new HttpRequestException("offline") : Task.FromResult(this.GetValueOrDefault((championKey, role)) ?? []);

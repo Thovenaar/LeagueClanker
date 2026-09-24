@@ -27,8 +27,9 @@ using LeagueClanker.Vision;
 //                                             recommend a rune page (from op.gg unless --source rules)
 //   LeagueClanker.Cli --champselect [--style tank] [--source rules] [--apply]
 //                                             runes and lane matchup for your champ select pick; --apply writes the runes
-//   LeagueClanker.Cli --matchup <champion | -> --position top --enemies "A;B;C" [--hover]
-//                                             guess enemy roles, show your lane matchup, or counter picks with "-" or --hover
+//   LeagueClanker.Cli --matchup <champion | -> --position top --enemies "A;B;C" [--allies "D;E"] [--hover] [--ban]
+//                                             guess enemy roles, show your lane matchup, or counter picks with "-" or --hover;
+//                                             --allies adds the team comp check, --ban adds ban suggestions
 
 Console.OutputEncoding = System.Text.Encoding.UTF8;
 using var cts = new CancellationTokenSource();
@@ -100,6 +101,15 @@ if (args is ["--champselect", ..])
     PrintMatchup(await new MatchupAdvisor(opgg, data.Champions).AnalyzeAsync(
         new MatchupRequest(champion, state.IsLocked, state.Position, state.Mode, state.Enemies) { Pickable = state.Pickable.Count > 0 ? state.Pickable : null, Mastery = state.Mastery },
         cts.Token));
+    PrintDraft(await new DraftAdvisor(opgg, data.Champions).AnalyzeAsync(
+        new DraftRequest(champion, state.IsLocked, state.Position, state.Mode, state.Allies, state.Enemies)
+        {
+            HasPendingBan = state.HasPendingBan,
+            Unavailable = state.Bans.Concat(state.Allies.Select(a => a.Key)).ToHashSet(),
+            Pickable = state.Pickable.Count > 0 ? state.Pickable : null,
+            Mastery = state.Mastery,
+        },
+        cts.Token));
     if (args.Contains("--apply"))
         Console.WriteLine((await new RunePageWriter(client).ApplyAsync(recommendation.Page, RunePageWriter.PageName(champion), cts.Token)).Message);
     return;
@@ -111,6 +121,14 @@ if (args is ["--matchup", var who, ..])
     var request = new MatchupRequest(me, IsLocked: me is not null && !args.Contains("--hover"), Positions.Parse(Option("--position")),
         GameMode.SummonersRift, Champions(Option("--enemies")));
     PrintMatchup(await new MatchupAdvisor(opgg, data.Champions).AnalyzeAsync(request, cts.Token));
+    var allies = Champions(Option("--allies"));
+    PrintDraft(await new DraftAdvisor(opgg, data.Champions).AnalyzeAsync(
+        new DraftRequest(me, request.IsLocked, request.Position, request.Mode, allies, request.Enemies)
+        {
+            HasPendingBan = args.Contains("--ban"),
+            Unavailable = allies.Select(a => a.Key).ToHashSet(),
+        },
+        cts.Token));
     return;
 }
 
@@ -281,6 +299,31 @@ async Task PrintExtrasAsync(ChampSelectState state, Archetype playstyle)
 List<ChampionInfo> Champions(string? names) =>
     (names ?? "").Split(';', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
         .Select(n => data.Champions.Find(n) ?? throw new ArgumentException($"Unknown champion '{n}'.")).ToList();
+
+static void PrintDraft(DraftReport? report)
+{
+    if (report is null)
+        return;
+
+    Console.WriteLine("=== Draft ===");
+    foreach (var ban in report.Bans)
+        Console.WriteLine($"  Ban {ban.Champion.Name}: {ban.Reason}");
+    foreach (var warning in report.Warnings)
+        Console.WriteLine($"  ! {warning}");
+    if (report.EnemySummary is not null)
+        Console.WriteLine($"  {report.EnemySummary}");
+    if (report.FillPicks.Count > 0)
+    {
+        Console.WriteLine($"  {report.FillHeader}:");
+        foreach (var pick in report.FillPicks)
+            Console.WriteLine($"    {pick.Champion.Name,-14} {pick.WinRate,6:P1}{(pick.YouPlayIt ? "  (you play this)" : "")}");
+    }
+    if (report.Note is not null)
+        Console.WriteLine($"  {report.Note}");
+    if (report is { Bans.Count: 0, Warnings.Count: 0, FillPicks.Count: 0, EnemySummary: null, Note: null })
+        Console.WriteLine("  Nothing to flag.");
+    Console.WriteLine();
+}
 
 static void PrintMatchup(MatchupReport? report)
 {

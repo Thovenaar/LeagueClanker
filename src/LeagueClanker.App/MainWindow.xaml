@@ -61,6 +61,28 @@
                 </DataTrigger>
             </DataTemplate.Triggers>
         </DataTemplate>
+        <!-- A champion suggestion: icon, name, "you play this", win rate and games -->
+        <DataTemplate x:Key="CounterRowTemplate" DataType="{x:Type local:CounterRow}">
+            <Border Background="{StaticResource CardBrush}" CornerRadius="4" Padding="6,3" Margin="0,0,0,3">
+                <DockPanel>
+                    <TextBlock DockPanel.Dock="Right" Text="{Binding Games}" Foreground="{StaticResource MutedBrush}" FontSize="10"
+                               VerticalAlignment="Center" Margin="8,0,0,0" />
+                    <TextBlock DockPanel.Dock="Right" Text="{Binding WinRate}" FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center" />
+                    <Image Source="{Binding IconUrl}" Width="20" Height="20" />
+                    <TextBlock Text="{Binding Name}" FontSize="11" Margin="6,0,0,0" VerticalAlignment="Center" />
+                    <Border x:Name="Played" Visibility="Collapsed" BorderBrush="{StaticResource AccentBrush}" BorderThickness="1"
+                            CornerRadius="3" Padding="4,0" Margin="6,0,0,0" VerticalAlignment="Center" HorizontalAlignment="Left">
+                        <TextBlock Text="you play this" Foreground="{StaticResource AccentBrush}" FontSize="9" />
+                    </Border>
+                </DockPanel>
+            </Border>
+            <DataTemplate.Triggers>
+                <DataTrigger Binding="{Binding YouPlayIt}" Value="True">
+                    <Setter TargetName="Played" Property="Visibility" Value="Visible" />
+                </DataTrigger>
+            </DataTemplate.Triggers>
+        </DataTemplate>
+
         <DataTemplate x:Key="RuneRowTemplate" DataType="{x:Type local:RuneRow}">
             <StackPanel Orientation="Horizontal" Margin="0,2">
                 <Image Source="{Binding IconUrl}" Width="22" Height="22" />
@@ -110,6 +132,26 @@
                         </StackPanel>
                     </DockPanel>
 
+                    <!-- Bans: while your ban is still to come -->
+                    <StackPanel Visibility="{Binding Bans, Converter={StaticResource HasContent}}">
+                        <TextBlock Style="{StaticResource SectionHeader}" Text="BAN SUGGESTIONS" />
+                        <ItemsControl ItemsSource="{Binding Bans}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate DataType="{x:Type local:BanRow}">
+                                    <Border Background="{StaticResource CardBrush}" CornerRadius="4" Padding="6,3" Margin="0,0,0,3">
+                                        <DockPanel>
+                                            <Image DockPanel.Dock="Left" Source="{Binding IconUrl}" Width="20" Height="20" VerticalAlignment="Top" />
+                                            <StackPanel Margin="6,0,0,0">
+                                                <TextBlock Text="{Binding Name}" FontSize="11" FontWeight="SemiBold" />
+                                                <TextBlock Text="{Binding Reason}" FontSize="10" Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap" />
+                                            </StackPanel>
+                                        </DockPanel>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+
                     <!-- Lane: who you'll face, how that matchup goes, and before you lock in, what beats them -->
                     <StackPanel Visibility="{Binding HasLane, Converter={StaticResource BoolToVisibility}}">
                         <TextBlock Style="{StaticResource SectionHeader}" Text="{Binding LaneTitle}" />
@@ -121,32 +163,17 @@
                         <TextBlock Text="{Binding MatchupText}" FontSize="11" TextWrapping="Wrap" Margin="0,4,0,0"
                                    Visibility="{Binding MatchupText, Converter={StaticResource HasContent}}" />
 
+                        <StackPanel Visibility="{Binding HasOpponent, Converter={StaticResource BoolToVisibility}}">
+                            <TextBlock Text="{Binding NoteLabel}" Foreground="{StaticResource AccentBrush}" FontSize="10" FontWeight="Bold" Margin="0,8,0,3" />
+                            <TextBox Style="{StaticResource SearchBox}" Text="{Binding OpponentNote, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True"
+                                     TextWrapping="Wrap" MinHeight="34" MaxHeight="90" VerticalScrollBarVisibility="Auto" FontSize="11"
+                                     ToolTip="Saved as you type. Shown whenever you face this champion again, also in game."
+                                     AutomationProperties.Name="Matchup notes" />
+                        </StackPanel>
+
                         <StackPanel Visibility="{Binding CounterPicks, Converter={StaticResource HasContent}}">
                             <TextBlock Text="{Binding CounterHeader}" Foreground="{StaticResource AccentBrush}" FontSize="10" FontWeight="Bold" Margin="0,8,0,3" />
-                            <ItemsControl ItemsSource="{Binding CounterPicks}">
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate DataType="{x:Type local:CounterRow}">
-                                        <Border Background="{StaticResource CardBrush}" CornerRadius="4" Padding="6,3" Margin="0,0,0,3">
-                                            <DockPanel>
-                                                <TextBlock DockPanel.Dock="Right" Text="{Binding Games}" Foreground="{StaticResource MutedBrush}" FontSize="10"
-                                                           VerticalAlignment="Center" Margin="8,0,0,0" />
-                                                <TextBlock DockPanel.Dock="Right" Text="{Binding WinRate}" FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center" />
-                                                <Image Source="{Binding IconUrl}" Width="20" Height="20" />
-                                                <TextBlock Text="{Binding Name}" FontSize="11" Margin="6,0,0,0" VerticalAlignment="Center" />
-                                                <Border x:Name="Played" Visibility="Collapsed" BorderBrush="{StaticResource AccentBrush}" BorderThickness="1"
-                                                        CornerRadius="3" Padding="4,0" Margin="6,0,0,0" VerticalAlignment="Center" HorizontalAlignment="Left">
-                                                    <TextBlock Text="you play this" Foreground="{StaticResource AccentBrush}" FontSize="9" />
-                                                </Border>
-                                            </DockPanel>
-                                        </Border>
-                                        <DataTemplate.Triggers>
-                                            <DataTrigger Binding="{Binding YouPlayIt}" Value="True">
-                                                <Setter TargetName="Played" Property="Visibility" Value="Visible" />
-                                            </DataTrigger>
-                                        </DataTemplate.Triggers>
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
+                            <ItemsControl ItemsSource="{Binding CounterPicks}" ItemTemplate="{StaticResource CounterRowTemplate}" />
                             <TextBlock Text="Your win rate with each champion against them on op.gg, all ranks." Foreground="{StaticResource MutedBrush}" FontSize="10" />
                         </StackPanel>
 
@@ -155,6 +182,29 @@
                         <TextBlock Text="{Binding LaneNote}" Foreground="{StaticResource MutedBrush}" FontSize="10" TextWrapping="Wrap" Margin="0,4,0,0"
                                    Visibility="{Binding LaneNote, Converter={StaticResource HasContent}}" />
                     </StackPanel>
+
+                    <!-- Team: gaps in your team's comp, the enemy comp so far, and picks that fill the gap -->
+                    <StackPanel Visibility="{Binding HasTeamSection, Converter={StaticResource BoolToVisibility}}">
+                        <TextBlock Style="{StaticResource SectionHeader}" Text="TEAM COMP" />
+                        <ItemsControl ItemsSource="{Binding TeamWarnings}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <DockPanel Margin="0,0,0,3">
+                                        <TextBlock DockPanel.Dock="Left" Text="!" Foreground="{StaticResource AdBrush}" FontWeight="Bold" Margin="0,0,7,0" />
+                                        <TextBlock Text="{Binding}" FontSize="11" TextWrapping="Wrap" />
+                                    </DockPanel>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <TextBlock Text="{Binding EnemySummary}" Foreground="{StaticResource MutedBrush}" FontSize="11" TextWrapping="Wrap" Margin="0,2,0,0"
+                                   Visibility="{Binding EnemySummary, Converter={StaticResource HasContent}}" />
+                        <StackPanel Visibility="{Binding FillPicks, Converter={StaticResource HasContent}}">
+                            <TextBlock Text="{Binding FillHeader}" Foreground="{StaticResource AccentBrush}" FontSize="10" FontWeight="Bold" Margin="0,8,0,3" />
+                            <ItemsControl ItemsSource="{Binding FillPicks}" ItemTemplate="{StaticResource CounterRowTemplate}" />
+                        </StackPanel>
+                    </StackPanel>
+                    <TextBlock Text="{Binding DraftNote}" Foreground="{StaticResource MutedBrush}" FontSize="10" TextWrapping="Wrap" Margin="0,4,0,0"
+                               Visibility="{Binding DraftNote, Converter={StaticResource HasContent}}" />
 
                     <StackPanel Visibility="{Binding HasChampion, Converter={StaticResource BoolToVisibility}}">
                         <TextBlock Style="{StaticResource SectionHeader}" Text="HOW DO YOU WANT TO PLAY?" />
@@ -267,6 +317,8 @@
                     </StackPanel>
                     <TextBlock Text="{Binding MatchupLine}" Foreground="{StaticResource MutedBrush}" FontSize="11" TextTrimming="CharacterEllipsis" Margin="0,0,0,8"
                                Visibility="{Binding MatchupLine, Converter={StaticResource HasContent}}" ToolTip="Your lane matchup on op.gg, all ranks" />
+                    <TextBlock Text="{Binding MatchupNote}" Foreground="{StaticResource AccentBrush}" FontSize="11" TextWrapping="Wrap" Margin="0,-4,0,8"
+                               Visibility="{Binding MatchupNote, Converter={StaticResource HasContent}}" />
                     <Border Height="4" Visibility="{Binding MatchupLine, Converter={StaticResource HasContent}, ConverterParameter=invert}" />
 
                     <!-- Enemy damage split bar -->

@@ -22,9 +22,11 @@ In League Classic it recommends from the old item shop, with the old stats:
 
 <img src="docs/screenshots/classic.png" alt="League Classic build" width="400">
 
-In champ select it shows your lane opponent, champions that beat them before you lock in, and how your pick does against them. You pick how you'll play, and one click writes the matching rune page, summoner spells and a shop item set into the client:
+In champ select it suggests bans, checks your team's comp, and shows your lane opponent with champions that beat them before you lock in. You pick how you'll play, and one click writes the matching rune page, summoner spells and a shop item set into the client:
 
-<img src="docs/screenshots/champselect.png" alt="Champ select with playstyle and rune page" width="400">
+| Picking | Banning |
+|---|---|
+| ![Champ select with lane matchup, playstyle and runes](docs/screenshots/champselect.png) | ![Ban phase with ban suggestions and team comp check](docs/screenshots/draft.png) |
 
 The screenshots come from the demo snapshots in `samples/`, not a live game.
 
@@ -62,7 +64,7 @@ dotnet run --project src/LeagueClanker.App -- --demo samples/mayhem/jinx-level7.
 dotnet run --project src/LeagueClanker.App -- --champselect samples/champselect/leona-support.json
 ```
 
-`samples/champselect/top-vs-darius.json` is a top laner who hasn't locked in yet, against a Darius, so it shows counter picks.
+`samples/champselect/top-vs-darius.json` is a top laner who hasn't locked in yet, against a Darius, so it shows counter picks. `samples/champselect/ban-phase.json` is the same player during bans, with an all-AD team.
 
 Point it at a folder to replay snapshots in order, one every 10 seconds. `samples/pivot-demo` is a Garen game where the enemy team switches from AD to AP items, which triggers a pivot suggestion:
 
@@ -98,7 +100,7 @@ dotnet run --project src/LeagueClanker.Cli -- --runes Ezreal --position bottom -
 
 During champ select, `--champselect` does the same for your pick and adds your lane matchup. `--champselect --apply` writes the page into the client.
 
-`--matchup` guesses the enemy roles and shows your lane matchup. Use `-` instead of a champion, or add `--hover`, to see counter picks:
+`--matchup` guesses the enemy roles and shows your lane matchup. Use `-` instead of a champion, or add `--hover`, to see counter picks. `--allies` adds the team comp check and `--ban` adds ban suggestions:
 
 ```bash
 dotnet run --project src/LeagueClanker.Cli -- --matchup - --position top --enemies "Darius;Amumu;Caitlyn"
@@ -174,6 +176,14 @@ The enemy in your role is your lane opponent. In bottom lane you also see the ot
 - **In game**, the matchup line sits under your champion's name. Matchmade games report every role, so nothing is guessed there.
 
 op.gg's ranked data is read for all ranks. That's about four times the games of their default Emerald+ filter. With only a hundred games a pairing's win rate jumps around; Ornn looked like a 60% counter to Darius at Emerald+, and is 54% over all ranks. ARAM, Arena and League Classic have no lanes, so they get no matchup.
+
+### Champ select: bans, team comp and notes
+
+- **Bans.** While your ban is still to come, it lists up to five champions to ban. With a champion in mind (your hover), these are the champions it loses to most, at 49% or less over at least 200 games. Without one, they're the strongest champions in your role by op.gg's tier. Banned champions and your teammates' hovers are left out.
+- **Team comp.** Once your team has picks (teammates count with their hover), it warns about gaps. It checks for no tank or bruiser in three or more picks, a team that's 80% or more one damage type, and no heavy crowd control in four or more picks. Before you lock in, it lists up to five champions in your role that fill the biggest gap, with a frontline first, then the other damage type, then crowd control. Champions you play come first. It also sums up the enemy picks so far: their AP share, tanks and crowd control.
+- **Notes.** Under your lane opponent there's a box for your own notes, like "Darius: don't trade at level 2". It saves as you type, in `%LOCALAPPDATA%\LeagueClanker\notes.json`. The note shows up again the next time you face that champion, in champ select and under the matchup line in game.
+
+`DraftAdvisor.cs` holds these thresholds. The damage split and crowd control come from champion classes and the hand-kept lists in `ChampionKnowledge.cs`, so they're estimates before anyone buys items.
 
 ### Champ select: playstyle and runes
 
@@ -316,6 +326,7 @@ To add a rule, implement `IBuildRule`, return a `Situation` with a label, a sent
 - The core-item lists and weights are my best guess for patch 16.18. Real win-rate data per matchup would beat them.
 - Writing rune pages, summoner spells and item sets has been tested against a simulated client, not yet against a real one. The client's local API and op.gg's JSON API are both undocumented and can change.
 - Enemy roles are guessed until the game starts. Flex picks (a mid Gragas, a top Seraphine) can land in the wrong role, and so can the lane opponent.
+- The team comp check reads champion classes and a hand-kept crowd control list. Champions with crowd control that isn't on the list count as having none.
 - The rule pages and keystone lists are hand-made for patch 16.19. New keystones need adding to `KeystoneFit` before op.gg pages with them are used.
 - Rune pages assume today's runes. League Classic's old runes and masteries aren't supported.
 - League Classic's mode string is unverified until someone saves a snapshot from a real game (see *Running it from source*). The classic-item check covers the likely cases.

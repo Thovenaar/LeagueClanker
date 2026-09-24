@@ -8,7 +8,8 @@ namespace LeagueClanker.Core.Matchups;
 /// <summary>Role play rates and lane matchups. <see cref="OpggClient"/> provides them; tests use a fake.</summary>
 public interface IMatchupData
 {
-    Task<IReadOnlyDictionary<int, IReadOnlyDictionary<Position, double>>> GetRoleRatesAsync(CancellationToken ct);
+    /// <summary>Per champion key, how it does in each role it's played in.</summary>
+    Task<IReadOnlyDictionary<int, IReadOnlyDictionary<Position, OpggRoleStats>>> GetRoleStatsAsync(CancellationToken ct);
 
     /// <summary>How the champion does in that role against each opponent in the same role.</summary>
     Task<IReadOnlyList<OpggMatchup>> GetMatchupsAsync(int championKey, Position role, CancellationToken ct);
@@ -105,7 +106,7 @@ public sealed class MatchupAdvisor(IMatchupData data, ChampionCatalog champions)
             IReadOnlyDictionary<int, IReadOnlyDictionary<Position, double>> rates = new Dictionary<int, IReadOnlyDictionary<Position, double>>();
             try
             {
-                rates = await data.GetRoleRatesAsync(ct);
+                rates = RoleRates(await data.GetRoleStatsAsync(ct));
             }
             catch (Exception ex) when (IsUnreachable(ex, ct))
             {
@@ -170,6 +171,10 @@ public sealed class MatchupAdvisor(IMatchupData data, ChampionCatalog champions)
             .ToList();
     }
 
-    private static bool IsUnreachable(Exception ex, CancellationToken ct) =>
+    internal static IReadOnlyDictionary<int, IReadOnlyDictionary<Position, double>> RoleRates(
+        IReadOnlyDictionary<int, IReadOnlyDictionary<Position, OpggRoleStats>> stats) =>
+        stats.ToDictionary(c => c.Key, c => (IReadOnlyDictionary<Position, double>)c.Value.ToDictionary(r => r.Key, r => r.Value.RoleRate));
+
+    internal static bool IsUnreachable(Exception ex, CancellationToken ct) =>
         ex is HttpRequestException or JsonException or InvalidOperationException || (ex is TaskCanceledException && !ct.IsCancellationRequested);
 }

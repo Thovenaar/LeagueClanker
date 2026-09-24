@@ -140,6 +140,12 @@ $shots = [ordered]@{
         Save-Window $p "champselect.png"
         $p
     }
+    draft = {
+        $p = Start-App "--champselect", "samples/champselect/ban-phase.json"
+        Start-Sleep -Seconds 8
+        Save-Window $p "draft.png"
+        $p
+    }
     settings = {
         $p = Start-App "--champselect", "samples/champselect/leona-support.json"
         Start-Sleep -Seconds 4

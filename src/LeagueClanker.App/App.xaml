@@ -206,6 +206,29 @@
             </Setter>
         </Style>
 
+        <!-- Slim dark scrollbar for the long champ select panel; the default one is light grey -->
+        <Style TargetType="ScrollBar">
+            <Setter Property="Width" Value="8" />
+            <Setter Property="MinWidth" Value="8" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ScrollBar">
+                        <Track x:Name="PART_Track" IsDirectionReversed="True" Width="8">
+                            <Track.Thumb>
+                                <Thumb>
+                                    <Thumb.Template>
+                                        <ControlTemplate TargetType="Thumb">
+                                            <Border Background="{StaticResource BorderBrush}" CornerRadius="3" Margin="2,0" />
+                                        </ControlTemplate>
+                                    </Thumb.Template>
+                                </Thumb>
+                            </Track.Thumb>
+                        </Track>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <!-- On/off setting: a small box that fills with the accent colour, then the label -->
         <Style x:Key="SettingCheck" TargetType="CheckBox">
             <Setter Property="Foreground" Value="{StaticResource TextBrush}" />

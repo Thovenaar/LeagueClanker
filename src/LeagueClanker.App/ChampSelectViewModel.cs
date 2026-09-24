@@ -21,8 +21,11 @@ public sealed record RuneRow(string Name, string IconUrl);
 
 public sealed record CounterRow(string Name, string IconUrl, string WinRate, string Games, bool YouPlayIt);
 
+public sealed record BanRow(string Name, string IconUrl, string Reason);
+
 /// <summary>Everything the champ select panel needs, handed over once the static data is loaded.</summary>
-public sealed record ChampSelectServices(StaticGameData Data, RuneAdvisor Runes, MatchupAdvisor Matchups, SpellAdvisor Spells, OpggClient Opgg);
+public sealed record ChampSelectServices(
+    StaticGameData Data, RuneAdvisor Runes, MatchupAdvisor Matchups, SpellAdvisor Spells, OpggClient Opgg, DraftAdvisor Draft, MatchupNotes Notes);
 
 /// <summary>
 /// Champ select: your lane matchup, how you'll play your champion, and the rune page, spells, skill order and item set
@@ -40,7 +43,15 @@ public sealed class ChampSelectViewModel : INotifyPropertyChanged
     private OpggChampion? _opgg;
     private int _requestVersion;
     private int _matchupVersion;
+    private int _draftVersion;
     private string? _autoAppliedFor;
+    private ChampionInfo? _opponent;
+    private IReadOnlyList<BanRow> _bans = [];
+    private IReadOnlyList<string> _teamWarnings = [];
+    private string _fillHeader = "";
+    private IReadOnlyList<CounterRow> _fillPicks = [];
+    private string _enemySummary = "";
+    private string _draftNote = "";
 
     private bool _isActive;
     private string _championName = "";
@@ -148,6 +159,38 @@ public sealed class ChampSelectViewModel : INotifyPropertyChanged
 
     public string LaneNote { get => _laneNote; private set => Set(ref _laneNote, value); }
 
+    /// <summary>Champions worth banning, while your ban is still to come.</summary>
+    public IReadOnlyList<BanRow> Bans { get => _bans; private set => Set(ref _bans, value); }
+
+    public IReadOnlyList<string> TeamWarnings { get => _teamWarnings; private set => Set(ref _teamWarnings, value); }
+
+    /// <summary>"PICKS THAT ADD AP". Empty without fill picks.</summary>
+    public string FillHeader { get => _fillHeader; private set => Set(ref _fillHeader, value); }
+
+    public IReadOnlyList<CounterRow> FillPicks { get => _fillPicks; private set => Set(ref _fillPicks, value); }
+
+    /// <summary>"Enemy so far: 70% AP, 2 tanks, heavy crowd control".</summary>
+    public string EnemySummary { get => _enemySummary; private set => Set(ref _enemySummary, value); }
+
+    public string DraftNote { get => _draftNote; private set => Set(ref _draftNote, value); }
+
+    public bool HasTeamSection => TeamWarnings.Count > 0 || EnemySummary.Length > 0 || FillPicks.Count > 0;
+
+    public bool HasOpponent => _opponent is not null;
+
+    public string NoteLabel => _opponent is null ? "" : $"YOUR NOTES VS {_opponent.Name.ToUpperInvariant()}";
+
+    /// <summary>Your note on the lane opponent. Saved as you type and shown whenever you face them again.</summary>
+    public string OpponentNote
+    {
+        get => _opponent is null || _services is null ? "" : _services.Notes.Get(_opponent);
+        set
+        {
+            if (_opponent is not null && _services is not null)
+                _services.Notes.Set(_opponent, value);
+        }
+    }
+
     public Archetype? SelectedPlaystyle => Playstyles.FirstOrDefault(p => p.IsSelected)?.Value;
 
     public void Configure(ChampSelectServices services) => _services = services;
@@ -172,6 +215,7 @@ public sealed class ChampSelectViewModel : INotifyPropertyChanged
 
         Raise(nameof(HasChampion));
         _ = RecomputeMatchupAsync();
+        _ = RecomputeDraftAsync();
         if (state.Champion is not { } champion || _services is null)
         {
             ChampionName = "Pick or hover a champion";
@@ -344,9 +388,43 @@ public sealed class ChampSelectViewModel : INotifyPropertyChanged
         ShowMatchup(report, state, services.Data);
     }
 
+    private async Task RecomputeDraftAsync()
+    {
+        if (_state is not { } state || _services is not { } services)
+            return;
+
+        var version = ++_draftVersion;
+        var request = new DraftRequest(state.Champion, state.IsLocked, state.Position, state.Mode, state.Allies, state.Enemies)
+        {
+            HasPendingBan = state.HasPendingBan,
+            Unavailable = state.Bans.Concat(state.Allies.Select(a => a.Key)).ToHashSet(),
+            Pickable = state.Pickable.Count > 0 ? state.Pickable : null,
+            Mastery = state.Mastery,
+        };
+        var report = await services.Draft.AnalyzeAsync(request);
+        if (version != _draftVersion)
+            return;
+
+        var data = services.Data;
+        Bans = report?.Bans.Select(b => new BanRow(b.Champion.Name, data.ChampionIconUrl(b.Champion.Id), b.Reason)).ToList() ?? [];
+        TeamWarnings = report?.Warnings ?? [];
+        FillHeader = report?.FillHeader ?? "";
+        FillPicks = report?.FillPicks
+            .Select(p => new CounterRow(p.Champion.Name, data.ChampionIconUrl(p.Champion.Id), $"{p.WinRate:P1}", $"in {state.Position.DisplayName().ToLowerInvariant()}", p.YouPlayIt))
+            .ToList() ?? [];
+        EnemySummary = report?.EnemySummary ?? "";
+        DraftNote = report?.Note ?? "";
+        Raise(nameof(HasTeamSection));
+    }
+
     private void ShowMatchup(MatchupReport? report, ChampSelectState state, StaticGameData data)
     {
         HasLane = report is not null;
+        if (_opponent?.Id != report?.Opponent?.Id)
+        {
+            _opponent = report?.Opponent;
+            Raise(nameof(HasOpponent), nameof(NoteLabel), nameof(OpponentNote));
+        }
         if (report is null)
             return;
 

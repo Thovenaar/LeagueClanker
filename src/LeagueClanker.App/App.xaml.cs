@@ -68,8 +68,11 @@ public partial class App : Application
             var opgg = new OpggClient(userAgent: userAgent);
             var runes = new RuneAdvisor(new RuleRuneSource(data.Runes), new OpggRuneSource(data.Runes, opgg));
             var matchups = new MatchupAdvisor(opgg, data.Champions);
-            viewModel.ChampSelect.Configure(new ChampSelectServices(data, runes, matchups, new SpellAdvisor(data.Spells, opgg), opgg));
+            var notes = new MatchupNotes(Path.Combine(AppPaths.DataFolder, "notes.json"));
+            viewModel.ChampSelect.Configure(new ChampSelectServices(
+                data, runes, matchups, new SpellAdvisor(data.Spells, opgg), opgg, new DraftAdvisor(opgg, data.Champions), notes));
             viewModel.Matchups = matchups;
+            viewModel.Notes = notes;
             _ = RunChampSelectAsync(viewModel, data, champSelectDemo);
 
             await foreach (var update in advisor.RunAsync(PollInterval, _cts.Token))

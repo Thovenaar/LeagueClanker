@@ -20,6 +20,14 @@ public sealed class ChampSelectSession
 
     /// <summary>Bans and picks in turn order, grouped per turn.</summary>
     public List<List<ChampSelectAction>> Actions { get; init; } = [];
+
+    public ChampSelectBans? Bans { get; init; }
+}
+
+public sealed class ChampSelectBans
+{
+    public List<int> MyTeamBans { get; init; } = [];
+    public List<int> TheirTeamBans { get; init; } = [];
 }
 
 public sealed class ChampSelectAction

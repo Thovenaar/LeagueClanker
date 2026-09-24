@@ -30,6 +30,11 @@ public sealed record OpggSkillOrder(IReadOnlyList<string> MaxOrder, IReadOnlyLis
     public double WinRate => Games == 0 ? 0 : (double)Wins / Games;
 }
 
+/// <summary>How a champion does in one role, from op.gg's champion list.</summary>
+/// <param name="RoleRate">Share of the champion's games in this role, 0-1.</param>
+/// <param name="Tier">op.gg's tier, 1 (best) to 5. <see cref="Rank"/> orders champions within the role.</param>
+public sealed record OpggRoleStats(double RoleRate, double WinRate, double BanRate, int Tier, int Rank, int Games);
+
 /// <summary>One champion in one role (or ARAM): its rune pages, matchups, the role it's played in most, and its build.</summary>
 public sealed record OpggChampion(IReadOnlyList<OpggPage> Pages, IReadOnlyList<OpggMatchup> Matchups, Position MainRole)
 {
@@ -60,7 +65,7 @@ public sealed class OpggClient : IMatchupData
 
     private readonly HttpClient _http;
     private readonly ConcurrentDictionary<string, OpggChampion?> _champions = new();
-    private IReadOnlyDictionary<int, IReadOnlyDictionary<Position, double>>? _roleRates;
+    private IReadOnlyDictionary<int, IReadOnlyDictionary<Position, OpggRoleStats>>? _roleStats;
 
     public OpggClient(HttpClient? http = null, string? userAgent = null)
     {
@@ -87,14 +92,14 @@ public sealed class OpggClient : IMatchupData
     public async Task<IReadOnlyList<OpggMatchup>> GetMatchupsAsync(int championKey, Position role, CancellationToken ct) =>
         (await GetChampionAsync(championKey, aram: false, role, ct))?.Matchups ?? [];
 
-    /// <summary>For every champion (by numeric id), the share of its ranked games in each role.</summary>
-    public async Task<IReadOnlyDictionary<int, IReadOnlyDictionary<Position, double>>> GetRoleRatesAsync(CancellationToken ct)
+    /// <summary>For every champion (by numeric id), how it does in each role it's played in.</summary>
+    public async Task<IReadOnlyDictionary<int, IReadOnlyDictionary<Position, OpggRoleStats>>> GetRoleStatsAsync(CancellationToken ct)
     {
-        if (_roleRates is not null)
-            return _roleRates;
+        if (_roleStats is not null)
+            return _roleStats;
 
         using var response = await _http.GetAsync("ranked?tier=all", ct);
-        return _roleRates = ParseRoleRates(await response.EnsureSuccessStatusCode().Content.ReadAsStringAsync(ct));
+        return _roleStats = ParseRoleStats(await response.EnsureSuccessStatusCode().Content.ReadAsStringAsync(ct));
     }
 
     /// <summary>op.gg's role names. Without a role, guess from the playstyle.</summary>
@@ -176,21 +181,33 @@ public sealed class OpggClient : IMatchupData
         };
     }
 
-    internal static IReadOnlyDictionary<int, IReadOnlyDictionary<Position, double>> ParseRoleRates(string json)
+    internal static IReadOnlyDictionary<int, IReadOnlyDictionary<Position, OpggRoleStats>> ParseRoleStats(string json)
     {
         using var doc = JsonDocument.Parse(json);
-        var rates = new Dictionary<int, IReadOnlyDictionary<Position, double>>();
+        var result = new Dictionary<int, IReadOnlyDictionary<Position, OpggRoleStats>>();
         foreach (var champion in Array(doc.RootElement, "data"))
         {
-            var roles = Array(champion, "positions")
-                .Select(p => (Role: Positions.Parse(p.GetProperty("name").GetString()), Rate: p.GetProperty("stats").GetProperty("role_rate").GetDouble()))
-                .Where(r => r.Role != Position.None)
-                .GroupBy(r => r.Role)
-                .ToDictionary(g => g.Key, g => g.Sum(r => r.Rate));
-            rates[champion.GetProperty("id").GetInt32()] = roles;
+            var roles = new Dictionary<Position, OpggRoleStats>();
+            foreach (var position in Array(champion, "positions"))
+            {
+                var role = Positions.Parse(position.GetProperty("name").GetString());
+                if (role == Position.None || roles.ContainsKey(role) || !position.TryGetProperty("stats", out var stats))
+                    continue;
+                var tier = stats.TryGetProperty("tier_data", out var tierData) ? tierData : default;
+                roles[role] = new OpggRoleStats(
+                    Number(stats, "role_rate"), Number(stats, "win_rate"), Number(stats, "ban_rate"),
+                    tier.ValueKind == JsonValueKind.Object ? (int)Number(tier, "tier") : 5,
+                    tier.ValueKind == JsonValueKind.Object ? (int)Number(tier, "rank") : 999,
+                    (int)Number(stats, "play"));
+            }
+            result[champion.GetProperty("id").GetInt32()] = roles;
         }
-        return rates;
+        return result;
     }
+
+    // op.gg sends null for missing numbers, like the ban rate of an unbannable champion.
+    private static double Number(JsonElement element, string property) =>
+        element.TryGetProperty(property, out var value) && value.ValueKind == JsonValueKind.Number ? value.GetDouble() : 0;
 
     private static IEnumerable<JsonElement> Array(JsonElement element, string property) =>
         element.TryGetProperty(property, out var value) && value.ValueKind == JsonValueKind.Array ? value.EnumerateArray() : [];

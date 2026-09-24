@@ -22,6 +22,12 @@ public sealed record ChampSelectState(
     /// <summary>The summoner spells you have selected now, on your first and second key.</summary>
     public (int First, int Second) Spells { get; init; }
 
+    /// <summary>True while your ban is still to come.</summary>
+    public bool HasPendingBan { get; init; }
+
+    /// <summary>Banned champions, by key.</summary>
+    public IReadOnlySet<int> Bans { get; init; } = new HashSet<int>();
+
     /// <summary>
     /// The game as it will look at the start: everyone at level 1 without items. The item advisor can then recommend a
     /// build before the game, for the shop's item set. Your playstyle is passed to the analyzer separately.
@@ -57,9 +63,10 @@ public sealed record ChampSelectState(
         };
     }
 
-    /// <summary>Changes when anything that affects the rune page or the matchup changes.</summary>
+    /// <summary>Changes when anything that affects the rune page, the matchup or the draft advice changes.</summary>
     public string Fingerprint =>
-        $"{Champion?.Id}|{IsLocked}|{Position}|{Mode}|{string.Join(',', Enemies.Select(e => e.Id))}";
+        $"{Champion?.Id}|{IsLocked}|{Position}|{Mode}|{HasPendingBan}|{string.Join(',', Enemies.Select(e => e.Id))}"
+        + $"|{string.Join(',', Allies.Select(a => a.Id))}|{string.Join(',', Bans.Order())}";
 
     public static ChampSelectState? From(ClientSnapshot snapshot, ChampionCatalog champions)
     {
@@ -76,18 +83,28 @@ public sealed record ChampSelectState(
         var queue = snapshot.Gameflow?.GameData?.Queue;
         var mode = queue is null ? GameMode.SummonersRift : GameModes.Detect(queue.GameMode, queue.MapId);
 
-        IReadOnlyList<ChampionInfo> Picks(IEnumerable<ChampSelectPlayer> players) =>
-            players.Select(p => champions.GetByKey(p.ChampionId)).OfType<ChampionInfo>().ToList();
+        // Teammates count with their hover, so the team check works during planning. Enemies only once locked.
+        IReadOnlyList<ChampionInfo> Picks(IEnumerable<ChampSelectPlayer> players, bool withHovers) =>
+            players.Select(p => champions.GetByKey(p.ChampionId != 0 || !withHovers ? p.ChampionId : p.ChampionPickIntent))
+                .OfType<ChampionInfo>().ToList();
 
         // Locked once your pick action is done. Modes without pick turns (ARAM) hand you a champion: that counts as locked.
-        var myPicks = session.Actions.SelectMany(turn => turn).Where(a => a.Type == "pick" && a.ActorCellId == session.LocalPlayerCellId).ToList();
+        var actions = session.Actions.SelectMany(turn => turn).ToList();
+        var myPicks = actions.Where(a => a.Type == "pick" && a.ActorCellId == session.LocalPlayerCellId).ToList();
         var isLocked = myPicks.Count > 0 ? myPicks.Any(a => a.Completed) : me?.ChampionId > 0;
+        var myBans = actions.Where(a => a.Type == "ban" && a.ActorCellId == session.LocalPlayerCellId).ToList();
+        var bans = actions.Where(a => a.Type == "ban" && a.Completed && a.ChampionId > 0).Select(a => a.ChampionId)
+            .Concat(session.Bans?.MyTeamBans ?? []).Concat(session.Bans?.TheirTeamBans ?? [])
+            .Where(id => id > 0)
+            .ToHashSet();
 
         return new ChampSelectState(
             champions.GetByKey(championKey), position, mode,
-            Picks(session.MyTeam.Where(p => p != me)), Picks(session.TheirTeam))
+            Picks(session.MyTeam.Where(p => p != me), withHovers: true), Picks(session.TheirTeam, withHovers: false))
         {
             IsLocked = isLocked,
+            HasPendingBan = myBans.Count > 0 && !myBans.Any(a => a.Completed),
+            Bans = bans,
             Spells = (me?.Spell1Id ?? 0, me?.Spell2Id ?? 0),
             Pickable = snapshot.PickableChampionIds.ToHashSet(),
             Mastery = snapshot.Mastery.GroupBy(m => m.ChampionId).ToDictionary(g => g.Key, g => g.Max(m => m.ChampionPoints)),
