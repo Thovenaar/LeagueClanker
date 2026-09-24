@@ -61,6 +61,12 @@
                 </DataTrigger>
             </DataTemplate.Triggers>
         </DataTemplate>
+        <DataTemplate x:Key="RuneRowTemplate" DataType="{x:Type local:RuneRow}">
+            <StackPanel Orientation="Horizontal" Margin="0,2">
+                <Image Source="{Binding IconUrl}" Width="22" Height="22" />
+                <TextBlock Text="{Binding Name}" FontSize="11" Margin="6,0,0,0" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+            </StackPanel>
+        </DataTemplate>
     </Window.Resources>
 
     <Border Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="8">
@@ -79,6 +85,87 @@
 
             <TextBlock DockPanel.Dock="Bottom" Text="{Binding Footer}" Foreground="{StaticResource MutedBrush}" FontSize="10" Margin="12,4,12,8" />
 
+            <Grid>
+            <!-- ===== Champ select: playstyle and rune page ===== -->
+            <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="12,0,12,0"
+                          Visibility="{Binding ShowChampSelect, Converter={StaticResource BoolToVisibility}}">
+                <StackPanel DataContext="{Binding ChampSelect}" Margin="0,2,0,6">
+                    <DockPanel>
+                        <Image DockPanel.Dock="Left" Source="{Binding ChampionIconUrl, TargetNullValue={x:Null}}" Width="34" Height="34" Margin="0,0,10,0"
+                               Visibility="{Binding HasChampion, Converter={StaticResource BoolToVisibility}}" />
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="{Binding ChampionName}" FontSize="16" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                            <TextBlock Text="{Binding Situation}" Foreground="{StaticResource MutedBrush}" FontSize="11" />
+                        </StackPanel>
+                    </DockPanel>
+
+                    <StackPanel Visibility="{Binding HasChampion, Converter={StaticResource BoolToVisibility}}">
+                        <TextBlock Style="{StaticResource SectionHeader}" Text="HOW DO YOU WANT TO PLAY?" />
+                        <ItemsControl ItemsSource="{Binding Playstyles}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <WrapPanel />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate DataType="{x:Type local:PlaystyleOption}">
+                                    <RadioButton Style="{StaticResource ChipButton}" GroupName="Playstyle" Content="{Binding Label}" Margin="0,0,6,6"
+                                                 IsChecked="{Binding IsSelected, Mode=OneWay}" Checked="OnPlaystyleChecked" />
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <TextBlock Text="This also picks your item build once the game starts." Foreground="{StaticResource MutedBrush}" FontSize="10" />
+
+                        <DockPanel Margin="0,12,0,5">
+                            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                                <RadioButton Style="{StaticResource ChipButton}" GroupName="RuneSource" Content="op.gg" Margin="0,0,6,0"
+                                             IsChecked="{Binding UseStatsSite, Mode=OneWay}" Checked="OnStatsSiteChecked"
+                                             ToolTip="Most played page on op.gg that fits your playstyle. Falls back to LeagueClanker's own page." />
+                                <RadioButton Style="{StaticResource ChipButton}" GroupName="RuneSource" Content="Own rules"
+                                             IsChecked="{Binding UseOwnRules, Mode=OneWay}" Checked="OnOwnRulesChecked"
+                                             ToolTip="LeagueClanker's own page for your playstyle, adjusted to the enemy picks." />
+                            </StackPanel>
+                            <TextBlock Style="{StaticResource SectionHeader}" Text="RUNES" Margin="0" VerticalAlignment="Center" />
+                        </DockPanel>
+
+                        <Border Background="{StaticResource CardBrush}" CornerRadius="6" Padding="10,8">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel>
+                                    <TextBlock Text="{Binding PrimaryName}" Foreground="{StaticResource AccentBrush}" FontSize="10" FontWeight="Bold" Margin="0,0,0,2" />
+                                    <ItemsControl ItemsSource="{Binding PrimaryRunes}" ItemTemplate="{StaticResource RuneRowTemplate}" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="1" Margin="8,0,0,0">
+                                    <TextBlock Text="{Binding SecondaryName}" Foreground="{StaticResource AccentBrush}" FontSize="10" FontWeight="Bold" Margin="0,0,0,2" />
+                                    <ItemsControl ItemsSource="{Binding SecondaryRunes}" ItemTemplate="{StaticResource RuneRowTemplate}" />
+                                    <TextBlock Text="SHARDS" Foreground="{StaticResource AccentBrush}" FontSize="10" FontWeight="Bold" Margin="0,6,0,2" />
+                                    <ItemsControl ItemsSource="{Binding Shards}" ItemTemplate="{StaticResource RuneRowTemplate}" />
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+                        <TextBlock Text="{Binding SourceLine}" Foreground="{StaticResource MutedBrush}" FontSize="10" Margin="0,4,0,0" />
+                        <ItemsControl ItemsSource="{Binding Reasons}" Margin="0,6,0,0">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <DockPanel Margin="0,0,0,3">
+                                        <TextBlock DockPanel.Dock="Left" Text="&#x2022;" Foreground="{StaticResource AccentBrush}" Margin="0,0,6,0" />
+                                        <TextBlock Text="{Binding}" FontSize="11" TextWrapping="Wrap" />
+                                    </DockPanel>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+
+                        <Button Style="{StaticResource PrimaryButton}" Content="Apply to my rune page" HorizontalAlignment="Left" Margin="0,8,0,0"
+                                IsEnabled="{Binding CanApply}" Click="OnApplyRunes" />
+                        <TextBlock Text="{Binding ApplyStatus}" Foreground="{StaticResource MutedBrush}" FontSize="11" TextWrapping="Wrap" Margin="0,6,0,0"
+                                   Visibility="{Binding ApplyStatus, Converter={StaticResource HasContent}}" />
+                    </StackPanel>
+                </StackPanel>
+            </ScrollViewer>
+
             <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="12,0,12,0"
                           Visibility="{Binding IsLive, Converter={StaticResource BoolToVisibility}}">
                 <StackPanel>
@@ -91,6 +178,13 @@
                         </StackPanel>
                         <TextBlock Text="{Binding ChampionLine}" FontSize="16" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" Margin="0,0,12,0" />
                     </DockPanel>
+
+                    <!-- How you play this champion. Changing it rebuilds the item list. -->
+                    <StackPanel Orientation="Horizontal" Margin="0,-6,0,8">
+                        <TextBlock Text="Playing as" Foreground="{StaticResource MutedBrush}" FontSize="11" />
+                        <Button Style="{StaticResource LinkButton}" Content="{Binding PlaystyleLabel}" Margin="5,0,0,0" Click="OnPlaystyleMenu"
+                                ToolTip="Change how you play this champion, e.g. AP instead of AD" AutomationProperties.Name="Change playstyle" />
+                    </StackPanel>
 
                     <!-- Enemy damage split bar -->
                     <TextBlock Text="{Binding DamageSummary}" Foreground="{StaticResource MutedBrush}" FontSize="11" Margin="0,0,0,4" />
@@ -362,6 +456,7 @@
                     </StackPanel>
                 </StackPanel>
             </ScrollViewer>
+            </Grid>
         </DockPanel>
     </Border>
 </Window>

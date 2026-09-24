@@ -1,6 +1,8 @@
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
+using LeagueClanker.Core.Runes;
 
 namespace LeagueClanker.App;
 
@@ -56,6 +58,31 @@ public partial class MainWindow : Window
     {
         ViewModel.Augments.MarkRerolled(CardName(sender));
         AugmentSearch.Focus(); // type the new card right away
+    }
+
+    // Chips are rebuilt on every change. Building a chip checks the selected one, which matches the view model and is ignored.
+    private void OnPlaystyleChecked(object sender, RoutedEventArgs e)
+    {
+        if (sender is RadioButton { DataContext: PlaystyleOption { IsSelected: false } option })
+            ViewModel.ChampSelect.SelectPlaystyle(option.Value);
+    }
+
+    private void OnStatsSiteChecked(object sender, RoutedEventArgs e) => ViewModel.ChampSelect.SelectSource(RuneSourceKind.StatsSite);
+
+    private void OnOwnRulesChecked(object sender, RoutedEventArgs e) => ViewModel.ChampSelect.SelectSource(RuneSourceKind.OwnRules);
+
+    private async void OnApplyRunes(object sender, RoutedEventArgs e) => await ViewModel.ChampSelect.ApplyAsync();
+
+    private void OnPlaystyleMenu(object sender, RoutedEventArgs e)
+    {
+        var menu = new ContextMenu { PlacementTarget = (UIElement)sender, Placement = PlacementMode.Bottom };
+        foreach (var option in ViewModel.LivePlaystyles)
+        {
+            var item = new MenuItem { Header = option.Label, IsCheckable = true, IsChecked = option.IsSelected };
+            item.Click += (_, _) => ViewModel.ChangePlaystyle(option.Value);
+            menu.Items.Add(item);
+        }
+        menu.IsOpen = true;
     }
 
     private void OnAugmentSearchKeyDown(object sender, KeyEventArgs e)

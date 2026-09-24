@@ -5,6 +5,7 @@ using System.Windows;
 using LeagueClanker.Core;
 using LeagueClanker.Core.Analysis;
 using LeagueClanker.Core.Recommendation;
+using LeagueClanker.Core.Runes;
 using LeagueClanker.Core.StaticData;
 
 namespace LeagueClanker.App;
@@ -47,8 +48,17 @@ public sealed class MainViewModel : INotifyPropertyChanged
     private string _switchHint = "";
     private IReadOnlyList<PlayerRow> _enemies = [];
     private IReadOnlyList<PlayerRow> _team = [];
+    private string _playstyleLabel = "";
+    private IReadOnlyList<PlaystyleOption> _livePlaystyles = [];
+
+    // The playstyle you chose (or champ select defaulted to), and for which champion. The build advisor uses it.
+    private string? _playstyleChampion;
+    private Archetype? _playstyle;
 
     public event PropertyChangedEventHandler? PropertyChanged;
+
+    /// <summary>Raised when the playstyle the build advisor should use changes. Null means the champion's usual one.</summary>
+    public event EventHandler<Archetype?>? PlaystyleChanged;
 
     public string Status { get => _status; set => Set(ref _status, value); }
     public bool IsLive { get => _isLive; private set => Set(ref _isLive, value); }
@@ -75,6 +85,44 @@ public sealed class MainViewModel : INotifyPropertyChanged
             SelectTab(Tab.Augments);
             SystemSounds.Asterisk.Play();
         };
+
+        ChampSelect.PlaystyleSelected += (_, choice) => UsePlaystyle(choice.ChampionId, choice.Playstyle);
+        ChampSelect.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName != nameof(ChampSelectViewModel.IsActive))
+                return;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(ShowChampSelect)));
+            if (!IsLive)
+                Status = ChampSelect.IsActive ? "Champ select" : WaitingStatus;
+        };
+    }
+
+    private const string WaitingStatus = "Waiting for a game... (Practice Tool works too)";
+
+    /// <summary>Playstyle and rune page for champ select. Shown while you're in champ select and no game runs.</summary>
+    public ChampSelectViewModel ChampSelect { get; } = new();
+
+    public bool ShowChampSelect => ChampSelect.IsActive && !IsLive;
+
+    /// <summary>"Marksman ▾": opens the playstyle menu in game.</summary>
+    public string PlaystyleLabel { get => _playstyleLabel; private set => Set(ref _playstyleLabel, value); }
+
+    public IReadOnlyList<PlaystyleOption> LivePlaystyles { get => _livePlaystyles; private set => Set(ref _livePlaystyles, value); }
+
+    /// <summary>You picked another playstyle in game. The build follows on the next poll.</summary>
+    public void ChangePlaystyle(Archetype playstyle)
+    {
+        if (_planner.Latest?.Game.Me.Champion.Id is { } championId)
+            UsePlaystyle(championId, playstyle);
+    }
+
+    private void UsePlaystyle(string championId, Archetype? playstyle)
+    {
+        if (_playstyleChampion == championId && _playstyle == playstyle)
+            return;
+        _playstyleChampion = playstyle is null ? null : championId;
+        _playstyle = playstyle;
+        PlaystyleChanged?.Invoke(this, playstyle);
     }
 
     /// <summary>Card picker for ARAM: Mayhem. Its tab only shows in modes with augments.</summary>
@@ -98,9 +146,18 @@ public sealed class MainViewModel : INotifyPropertyChanged
             Augments.Reset();
             _lastPivotSummary = null;
             IsLive = false;
-            Status = "Waiting for a game... (Practice Tool works too)";
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(ShowChampSelect)));
+            Status = ChampSelect.IsActive ? "Champ select" : WaitingStatus;
             return;
         }
+
+        // A playstyle chosen for another champion (a previous game) doesn't apply to this one.
+        if (_playstyleChampion is not null && _playstyleChampion != rec.Game.Me.Champion.Id)
+            UsePlaystyle(rec.Game.Me.Champion.Id, null);
+
+        // A new playstyle is your decision, not the game's: take its build right away instead of suggesting a pivot.
+        if (_planner.Latest?.Game.Me is { } previous && previous.Champion.Id == rec.Game.Me.Champion.Id && previous.Archetype != rec.Game.Me.Archetype)
+            _planner.Reset();
 
         _planner.Update(rec);
         Render();
@@ -131,8 +188,11 @@ public sealed class MainViewModel : INotifyPropertyChanged
 
         var me = rec.Game.Me;
         IsLive = true;
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(ShowChampSelect)));
         Status = $"Live · {TimeSpan.FromSeconds(rec.Game.GameTimeSeconds):mm\\:ss} · {rec.Game.Mode.DisplayName()}";
-        ChampionLine = $"{me.Name} · {me.Archetype.DisplayName()}";
+        ChampionLine = me.Name;
+        PlaystyleLabel = $"{me.Archetype.DisplayName()} ▾";
+        LivePlaystyles = Playstyles.All.Select(a => new PlaystyleOption(a, a.DisplayName(), a == me.Archetype)).ToList();
         DamageSummary = rec.DamageSummary;
         AdShare = new GridLength(rec.Game.Enemies.PhysicalShare, GridUnitType.Star);
         ApShare = new GridLength(rec.Game.Enemies.MagicShare, GridUnitType.Star);

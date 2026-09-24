@@ -4,7 +4,9 @@ using System.Net.Http;
 using System.Windows;
 using LeagueClanker.Core;
 using LeagueClanker.Core.Augments;
+using LeagueClanker.Core.LeagueClient;
 using LeagueClanker.Core.LiveClient;
+using LeagueClanker.Core.Runes;
 using LeagueClanker.Core.StaticData;
 using LeagueClanker.Vision;
 using System.Windows.Interop;
@@ -13,7 +15,8 @@ namespace LeagueClanker.App;
 
 /// <summary>
 /// Usage: LeagueClanker.App.exe [--demo samples/ap-heavy.json | --demo samples/pivot-demo] [--scan-image screenshot.png]
-/// Without --demo it polls the Live Client Data API while a game is running.
+///                              [--champselect samples/champselect/leona-support.json]
+/// Without --demo it polls the Live Client Data API while a game is running, and the League client during champ select.
 /// A demo folder replays its snapshots in order, which shows pivots happening.
 /// </summary>
 public partial class App : Application
@@ -33,6 +36,8 @@ public partial class App : Application
 
         var demoPath = ResolvePath(e.Args, "--demo");
         var scanImage = ResolvePath(e.Args, "--scan-image");
+        var champSelectDemo = ResolvePath(e.Args, "--champselect");
+        var settings = AppSettings.Load();
         IGameDataSource source = demoPath is null ? new LiveClientApi() : SequenceGameDataSource.FromPath(demoPath);
 
         try
@@ -45,6 +50,18 @@ public partial class App : Application
 
             var advisor = new BuildAdvisor(source, data);
             viewModel.Augments.PickedChanged += (_, picked) => advisor.Augments = picked;
+            viewModel.PlaystyleChanged += (_, playstyle) => advisor.Playstyle = playstyle;
+
+            var userAgent = $"LeagueClanker/{AppVersion} (+https://github.com/Thovenaar/LeagueClanker)";
+            var runes = new RuneAdvisor(new RuleRuneSource(data.Runes), new OpggRuneSource(data.Runes, userAgent: userAgent));
+            viewModel.ChampSelect.Configure(data, runes, settings.RuneSource);
+            viewModel.ChampSelect.SourceChanged += (_, runeSource) =>
+            {
+                settings.RuneSource = runeSource;
+                settings.Save();
+            };
+            _ = RunChampSelectAsync(viewModel, data, champSelectDemo);
+
             await foreach (var update in advisor.RunAsync(PollInterval, _cts.Token))
                 viewModel.Apply(update, data);
         }
@@ -58,6 +75,68 @@ public partial class App : Application
         finally
         {
             (source as IDisposable)?.Dispose();
+        }
+    }
+
+    /// <summary>
+    /// Watches the League client for champ select while no game runs. The client's port and password change whenever it
+    /// restarts, so the lockfile is read again whenever we're not in champ select. With <paramref name="demoPath"/> it
+    /// shows a saved champ select instead, and Apply only says what it would do.
+    /// </summary>
+    private async Task RunChampSelectAsync(MainViewModel viewModel, StaticGameData data, string? demoPath)
+    {
+        var champSelect = viewModel.ChampSelect;
+        IClientSource? demo = demoPath is null ? null : new FileClientSource(demoPath);
+        Lockfile? lockfile = null;
+        LeagueClientApi? client = null;
+
+        champSelect.ApplyHandler = demo is not null
+            ? (_, name) => Task.FromResult(new ApplyResult(true, $"Demo: this would overwrite your current rune page as \"{name}\"."))
+            : (page, name) => client is null
+                ? Task.FromResult(new ApplyResult(false, "The League client isn't running."))
+                : new RunePageWriter(client).ApplyAsync(page, name, _cts.Token);
+
+        using var timer = new PeriodicTimer(PollInterval);
+        try
+        {
+            do
+            {
+                if (viewModel.IsLive)
+                {
+                    champSelect.Update(null);
+                    continue;
+                }
+
+                ClientSnapshot? snapshot;
+                if (demo is not null)
+                {
+                    snapshot = await demo.TryGetChampSelectAsync(_cts.Token);
+                }
+                else
+                {
+                    snapshot = client is null ? null : await client.TryGetChampSelectAsync(_cts.Token);
+                    if (snapshot is null && LeagueClientApi.FindLockfile() is var found && found != lockfile)
+                    {
+                        client?.Dispose();
+                        lockfile = found;
+                        client = found is null ? null : new LeagueClientApi(found);
+                        snapshot = client is null ? null : await client.TryGetChampSelectAsync(_cts.Token);
+                    }
+                }
+                champSelect.Update(snapshot is null ? null : ChampSelectState.From(snapshot, data.Champions));
+            }
+            while (await timer.WaitForNextTickAsync(_cts.Token));
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception ex) when (ex is IOException or System.Text.Json.JsonException)
+        {
+            viewModel.Status = $"Champ select error: {ex.Message}";
+        }
+        finally
+        {
+            client?.Dispose();
         }
     }
 

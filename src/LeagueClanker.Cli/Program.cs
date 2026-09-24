@@ -1,8 +1,10 @@
 using LeagueClanker.Core;
 using LeagueClanker.Core.Analysis;
 using LeagueClanker.Core.Augments;
+using LeagueClanker.Core.LeagueClient;
 using LeagueClanker.Core.LiveClient;
 using LeagueClanker.Core.Recommendation;
+using LeagueClanker.Core.Runes;
 using LeagueClanker.Core.StaticData;
 using LeagueClanker.Vision;
 
@@ -17,6 +19,10 @@ using LeagueClanker.Vision;
 //                                             rank an augment offer and say which cards to reroll
 //   LeagueClanker.Cli --scan <image.png | screen> [--verbose]
 //                                             read an augment offer from a screenshot or the game
+//   LeagueClanker.Cli --runes <champion> [--position support] [--style tank] [--mode aram] [--enemies "A;B"] [--source rules]
+//                                             recommend a rune page (from op.gg unless --source rules)
+//   LeagueClanker.Cli --champselect [--style tank] [--source rules] [--apply]
+//                                             recommend runes for your champ select pick, and write them into the client
 
 Console.OutputEncoding = System.Text.Encoding.UTF8;
 using var cts = new CancellationTokenSource();
@@ -45,6 +51,46 @@ if (args is ["--augments"])
         Console.WriteLine($"{a.Tier.ToString()[0]} {a.Name,-28} gives [{a.Effects}] needs [{a.Triggers}]" +
             (a.MentionedItems.Count > 0 ? $" items [{string.Join(", ", a.MentionedItems.Select(i => i.Name))}]" : "") + (flags != "" ? $" {flags}" : ""));
     }
+    return;
+}
+
+string? Option(string flag) => args.SkipWhile(a => a != flag).Skip(1).FirstOrDefault();
+
+if (args is ["--runes", var championName, ..])
+{
+    var champion = data.Champions.Find(championName) ?? throw new ArgumentException($"Unknown champion '{championName}'.");
+    var position = Positions.Parse(Option("--position"));
+    var mode = Option("--mode")?.ToLowerInvariant() switch { "aram" => GameMode.Aram, "mayhem" => GameMode.AramMayhem, _ => GameMode.SummonersRift };
+    var enemies = (Option("--enemies") ?? "").Split(';', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
+        .Select(n => data.Champions.Find(n) ?? throw new ArgumentException($"Unknown champion '{n}'.")).ToList();
+    var request = new RuneRequest(champion, ParseStyle(Option("--style")) ?? Playstyles.Default(champion, position), position, mode) { Enemies = enemies };
+    PrintRunes(request, await RuneAdvisorFor().RecommendAsync(request, RuneSource(), cts.Token));
+    return;
+}
+
+if (args is ["--champselect", ..])
+{
+    using var client = LeagueClientApi.TryConnect();
+    if (client is null)
+    {
+        Console.WriteLine("The League client isn't running.");
+        return;
+    }
+    var state = await client.TryGetChampSelectAsync(cts.Token) is { } snapshot ? ChampSelectState.From(snapshot, data.Champions) : null;
+    if (state?.Champion is not { } champion)
+    {
+        Console.WriteLine("Not in champ select, or you haven't picked or hovered a champion yet.");
+        return;
+    }
+
+    var request = new RuneRequest(champion, ParseStyle(Option("--style")) ?? Playstyles.Default(champion, state.Position), state.Position, state.Mode)
+    {
+        Enemies = state.Enemies,
+    };
+    var recommendation = await RuneAdvisorFor().RecommendAsync(request, RuneSource(), cts.Token);
+    PrintRunes(request, recommendation);
+    if (args.Contains("--apply"))
+        Console.WriteLine((await new RunePageWriter(client).ApplyAsync(recommendation.Page, RunePageWriter.PageName(champion), cts.Token)).Message);
     return;
 }
 
@@ -185,6 +231,29 @@ async Task<BuildRecommendation?> RecommendAsync(string path, IReadOnlyList<Augme
     var game = await new FileGameDataSource(path).TryGetAsync(cts.Token)
         ?? throw new InvalidOperationException($"{path} does not contain a playable game.");
     return new BuildAdvisor(new FileGameDataSource(path), data) { Augments = augments ?? [] }.RecommendOnce(game);
+}
+
+RuneAdvisor RuneAdvisorFor() => new(new RuleRuneSource(data.Runes), new OpggRuneSource(data.Runes));
+
+RuneSourceKind RuneSource() => Option("--source") == "rules" ? RuneSourceKind.OwnRules : RuneSourceKind.StatsSite;
+
+static Archetype? ParseStyle(string? style) =>
+    style is null ? null : Playstyles.All.FirstOrDefault(a => a.DisplayName().Replace(" ", "").Equals(style.Replace(" ", ""), StringComparison.OrdinalIgnoreCase));
+
+void PrintRunes(RuneRequest request, RuneRecommendation rec)
+{
+    string Name(int id) => data.Runes.Get(id)?.Name ?? id.ToString();
+    var page = rec.Page;
+    Console.WriteLine($"=== {request.Champion.Name}, {request.Playstyle.DisplayName()}, {request.Position.DisplayName()}, {request.Mode.DisplayName()} ===");
+    Console.WriteLine($"  {data.Runes.Style(page.PrimaryStyleId)?.Name}: {string.Join(", ", page.PrimaryRunes.Select(Name))}");
+    Console.WriteLine($"  {data.Runes.Style(page.SubStyleId)?.Name}: {string.Join(", ", page.SecondaryRunes.Select(Name))}");
+    Console.WriteLine($"  Shards: {string.Join(", ", page.Shards.Select(Name))}");
+    Console.WriteLine(rec.Games is { } games ? $"  Source: {rec.Source}, {rec.WinRate:P1} win rate over {games:N0} games" : $"  Source: {rec.Source}");
+    foreach (var reason in rec.Reasons)
+        Console.WriteLine($"  - {reason}");
+    if (data.Runes.Validate(page) is { } problem)
+        Console.WriteLine($"  INVALID: {problem}");
+    Console.WriteLine();
 }
 
 static void Print(BuildRecommendation? rec)

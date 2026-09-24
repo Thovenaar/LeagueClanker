@@ -121,7 +121,8 @@ public sealed record GameAnalysis(PlayerProfile Me, TeamProfile Allies, TeamProf
 public static class GameAnalyzer
 {
     /// <summary>Returns null when the active player can't be found (e.g. spectating).</summary>
-    public static GameAnalysis? Analyze(AllGameData data, StaticGameData staticData, IReadOnlyList<AugmentInfo>? augments = null)
+    /// <param name="playstyle">How you chose to play your champion (AP Ezreal, tank Leona). Null uses the champion's usual archetype.</param>
+    public static GameAnalysis? Analyze(AllGameData data, StaticGameData staticData, IReadOnlyList<AugmentInfo>? augments = null, Archetype? playstyle = null)
     {
         if (data.ActivePlayer is not { } active)
             return null;
@@ -134,7 +135,7 @@ public static class GameAnalyzer
         var mode = DetectMode(data);
         var allies = data.AllPlayers.Where(p => p != me && p.Team == me.Team).Select(p => Profile(p, staticData, mode: mode)).ToList();
         var enemies = data.AllPlayers.Where(p => p.Team != me.Team).Select(p => Profile(p, staticData, mode: mode)).ToList();
-        var myProfile = Profile(me, staticData, active.ChampionStats, mode);
+        var myProfile = Profile(me, staticData, active.ChampionStats, mode, playstyle);
         return new GameAnalysis(myProfile, new TeamProfile(allies), new TeamProfile(enemies), data.GameData?.GameTime ?? 0)
         {
             Mode = mode,
@@ -153,10 +154,11 @@ public static class GameAnalyzer
         return mode is GameMode.SummonersRift or GameMode.Unsupported && holdsClassicItems ? GameMode.LeagueClassic : mode;
     }
 
-    public static PlayerProfile Profile(LivePlayer player, StaticGameData staticData, LiveChampionStats? realStats = null, GameMode mode = GameMode.SummonersRift)
+    public static PlayerProfile Profile(
+        LivePlayer player, StaticGameData staticData, LiveChampionStats? realStats = null, GameMode mode = GameMode.SummonersRift, Archetype? archetype = null)
     {
         var champion = staticData.Champions.Resolve(player);
-        var archetype = ArchetypeClassifier.Classify(champion);
+        archetype ??= ArchetypeClassifier.Classify(champion);
         var items = player.Items
             .SelectMany(i => Enumerable.Repeat(staticData.Items.Get(i.ItemID), Math.Max(1, i.Count)))
             .OfType<ItemInfo>()
@@ -166,9 +168,9 @@ public static class GameAnalyzer
         return new PlayerProfile
         {
             Champion = champion,
-            Archetype = archetype,
+            Archetype = archetype.Value,
             Items = items,
-            MagicShare = EstimateMagicShare(champion, archetype, items),
+            MagicShare = EstimateMagicShare(champion, archetype.Value, items),
             Threat = EstimateThreat(items, player.Scores),
             Scores = player.Scores,
             HasSmite = player.HasSmite,

@@ -9,9 +9,10 @@ namespace LeagueClanker.Core.StaticData;
 /// <param name="Magic">Riot's 0-10 rating of magic damage.</param>
 /// <param name="BaseStats">Level 1 stats and growth. Null for unknown champions.</param>
 /// <param name="Resource">"Mana", "Energy", "None", "Fury", ...</param>
+/// <param name="Key">Riot's numeric champion id, e.g. 222 for Jinx. The League client and stats sites use this one.</param>
 public sealed record ChampionInfo(
     string Id, string Name, IReadOnlyList<string> Tags, int Attack, int Defense, int Magic,
-    ChampionStats? BaseStats = null, string Resource = "Mana")
+    ChampionStats? BaseStats = null, string Resource = "Mana", int Key = 0)
 {
     public bool UsesMana => Resource.Equals("Mana", StringComparison.OrdinalIgnoreCase);
 
@@ -62,15 +63,25 @@ public sealed class ChampionCatalog
 
     private readonly Dictionary<string, ChampionInfo> _byId;
     private readonly Dictionary<string, ChampionInfo> _byNormalizedName;
+    private readonly Dictionary<int, ChampionInfo> _byKey;
 
     public ChampionCatalog(IEnumerable<ChampionInfo> champions)
     {
         var list = champions.ToList();
         _byId = list.ToDictionary(c => c.Id, StringComparer.OrdinalIgnoreCase);
         _byNormalizedName = list.GroupBy(c => Normalize(c.Name)).ToDictionary(g => g.Key, g => g.First());
+        _byKey = list.Where(c => c.Key > 0).GroupBy(c => c.Key).ToDictionary(g => g.Key, g => g.First());
     }
 
+    public IEnumerable<ChampionInfo> All => _byId.Values;
+
     public ChampionInfo? Get(string id) => _byId.GetValueOrDefault(id);
+
+    /// <summary>Looks up a champion by Riot's numeric id, as the League client reports it in champ select.</summary>
+    public ChampionInfo? GetByKey(int key) => _byKey.GetValueOrDefault(key);
+
+    /// <summary>Finds a champion by name or id, ignoring case, spaces and punctuation ("kaisa" finds Kai'Sa).</summary>
+    public ChampionInfo? Find(string name) => _byId.GetValueOrDefault(name) ?? _byNormalizedName.GetValueOrDefault(Normalize(name));
 
     /// <summary>Maps a live-game player to static champion data. Unknown champions get a neutral placeholder.</summary>
     public ChampionInfo Resolve(LivePlayer player)
@@ -114,7 +125,8 @@ public sealed class ChampionCatalog
                     MoveSpeed = stats.GetProperty("movespeed").GetDouble(),
                     AttackRange = stats.GetProperty("attackrange").GetDouble(),
                 },
-                c.GetStringOrEmpty("partype"));
+                c.GetStringOrEmpty("partype"),
+                int.TryParse(c.GetStringOrEmpty("key"), out var key) ? key : 0);
         });
         return new ChampionCatalog(champions);
     }

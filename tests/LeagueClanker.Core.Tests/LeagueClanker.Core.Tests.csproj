@@ -18,6 +18,11 @@
     <Using Include="Xunit" />
   </ItemGroup>
 
+  <!-- Data Dragon 16.19 rune data, so rune tests run against the real trees. -->
+  <ItemGroup>
+    <None Include="Data\**" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\..\src\LeagueClanker.Core\LeagueClanker.Core.csproj" />
   </ItemGroup>

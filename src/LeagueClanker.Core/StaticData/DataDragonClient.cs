@@ -1,10 +1,15 @@
 using System.Net.Http.Json;
+using System.Text.Json;
+using LeagueClanker.Core.Runes;
 
 namespace LeagueClanker.Core.StaticData;
 
-/// <summary>Item and champion data for one patch.</summary>
+/// <summary>Item, champion and rune data for one patch.</summary>
 public sealed record StaticGameData(string Version, ItemCatalog Items, ChampionCatalog Champions)
 {
+    /// <summary>Empty when the rune data couldn't be loaded; the item advisor works without it.</summary>
+    public RuneCatalog Runes { get; init; } = RuneCatalog.Empty;
+
     public string ItemIconUrl(int itemId) => $"https://ddragon.leagueoflegends.com/cdn/{Version}/img/item/{itemId}.png";
     public string ChampionIconUrl(string championId) => $"https://ddragon.leagueoflegends.com/cdn/{Version}/img/champion/{championId}.png";
 }
@@ -22,7 +27,23 @@ public sealed class DataDragonClient(HttpClient? http = null, string? cacheDirec
         var version = await GetLatestVersionAsync(ct);
         var itemJson = await GetCachedAsync(version, "item.json", ct);
         var championJson = await GetCachedAsync(version, "champion.json", ct);
-        return new StaticGameData(version, ItemCatalog.Parse(itemJson), ChampionCatalog.Parse(championJson));
+        return new StaticGameData(version, ItemCatalog.Parse(itemJson), ChampionCatalog.Parse(championJson))
+        {
+            Runes = await LoadRunesAsync(version, ct),
+        };
+    }
+
+    // Older caches predate rune support; offline, the build advisor still runs without runes.
+    private async Task<RuneCatalog> LoadRunesAsync(string version, CancellationToken ct)
+    {
+        try
+        {
+            return RuneCatalog.Parse(await GetCachedAsync(version, "runesReforged.json", ct));
+        }
+        catch (Exception ex) when (ex is HttpRequestException or JsonException)
+        {
+            return RuneCatalog.Empty;
+        }
     }
 
     private async Task<string> GetLatestVersionAsync(CancellationToken ct)

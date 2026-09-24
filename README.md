@@ -22,6 +22,10 @@ In League Classic it recommends from the old item shop, with the old stats:
 
 <img src="docs/screenshots/classic.png" alt="League Classic build" width="400">
 
+In champ select you pick how you'll play your champion, and one click writes the matching rune page into the client:
+
+<img src="docs/screenshots/champselect.png" alt="Champ select with playstyle and rune page" width="400">
+
 The screenshots come from the demo snapshots in `samples/`, not a live game.
 
 ## Download
@@ -52,6 +56,12 @@ dotnet run --project src/LeagueClanker.App -- --demo samples/mayhem/jinx-level7.
 
 `samples/classic/ashe-vs-tanks.json` is a League Classic game: Ashe against three tanks, with the classic items.
 
+`--champselect` shows a saved champ select instead of the live one. *Apply* then only says what it would write:
+
+```bash
+dotnet run --project src/LeagueClanker.App -- --champselect samples/champselect/leona-support.json
+```
+
 Point it at a folder to replay snapshots in order, one every 10 seconds. `samples/pivot-demo` is a Garen game where the enemy team switches from AD to AP items, which triggers a pivot suggestion:
 
 ```bash
@@ -78,6 +88,14 @@ dotnet run --project src/LeagueClanker.Cli -- --mayhem samples/mayhem/jinx-level
 
 Add `--rerolled "Recursion"` for cards whose reroll is used up, and `--golden "Celestial Body"` for the card with the golden reroll.
 
+For rune pages, name a champion. Add a role, a playstyle, the mode or enemies to see how the page changes, and `--source rules` to skip op.gg:
+
+```bash
+dotnet run --project src/LeagueClanker.Cli -- --runes Ezreal --position bottom --style mage
+```
+
+During champ select, `--champselect` does the same for your pick, and `--champselect --apply` writes the page into the client.
+
 `--augments` lists all 225 augments with the tags the parser gave them. `--scan` reads an offer from a screenshot, or from the running game with `--scan screen`. Add `--verbose` to see every line of text it recognized:
 
 ```bash
@@ -102,7 +120,9 @@ Tick *dry run* (or add `-f dry_run=true`) to build and test without publishing. 
 
 ## Is it allowed
 
-The app reads two things: Riot's official Live Client Data API on localhost, and Data Dragon. It doesn't read game memory, inject into the client, send input, or draw inside the game. It's an ordinary window next to the game, so Vanguard has nothing to object to.
+During a game the app reads Riot's official Live Client Data API on localhost, and Data Dragon. It doesn't read game memory, inject into the client, send input, or draw inside the game. It's an ordinary window next to the game, so Vanguard has nothing to object to.
+
+In champ select it reads the League client's local API, the same one Porofessor, Blitz and Mobalytics use to import runes. Writing your rune page when you press *Apply* is the only thing it changes. Riot doesn't document that API, but it has tolerated rune importers for years.
 
 Riot's third-party policy allows apps that highlight decisions with multiple choices rather than dictate them. That's why every suggestion comes with an alternative and a reason.
 
@@ -130,6 +150,25 @@ Every player gets a full stat block in `StatBlock.cs`: AD, AP, attack speed, cri
 Accepting swaps just those items. Declining remembers them for the rest of the game. "Switch anyway" adopts the latest ranking whenever you want. Buying items from your build never counts as a pivot, and a new game or champion starts a fresh build.
 
 Your next three purchases keep the order of the latest ranking, so a new augment can move your third item to first without asking. Moving a later item into those three does need a pivot.
+
+### Champ select: playstyle and runes
+
+Every champion can be played more than one way: AP Ezreal, AD Thresh, tank or AD Leona. In champ select the app shows eight playstyles: marksman, mage, AD assassin, AP assassin, bruiser, AP bruiser, tank and enchanter. It picks the default from your champion and role:
+
+- Your role is the position champ select assigns you. In blind pick and normals, where nothing is assigned, it's the role you queued for.
+- The default is how the champion is normally played, which is also what the item advisor assumes. In support, a fighter who can tank, like Taric or Braum, defaults to tank.
+- ARAM has no roles, so AD and AP champions default to their damage playstyle and tanks to tank.
+
+Change it with one click. The choice carries into the game, where it decides your item build: an AP Ezreal gets AP items. You can change it in game too, with *Playing as* under your champion's name. The build switches right away, without a pivot suggestion, because it was your decision.
+
+The rune page comes from the source you choose, and the app remembers the choice:
+
+- **op.gg** (default): the most played page on op.gg for your champion, role or ARAM, and playstyle. Pages whose keystone doesn't fit your playstyle are skipped, so AP Ezreal doesn't get Lethal Tempo. Pages with fewer than 50 games are skipped too. The data comes from the unofficial JSON API behind op.gg's champion pages, once per champion and role per session.
+- **Own rules**: a standard page per playstyle in `RuleRuneSource.cs`, like Aftershock for engage tanks and Grasp for tanks in lane, adjusted to the enemy picks you can see. Two tanks swap Coup de Grace for Cut Down. Heavy crowd control gets the tenacity shard. Three ranged champions swap Bone Plating for Second Wind, and two assassins swap it back.
+
+When op.gg has no page for your playstyle (AD Thresh), or doesn't answer, you get the rules' page with a line saying so. Runes are named, not numbered, so if Riot removes one, the first rune of that row takes its place.
+
+*Apply to my rune page* overwrites your current page. Preset pages can't be edited, so then it updates a page it wrote before ("LeagueClanker Jinx"), or makes a new one if you have a free page slot. If neither works, it asks you to select one of your own pages. It never overwrites a page you didn't select.
 
 ### Game modes
 
@@ -233,6 +272,9 @@ To add a rule, implement `IBuildRule`, return a `Situation` with a label, a sent
 - Card names are matched in English, so screen reading needs the League client in English.
 - Screen reading has only been tested on a mock screenshot, not on real games yet.
 - The core-item lists and weights are my best guess for patch 16.18. Real win-rate data per matchup would beat them.
+- Writing rune pages has been tested against a simulated client, not yet against a real one. The client's local API and op.gg's JSON API are both undocumented and can change.
+- The rule pages and keystone lists are hand-made for patch 16.19. New keystones need adding to `KeystoneFit` before op.gg pages with them are used.
+- Rune pages assume today's runes. League Classic's old runes and masteries aren't supported.
 - League Classic's mode string is unverified until someone saves a snapshot from a real game (see *Running it from source*). The classic-item check covers the likely cases.
 - In League Classic, champion knowledge (roles, healers, crowd control) and base stats describe today's champions, not the old kits.
 - Runes and masteries aren't read in any mode, so they're missing from everyone's stats but yours.
@@ -241,6 +283,8 @@ To add a rule, implement `IBuildRule`, return a `Situation` with a label, a sent
 ## Legal
 
 Augment data comes from the [League of Legends Wiki](https://wiki.leagueoflegends.com/en-us/Module:MayhemAugmentData/data) under CC BY-SA 3.0.
+
+Rune statistics come from [op.gg](https://www.op.gg) when you choose op.gg as the rune source. LeagueClanker isn't affiliated with op.gg.
 
 
 LeagueClanker isn't endorsed by Riot Games and doesn't reflect the views or opinions of Riot Games or anyone officially involved in producing or managing Riot Games properties. Riot Games, and all associated properties are trademarks or registered trademarks of Riot Games, Inc.
