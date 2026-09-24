@@ -279,6 +279,8 @@
                                 Background="#1FC8AA6E" Padding="10,8" Margin="0,10,0,6">
                             <StackPanel>
                                 <TextBlock Text="SUGGESTED PICK" Foreground="{StaticResource AccentBrush}" FontSize="10" FontWeight="Bold" />
+                                <TextBlock Text="{Binding RerollText}" TextWrapping="Wrap" FontSize="12" FontWeight="SemiBold" Margin="0,3,0,0"
+                                           Visibility="{Binding RerollText, Converter={StaticResource HasContent}}" />
                                 <TextBlock Text="{Binding AdviceText}" TextWrapping="Wrap" FontSize="12" Margin="0,3,0,0" />
                             </StackPanel>
                         </Border>
@@ -293,16 +295,23 @@
                                             <DockPanel>
                                                 <Button DockPanel.Dock="Right" Style="{StaticResource SmallButton}" Content="I picked this" Click="OnPickOption"
                                                         AutomationProperties.Name="{Binding Name, StringFormat=I picked {0}}" />
+                                                <Button DockPanel.Dock="Right" Style="{StaticResource SmallButton}" Content="Rerolled" Click="OnRerolledOption" Margin="0,0,4,0"
+                                                        ToolTip="You rerolled it in game: type the card you got instead"
+                                                        Visibility="{Binding CanReroll, Converter={StaticResource BoolToVisibility}}"
+                                                        AutomationProperties.Name="{Binding Name, StringFormat=Rerolled {0}}" />
                                                 <StackPanel Orientation="Horizontal">
                                                     <TextBlock Text="{Binding Rank}" Foreground="{StaticResource AccentBrush}" FontWeight="Bold" Width="18" VerticalAlignment="Center" />
                                                     <TextBlock Style="{StaticResource TierName}" Text="{Binding Name}" FontSize="13" />
-                                                    <Border Background="{StaticResource AccentBrush}" CornerRadius="3" Padding="4,0" Margin="6,0,0,0" VerticalAlignment="Center"
-                                                            Visibility="{Binding IsBest, Converter={StaticResource BoolToVisibility}}">
-                                                        <TextBlock Text="BEST" FontSize="9" FontWeight="Bold" Foreground="#FF0E1217" />
+                                                    <Border x:Name="Badge" CornerRadius="3" Padding="4,0" Margin="6,0,0,0" VerticalAlignment="Center" BorderThickness="1"
+                                                            Background="{StaticResource AccentBrush}" BorderBrush="{StaticResource AccentBrush}"
+                                                            Visibility="{Binding Badge, Converter={StaticResource HasContent}}">
+                                                        <TextBlock x:Name="BadgeText" Text="{Binding Badge}" FontSize="9" FontWeight="Bold" Foreground="#FF0E1217" />
                                                     </Border>
                                                 </StackPanel>
                                             </DockPanel>
-                                            <TextBlock Text="{Binding Scores}" Foreground="{StaticResource MutedBrush}" FontSize="10" Margin="18,1,0,2" />
+                                            <TextBlock Text="{Binding Scores}" Foreground="{StaticResource MutedBrush}" FontSize="10" Margin="18,1,0,0" />
+                                            <TextBlock Text="{Binding RerollNote}" Foreground="{StaticResource MutedBrush}" FontSize="10" Margin="18,0,0,2"
+                                                       Visibility="{Binding RerollNote, Converter={StaticResource HasContent}}" />
                                             <ItemsControl ItemsSource="{Binding Reasons}" Margin="18,0,0,0">
                                                 <ItemsControl.ItemTemplate>
                                                     <DataTemplate>
@@ -314,6 +323,17 @@
                                                        Visibility="{Binding Combos, Converter={StaticResource HasContent}}" />
                                         </StackPanel>
                                     </Border>
+                                    <DataTemplate.Triggers>
+                                        <!-- KEEP and BEST are filled; reroll advice is an outline; used-up rerolls are grey. -->
+                                        <DataTrigger Binding="{Binding BadgeFilled}" Value="False">
+                                            <Setter TargetName="Badge" Property="Background" Value="Transparent" />
+                                            <Setter TargetName="BadgeText" Property="Foreground" Value="{StaticResource AccentBrush}" />
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding Badge}" Value="REROLLED">
+                                            <Setter TargetName="Badge" Property="BorderBrush" Value="{StaticResource MutedBrush}" />
+                                            <Setter TargetName="BadgeText" Property="Foreground" Value="{StaticResource MutedBrush}" />
+                                        </DataTrigger>
+                                    </DataTemplate.Triggers>
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>

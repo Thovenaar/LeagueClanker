@@ -42,7 +42,9 @@ public partial class App : Application
             if (await LoadAugmentsAsync(viewModel.Augments, data) is { } augments)
                 _ = RunScannerAsync(viewModel.Augments, new AugmentScreenReader(augments), scanImage);
 
-            await foreach (var update in new BuildAdvisor(source, data).RunAsync(PollInterval, _cts.Token))
+            var advisor = new BuildAdvisor(source, data);
+            viewModel.Augments.PickedChanged += (_, picked) => advisor.Augments = picked;
+            await foreach (var update in advisor.RunAsync(PollInterval, _cts.Token))
                 viewModel.Apply(update, data);
         }
         catch (OperationCanceledException)

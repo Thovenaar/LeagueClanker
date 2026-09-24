@@ -1,3 +1,4 @@
+using LeagueClanker.Core.Augments;
 using LeagueClanker.Core.LiveClient;
 using LeagueClanker.Core.StaticData;
 
@@ -107,6 +108,9 @@ public sealed record GameAnalysis(PlayerProfile Me, TeamProfile Allies, TeamProf
 {
     public GameMode Mode { get; init; } = GameMode.SummonersRift;
 
+    /// <summary>ARAM: Mayhem augments you picked. They shape the item advice like any other game fact.</summary>
+    public IReadOnlyList<AugmentInfo> Augments { get; init; } = [];
+
     /// <summary>My team including me.</summary>
     public TeamProfile MyTeam => new([Me, .. Allies.Players]);
 }
@@ -114,7 +118,7 @@ public sealed record GameAnalysis(PlayerProfile Me, TeamProfile Allies, TeamProf
 public static class GameAnalyzer
 {
     /// <summary>Returns null when the active player can't be found (e.g. spectating).</summary>
-    public static GameAnalysis? Analyze(AllGameData data, StaticGameData staticData)
+    public static GameAnalysis? Analyze(AllGameData data, StaticGameData staticData, IReadOnlyList<AugmentInfo>? augments = null)
     {
         if (data.ActivePlayer is not { } active)
             return null;
@@ -130,6 +134,7 @@ public static class GameAnalyzer
         return new GameAnalysis(myProfile, new TeamProfile(allies), new TeamProfile(enemies), data.GameData?.GameTime ?? 0)
         {
             Mode = GameModes.Detect(data.GameData?.GameMode, data.GameData?.MapNumber ?? 0),
+            Augments = augments ?? [],
         };
     }
 

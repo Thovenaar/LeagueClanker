@@ -76,6 +76,79 @@ public class AugmentAdvisorTests
         Assert.Contains(ownedReasons, r => r.Text == "upgrades your Plate");
     }
 
+    // Reroll advice compares a card with what a reroll could give, so it needs a pool the size of the real one
+    // (about 70 cards per tier). In a tiny pool a card you pass on keeps coming back, and every choice looks equal.
+    private static readonly AugmentCatalog BigPool = BuildBigPool();
+    private readonly AugmentAdvisor _bigAdvisor = new(BigPool, simulations: 400);
+
+    [Fact]
+    public void Rerolls_KeepTheBestCardAndRerollTheRest()
+    {
+        var ctx = BigPoolContext(picked: ["Rhythm"]);
+
+        var advice = _bigAdvisor.Rank([Card("Lucky"), Card("Pack Leader"), Card("Plated")], ctx);
+        var reroll = advice.Reroll!;
+
+        Assert.Equal(RerollAction.Keep, reroll.For(Card("Lucky"))!.Action);
+        Assert.Equal(RerollAction.Reroll, reroll.For(Card("Pack Leader"))!.Action);
+        Assert.Equal(RerollAction.Reroll, reroll.For(Card("Plated"))!.Action);
+        Assert.StartsWith("Keep Lucky. Reroll ", reroll.Text);
+    }
+
+    [Fact]
+    public void Rerolls_EvenTheBestCardWhenItIsWeak()
+    {
+        // Jinx has no pets and no Plate: both are worse than almost anything a reroll gives.
+        var advice = _bigAdvisor.Rank([Card("Pack Leader"), Card("Plated")], BigPoolContext());
+        var reroll = advice.Reroll!;
+
+        var keeper = reroll.Cards[0];
+        Assert.True(keeper.Action == RerollAction.RerollLast,
+            $"{keeper.Action}; " + string.Join(", ", advice.Ranked.Select(o => $"{o.Augment.Name} now {o.Now:0.00} exp {o.Expected:0.00} beats {reroll.For(o.Augment)!.RerollBeatsIt:P0}")));
+        Assert.True(keeper.RerollBeatsIt > 0.5, $"a reroll beats it {keeper.RerollBeatsIt:P0}");
+        Assert.All(reroll.Cards.Skip(1), c => Assert.Equal(RerollAction.Reroll, c.Action));
+        Assert.Contains("reroll it too", reroll.Text);
+    }
+
+    [Fact]
+    public void Rerolls_SkipCardsThatWereAlreadyRerolled()
+    {
+        var packLeader = Card("Pack Leader");
+        var plated = Card("Plated");
+
+        var oneLeft = _bigAdvisor.Rank([packLeader, plated], BigPoolContext(), rerolled: new HashSet<AugmentInfo> { plated });
+        var noneLeft = _bigAdvisor.Rank([packLeader, plated], BigPoolContext(), rerolled: new HashSet<AugmentInfo> { packLeader, plated });
+
+        Assert.Equal(RerollAction.AlreadyRerolled, oneLeft.Reroll!.For(plated)!.Action);
+        Assert.Null(noneLeft.Reroll);
+    }
+
+    private static AugmentInfo Card(string name) => BigPool.Find(name)!;
+
+    private static AugmentContext BigPoolContext(string[]? picked = null)
+    {
+        var game = TestData.Game(allies: [("Jinx", [])], enemies: [("Zed", []), ("Lux", [])]);
+        return new AugmentContext(GameAnalyzer.Analyze(game, TestData.Static)!) { Picked = (picked ?? []).Select(Card).ToList() };
+    }
+
+    /// <summary>A few strong cards for a marksman and many forgettable ones, in every tier.</summary>
+    private static AugmentCatalog BuildBigPool()
+    {
+        var cards = new List<string>
+        {
+            """["Lucky"] = { ["description"] = "Grants 50% critical strike chance.", ["tier"] = "Gold" }""",
+            """["Rhythm"] = { ["description"] = "Your critical strikes grant you 6% bonus attack speed.", ["tier"] = "Gold" }""",
+            """["Swift"] = { ["description"] = "Grants 40% bonus attack speed.", ["tier"] = "Gold" }""",
+            """["Keen"] = { ["description"] = "Increases attack damage by 25%.", ["tier"] = "Gold" }""",
+            """["Pack Leader"] = { ["description"] = "Your pets deal 40% increased damage.", ["tier"] = "Gold" }""",
+            """["Plated"] = { ["description"] = "Upgrades Plate, granting 50 armor.", ["tier"] = "Gold" }""",
+        };
+        foreach (var tier in new[] { "Silver", "Gold", "Prismatic" })
+            for (var i = 1; i <= 25; i++)
+                cards.Add($$"""["{{(tier == "Gold" ? "Guard" : tier)}} {{i}}"] = { ["description"] = "Grants 10 bonus magic resistance.", ["tier"] = "{{tier}}" }""");
+        return AugmentCatalog.ParseWikiModule($"return {{ {string.Join(", ", cards)} }}", TestData.Static.Items);
+    }
+
     [Fact]
     public void SecondSelection_IsNeverSilverAfterASilverFirst()
     {

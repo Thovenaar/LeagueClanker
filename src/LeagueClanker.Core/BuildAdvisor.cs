@@ -1,5 +1,6 @@
 using System.Runtime.CompilerServices;
 using LeagueClanker.Core.Analysis;
+using LeagueClanker.Core.Augments;
 using LeagueClanker.Core.LiveClient;
 using LeagueClanker.Core.Recommendation;
 using LeagueClanker.Core.StaticData;
@@ -19,6 +20,9 @@ public sealed class BuildAdvisor(IGameDataSource source, StaticGameData data)
 {
     private readonly RecommendationEngine _engine = new(data);
 
+    /// <summary>Augments you picked (ARAM: Mayhem). Changing them triggers a new recommendation on the next poll.</summary>
+    public IReadOnlyList<AugmentInfo> Augments { get; set; } = [];
+
     public async IAsyncEnumerable<AdvisorUpdate> RunAsync(TimeSpan interval, [EnumeratorCancellation] CancellationToken ct = default)
     {
         string? lastFingerprint = null;
@@ -27,7 +31,8 @@ public sealed class BuildAdvisor(IGameDataSource source, StaticGameData data)
         do
         {
             var game = await source.TryGetAsync(ct);
-            var analysis = game is null ? null : GameAnalyzer.Analyze(game, data);
+            var augments = Augments;
+            var analysis = game is null ? null : GameAnalyzer.Analyze(game, data, augments);
 
             if (analysis is null)
             {
@@ -37,7 +42,7 @@ public sealed class BuildAdvisor(IGameDataSource source, StaticGameData data)
                 continue;
             }
 
-            var fingerprint = Fingerprint(game!);
+            var fingerprint = Fingerprint(game!) + "|" + string.Join(",", augments.Select(a => a.Name));
             if (fingerprint != lastFingerprint)
             {
                 lastFingerprint = fingerprint;
@@ -48,7 +53,7 @@ public sealed class BuildAdvisor(IGameDataSource source, StaticGameData data)
     }
 
     public BuildRecommendation? RecommendOnce(AllGameData game) =>
-        GameAnalyzer.Analyze(game, data) is { } analysis ? _engine.Recommend(analysis) : null;
+        GameAnalyzer.Analyze(game, data, Augments) is { } analysis ? _engine.Recommend(analysis) : null;
 
     // Recompute whenever something that moves stats or threat changes: items, levels, kills and deaths.
     // Gold ticks alone don't change the build.

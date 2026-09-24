@@ -71,6 +71,7 @@ public sealed class RecommendationEngine(StaticGameData data, IReadOnlyList<IBui
         var situations = _rules
             .Select(r => r.Evaluate(game))
             .OfType<Situation>()
+            .Concat(AugmentRules.Evaluate(game))
             .Where(s => s.Impact > 0)
             .OrderByDescending(s => s.Impact)
             .ToList();
@@ -86,11 +87,13 @@ public sealed class RecommendationEngine(StaticGameData data, IReadOnlyList<IBui
         bool Available(ItemInfo item) => !ownedIds.Contains(item.Id) && !item.Passives.Any(ownedPassives.Contains);
 
         // A situation you've already answered with a finished item matters less for the next purchase.
-        var weights = situations.ToDictionary(s => s, s => owned
-            .Where(i => i.Kind is ItemKind.Legendary or ItemKind.Boots)
-            .Aggregate(1.0, (weight, item) => s.Score(item) >= ScoredItem.MinReasonPoints ? weight * OwnedDecay : weight));
+        var weights = situations.ToDictionary(s => s, s =>
+            owned
+                .Where(i => i.Kind is ItemKind.Legendary or ItemKind.Boots)
+                .Aggregate(1.0, (weight, item) => s.Score(item) >= ScoredItem.MinReasonPoints ? weight * OwnedDecay : weight)
+            * game.Augments.Aggregate(1.0, (weight, augment) => AugmentRules.Answers(augment, s) ? weight * OwnedDecay : weight));
 
-        var mine = game.Me.Stats;
+        var mine = AugmentRules.WithAugmentStats(game.Me.Stats, game.Augments);
         var map = game.Mode.MapId();
         var candidates = data.Items.LegendariesOn(map).Where(Available).Where(i => profile.BaseScore(i, mine) >= profile.MinFit).ToList();
         var boots = owned.Any(i => i.IsBoots && i.Id != BasicBootsId)

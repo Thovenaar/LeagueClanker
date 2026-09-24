@@ -123,6 +123,8 @@ internal static partial class AugmentTagger
             Effects = effects,
             Triggers = triggers,
             MentionedItems = items is null ? [] : FindItems(description, items),
+            CritChanceBonus = Amount(CritGrantRegex(), description),
+            AttackSpeedBonus = Amount(AttackSpeedGrantRegex(), description),
             HasDrawback = DrawbackRegex().IsMatch(description),
             IsRandom = RandomRegex().IsMatch(description),
             IsQuest = entry.ContainsKey("questinfo") || name.StartsWith("Quest:", StringComparison.OrdinalIgnoreCase),
@@ -157,6 +159,9 @@ internal static partial class AugmentTagger
 
         return (effects, triggers);
     }
+
+    private static double Amount(Regex pattern, string description) =>
+        pattern.Match(description) is { Success: true } m ? double.Parse(m.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture) : 0;
 
     private static List<ItemInfo> FindItems(string description, ItemCatalog items)
     {
@@ -196,6 +201,12 @@ internal static partial class AugmentTagger
 
     [GeneratedRegex(@"random [\w-]+ augments?|random augments?|random Prismatic|random Gold", RegexOptions.IgnoreCase)]
     private static partial Regex RandomRegex();
+
+    [GeneratedRegex(@"\b(?:gain|grants?)\s+(\d+)% critical strike chance", RegexOptions.IgnoreCase)]
+    private static partial Regex CritGrantRegex();
+
+    [GeneratedRegex(@"\b(?:gain|grants?)\s+(\d+)% bonus attack speed", RegexOptions.IgnoreCase)]
+    private static partial Regex AttackSpeedGrantRegex();
 
     [GeneratedRegex(@"\bSpellblade\b")]
     private static partial Regex SpellbladeRegex();

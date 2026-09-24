@@ -12,6 +12,11 @@ using LeagueClanker.Vision;
 //   LeagueClanker.Cli <folder | a.json b.json> [--decline]
 //                                             replay snapshots through the pivot planner, accepting pivots (or declining)
 //   LeagueClanker.Cli --items                 list the item catalog with detected traits (for tuning rules)
+//   LeagueClanker.Cli --augments              list Mayhem augments with their tags
+//   LeagueClanker.Cli --mayhem <game.json> --offer "A;B;C" [--picked "X;Y"] [--rerolled "A"]
+//                                             rank an augment offer and say which cards to reroll
+//   LeagueClanker.Cli --scan <image.png | screen> [--verbose]
+//                                             read an augment offer from a screenshot or the game
 
 Console.OutputEncoding = System.Text.Encoding.UTF8;
 using var cts = new CancellationTokenSource();
@@ -58,7 +63,10 @@ if (args is ["--mayhem", var gamePath, ..])
         Situations = rec.Situations,
     };
 
-    var advice = new AugmentAdvisor(augments).Rank(offer, ctx);
+    var rerolled = NamesAfter("--rerolled").Select(Resolve).ToHashSet();
+    var started = DateTime.UtcNow;
+    var advice = new AugmentAdvisor(augments).Rank(offer, ctx, rerolled);
+    var elapsed = DateTime.UtcNow - started;
     var me = rec.Game.Me;
     Console.WriteLine($"=== {me.Name} ({me.Archetype.DisplayName()}), {rec.Game.Mode.DisplayName()} ===");
     Console.WriteLine($"Picked: {(ctx.Picked.Count == 0 ? "nothing yet" : string.Join(", ", ctx.Picked))}");
@@ -66,13 +74,18 @@ if (args is ["--mayhem", var gamePath, ..])
     var rank = 1;
     foreach (var option in advice.Ranked)
     {
-        Console.WriteLine($"{rank++}. {option.Augment.Name} ({option.Augment.Tier})  now {option.Now:0.0}  with future picks {option.Expected:0.0}");
+        var reroll = advice.Reroll?.For(option.Augment);
+        var action = reroll is null ? "" : $"  [{reroll.Action}, a reroll beats it {reroll.RerollBeatsIt:P0}]";
+        Console.WriteLine($"{rank++}. {option.Augment.Name} ({option.Augment.Tier})  now {option.Now:0.0}  with future picks {option.Expected:0.0}{action}");
         foreach (var reason in option.Reasons.OrderByDescending(r => Math.Abs(r.Points)))
             Console.WriteLine($"     {(reason.Points < 0 ? "-" : "+")} {reason.Text}");
         if (option.Partners.Count > 0)
             Console.WriteLine($"     combos later: {string.Join(", ", option.Partners)}");
     }
-    Console.WriteLine($"\n{advice.Text}\n{AugmentDataClient.Attribution}");
+    Console.WriteLine();
+    if (advice.Reroll is { Text.Length: > 0 } rerollAdvice)
+        Console.WriteLine(rerollAdvice.Text);
+    Console.WriteLine($"{advice.Text}\n(ranked in {elapsed.TotalMilliseconds:0} ms) {AugmentDataClient.Attribution}");
     return;
 }
 
@@ -98,13 +111,23 @@ if (args is ["--scan", var source, ..])
 }
 
 var decline = args.Contains("--decline");
-var paths = args.Where(a => a != "--decline")
+var pickedIndex = Array.IndexOf(args, "--picked");
+var paths = args.Where((a, i) => a != "--decline" && (pickedIndex < 0 || (i != pickedIndex && i != pickedIndex + 1)))
     .SelectMany(a => Directory.Exists(a) ? Directory.GetFiles(a, "*.json").Order().ToArray() : new[] { a })
     .ToList();
 
 if (paths.Count == 1)
 {
-    Print(await RecommendAsync(paths[0]));
+    // --picked "A;B" adds ARAM: Mayhem augments you took, to see how they change the build.
+    IReadOnlyList<AugmentInfo> picked = [];
+    if (pickedIndex >= 0 && pickedIndex + 1 < args.Length)
+    {
+        var augments = await new AugmentDataClient().LoadMayhemAsync(data.Items, cts.Token);
+        picked = args[pickedIndex + 1].Split(';', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
+            .Select(n => augments.Find(n) ?? throw new ArgumentException($"Unknown augment '{n}'. Run --augments for the list."))
+            .ToList();
+    }
+    Print(await RecommendAsync(paths[0], picked));
     return;
 }
 
@@ -150,11 +173,11 @@ catch (OperationCanceledException)
 {
 }
 
-async Task<BuildRecommendation?> RecommendAsync(string path)
+async Task<BuildRecommendation?> RecommendAsync(string path, IReadOnlyList<AugmentInfo>? augments = null)
 {
     var game = await new FileGameDataSource(path).TryGetAsync(cts.Token)
         ?? throw new InvalidOperationException($"{path} does not contain a playable game.");
-    return new BuildAdvisor(new FileGameDataSource(path), data).RecommendOnce(game);
+    return new BuildAdvisor(new FileGameDataSource(path), data) { Augments = augments ?? [] }.RecommendOnce(game);
 }
 
 static void Print(BuildRecommendation? rec)

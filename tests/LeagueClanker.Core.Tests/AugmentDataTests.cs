@@ -83,6 +83,15 @@ public class AugmentDataTests
     }
 
     [Fact]
+    public void Catalog_ReadsGrantedCritAndAttackSpeed()
+    {
+        Assert.Equal(50, TestAugments.Get("Lucky").CritChanceBonus);
+        Assert.Equal(25, TestAugments.Get("Rhythm Plus").CritChanceBonus);
+        Assert.Equal(30, TestAugments.Get("Quick").AttackSpeedBonus);
+        Assert.Equal(0, TestAugments.Get("Rhythm").CritChanceBonus);
+    }
+
+    [Fact]
     public void Catalog_FindIsForgivingAndSkipsDisabledCards()
     {
         var catalog = TestAugments.Catalog;
@@ -110,6 +119,8 @@ internal static class TestAugments
             ["Echo I"] = { ["description"] = "Basic attacks deal 30 bonus magic damage.", ["tier"] = "Gold" },
             ["Echo II"] = { ["description"] = "Basic attacks deal 40 bonus magic damage.", ["tier"] = "Prismatic" },
             ["Echo III"] = { ["description"] = "Basic attacks deal 50 bonus magic damage.", ["tier"] = "Prismatic" },
+            ["Warded"] = { ["description"] = "Grants 40 bonus {{as|magic resistance}}.", ["tier"] = "Silver" },
+            ["Rhythm Plus"] = { ["description"] = "Your critical strikes grant attack speed. Additionally, gain 25% critical strike chance.", ["tier"] = "Prismatic" },
         }
         """, TestData.Static.Items);
 

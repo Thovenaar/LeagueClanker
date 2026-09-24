@@ -126,7 +126,10 @@ internal sealed class LuaTable
         if (end < 0) throw Error("Unterminated long string");
         var value = _s[_i..end];
         _i = end + close.Length;
-        return value.StartsWith('\n') ? value[1..] : value;
+        // Lua drops the line break right after the opening bracket, whichever style it is.
+        return value.StartsWith("\r\n", StringComparison.Ordinal) ? value[2..]
+            : value.StartsWith('\n') || value.StartsWith('\r') ? value[1..]
+            : value;
     }
 
     private double ParseNumber()

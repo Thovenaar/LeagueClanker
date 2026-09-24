@@ -9,8 +9,11 @@ namespace LeagueClanker.App;
 
 public sealed record AugmentRow(string Name, string Tier, string Description);
 
+/// <param name="Badge">KEEP, REROLL, REROLL LAST, REROLLED, or BEST when rerolls don't apply.</param>
+/// <param name="CanReroll">The card still has its reroll and the advice is to use it.</param>
 public sealed record AugmentOptionRow(
-    int Rank, string Name, string Tier, string Description, bool IsBest, string Scores, IReadOnlyList<string> Reasons, string Combos);
+    int Rank, string Name, string Tier, string Description, string Badge, bool BadgeFilled, bool CanReroll,
+    string Scores, string RerollNote, IReadOnlyList<string> Reasons, string Combos);
 
 /// <summary>
 /// Augment offers for ARAM: Mayhem, ranked. Offers are read from the screen when possible (<see cref="OnScan"/>);
@@ -31,6 +34,9 @@ public sealed class AugmentPickerViewModel : INotifyPropertyChanged
     private int _rankVersion;
     private int _level;
     private string? _lastDetected;
+    private List<AugmentInfo> _lastDetectedCards = [];
+    private readonly HashSet<AugmentInfo> _rerolled = [];
+    private int _pendingRerolls;
     private bool _offerFromScreen;
     private int _scansWithoutOffer;
 
@@ -41,12 +47,17 @@ public sealed class AugmentPickerViewModel : INotifyPropertyChanged
     private IReadOnlyList<AugmentRow> _pickedRows = [];
     private IReadOnlyList<AugmentOptionRow> _ranked = [];
     private string _adviceText = "";
+    private string _rerollText = "";
     private bool _isRanking;
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
     /// <summary>A new offer was read from the screen.</summary>
     public event EventHandler? OfferDetected;
+
+    /// <summary>Your picked augments changed. The item advice takes them into account.</summary>
+    public event EventHandler<IReadOnlyList<AugmentInfo>>? PickedChanged;
+    private string _lastPickedKey = "";
 
     public string SearchText
     {
@@ -64,6 +75,9 @@ public sealed class AugmentPickerViewModel : INotifyPropertyChanged
     public IReadOnlyList<AugmentRow> Picked { get => _pickedRows; private set => Set(ref _pickedRows, value); }
     public IReadOnlyList<AugmentOptionRow> Ranked { get => _ranked; private set => Set(ref _ranked, value); }
     public string AdviceText { get => _adviceText; private set => Set(ref _adviceText, value); }
+
+    /// <summary>"Keep X. Reroll Y and Z: ..." Empty when no card can be rerolled.</summary>
+    public string RerollText { get => _rerollText; private set => Set(ref _rerollText, value); }
     public bool IsRanking { get => _isRanking; private set => Set(ref _isRanking, value); }
     public bool IsAvailable => _catalog is not null;
     public string Attribution => AugmentDataClient.Attribution;
@@ -97,6 +111,9 @@ public sealed class AugmentPickerViewModel : INotifyPropertyChanged
         _offer.Clear();
         _picked.Clear();
         _lastDetected = null;
+        _lastDetectedCards = [];
+        _rerolled.Clear();
+        _pendingRerolls = 0;
         _offerFromScreen = false;
         _scansWithoutOffer = 0;
         SearchText = "";
@@ -108,8 +125,19 @@ public sealed class AugmentPickerViewModel : INotifyPropertyChanged
         if (Find(name) is not { } augment || _offer.Contains(augment) || _picked.Contains(augment))
             return;
         if (_offer.Count >= OfferSize || (_offer.Count > 0 && _offer[0].Tier != augment.Tier))
-            _offer.Clear(); // a new offer: every card in one offer shares a tier
+        {
+            // A new offer: every card in one offer shares a tier.
+            _offer.Clear();
+            _rerolled.Clear();
+            _pendingRerolls = 0;
+        }
         _offer.Add(augment);
+        if (_pendingRerolls > 0)
+        {
+            // This card replaced one you pressed "Rerolled" on, so its own reroll is used up.
+            _rerolled.Add(augment);
+            _pendingRerolls--;
+        }
         SearchText = "";
         Changed();
     }
@@ -131,8 +159,20 @@ public sealed class AugmentPickerViewModel : INotifyPropertyChanged
             return;
         _picked.Add(augment);
         _offer.Clear();
+        _rerolled.Clear();
+        _pendingRerolls = 0;
         _offerFromScreen = false;
         Changed();
+    }
+
+    /// <summary>You rerolled this card in game: it leaves the offer and the card you type next replaces it.</summary>
+    public void MarkRerolled(string name)
+    {
+        if (Find(name) is not { } augment || !_offer.Remove(augment))
+            return;
+        _pendingRerolls++;
+        Changed();
+        Status = $"Type the card that replaced {augment.Name}.";
     }
 
     /// <summary>
@@ -148,7 +188,15 @@ public sealed class AugmentPickerViewModel : INotifyPropertyChanged
             if (key == _lastDetected)
                 return;
 
+            // One or two cards changed while others stayed: those are rerolls, and can't be rerolled again.
+            var sameOffer = _lastDetectedCards.Count > 0 && detected.Any(_lastDetectedCards.Contains) && detected[0].Tier == _lastDetectedCards[0].Tier;
+            if (!sameOffer)
+                _rerolled.Clear();
+            foreach (var card in detected.Where(c => sameOffer && !_lastDetectedCards.Contains(c)))
+                _rerolled.Add(card);
+
             _lastDetected = key;
+            _lastDetectedCards = detected.ToList();
             _offer.Clear();
             _offer.AddRange(detected.Where(a => !_picked.Contains(a)));
             _offerFromScreen = true;
@@ -186,6 +234,12 @@ public sealed class AugmentPickerViewModel : INotifyPropertyChanged
     {
         Offer = _offer.Select(ToRow).ToList();
         Picked = _picked.Select(ToRow).ToList();
+        var pickedKey = string.Join("|", _picked.Select(a => a.Name));
+        if (pickedKey != _lastPickedKey)
+        {
+            _lastPickedKey = pickedKey;
+            PickedChanged?.Invoke(this, _picked.ToList());
+        }
         RefreshSuggestions();
         UpdateStatus(null);
         _ = RankAsync();
@@ -220,6 +274,7 @@ public sealed class AugmentPickerViewModel : INotifyPropertyChanged
         {
             Ranked = [];
             AdviceText = "";
+            RerollText = "";
             IsRanking = false;
             return;
         }
@@ -234,20 +289,40 @@ public sealed class AugmentPickerViewModel : INotifyPropertyChanged
 
         IsRanking = true;
         var advisor = _advisor;
-        var advice = await Task.Run(() => advisor.Rank(offer, ctx));
+        var rerolled = _rerolled.ToHashSet();
+        var advice = await Task.Run(() => advisor.Rank(offer, ctx, rerolled));
         if (version != _rankVersion)
             return; // the offer or game changed while simulating; a newer ranking is on its way
 
-        Ranked = advice.Ranked.Select((o, i) => new AugmentOptionRow(
-            i + 1,
-            o.Augment.Name,
-            o.Augment.Tier.ToString(),
-            o.Augment.Description,
-            i == 0,
-            $"now {o.Now:0.0} · with future picks {o.Expected:0.0}",
-            o.Reasons.OrderByDescending(r => Math.Abs(r.Points)).Take(3).Select(r => (r.Points < 0 ? "− " : "+ ") + r.Text).ToList(),
-            o.Partners.Count > 0 ? $"Combos later: {string.Join(", ", o.Partners.Take(3))}" : "")).ToList();
+        Ranked = advice.Ranked.Select((o, i) =>
+        {
+            var reroll = advice.Reroll?.For(o.Augment);
+            var (badge, filled) = reroll?.Action switch
+            {
+                RerollAction.Keep => ("KEEP", true),
+                RerollAction.Reroll => ("REROLL", false),
+                RerollAction.RerollLast => ("REROLL LAST", false),
+                RerollAction.AlreadyRerolled => ("REROLLED", false),
+                _ => (i == 0 ? "BEST" : "", true),
+            };
+            var note = reroll is null || reroll.Action == RerollAction.AlreadyRerolled
+                ? ""
+                : $"A reroll beats it {reroll.RerollBeatsIt:P0} of the time.";
+            return new AugmentOptionRow(
+                i + 1,
+                o.Augment.Name,
+                o.Augment.Tier.ToString(),
+                o.Augment.Description,
+                badge,
+                filled,
+                reroll?.Action is RerollAction.Reroll or RerollAction.RerollLast,
+                $"now {o.Now:0.0} · with future picks {o.Expected:0.0}",
+                note,
+                o.Reasons.OrderByDescending(r => Math.Abs(r.Points)).Take(3).Select(r => (r.Points < 0 ? "− " : "+ ") + r.Text).ToList(),
+                o.Partners.Count > 0 ? $"Combos later: {string.Join(", ", o.Partners.Take(3))}" : "");
+        }).ToList();
         AdviceText = advice.Text;
+        RerollText = advice.Reroll?.Text ?? "";
         IsRanking = false;
     }
 

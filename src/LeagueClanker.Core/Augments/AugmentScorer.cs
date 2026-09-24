@@ -123,6 +123,76 @@ public sealed class AugmentScorer
         ["team AP"] = [(AugmentEffect.Penetration, 0.6)],
     };
 
+    /// <summary>How much of what <paramref name="situation"/> asks for the augment already gives.</summary>
+    internal static double Answers(AugmentInfo augment, Situation situation) =>
+        SituationWants.TryGetValue(situation.Label, out var wants) ? wants.Where(w => augment.Gives(w.Effect)).Sum(w => w.Weight) : 0;
+
+    /// <summary>
+    /// Scoring for one game state with caching, for simulations that score the same cards thousands of times.
+    /// Gives the same numbers as the scorer's own methods.
+    /// </summary>
+    internal Session CreateSession(AugmentContext ctx) => new(this, ctx);
+
+    internal sealed class Session(AugmentScorer scorer, AugmentContext ctx)
+    {
+        private readonly Dictionary<AugmentInfo, (FitParts Fit, double ItemsAndSituations)> _cards = new(ReferenceEqualityComparer.Instance);
+        private readonly Dictionary<(AugmentInfo, AugmentInfo), double> _synergy = new(PairComparer.Instance);
+
+        public AugmentContext Context => ctx;
+
+        public double Value(AugmentInfo augment, IReadOnlyList<AugmentInfo> set)
+        {
+            var statCounts = new Dictionary<AugmentEffect, int>();
+            foreach (var other in set)
+                CountStats(other, statCounts);
+            var value = Standalone(augment, statCounts);
+            foreach (var other in set)
+                value += Synergy(augment, other);
+            return value;
+        }
+
+        public double SetValue(IReadOnlyList<AugmentInfo> set)
+        {
+            var total = 0.0;
+            var statCounts = new Dictionary<AugmentEffect, int>();
+            for (var i = 0; i < set.Count; i++)
+            {
+                total += Standalone(set[i], statCounts);
+                CountStats(set[i], statCounts);
+                for (var j = 0; j < i; j++)
+                    total += Synergy(set[i], set[j]);
+            }
+            return total;
+        }
+
+        public double Synergy(AugmentInfo a, AugmentInfo b)
+        {
+            if (!_synergy.TryGetValue((a, b), out var value))
+                _synergy[(a, b)] = value = scorer.Synergy(a, b, ctx, null);
+            return value;
+        }
+
+        private double Standalone(AugmentInfo augment, Dictionary<AugmentEffect, int> statCounts)
+        {
+            if (!_cards.TryGetValue(augment, out var card))
+                _cards[augment] = card = (scorer.ComputeFitParts(augment, ctx), scorer.ItemSynergy(augment, ctx, null) + Situational(augment, ctx, null));
+            return CombineFit(augment, card.Fit, statCounts) + card.ItemsAndSituations;
+        }
+
+        /// <summary>Synergy is symmetric, so (a, b) and (b, a) share a cache entry.</summary>
+        private sealed class PairComparer : IEqualityComparer<(AugmentInfo, AugmentInfo)>
+        {
+            public static readonly PairComparer Instance = new();
+
+            public bool Equals((AugmentInfo, AugmentInfo) x, (AugmentInfo, AugmentInfo) y) =>
+                ReferenceEquals(x.Item1, y.Item1) && ReferenceEquals(x.Item2, y.Item2)
+                || ReferenceEquals(x.Item1, y.Item2) && ReferenceEquals(x.Item2, y.Item1);
+
+            public int GetHashCode((AugmentInfo, AugmentInfo) pair) =>
+                System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(pair.Item1) ^ System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(pair.Item2);
+        }
+    }
+
     /// <summary>Total value of a set of augments: each card's own value plus every pair's synergy.</summary>
     public double SetValue(IReadOnlyList<AugmentInfo> set, AugmentContext ctx)
     {
@@ -158,14 +228,14 @@ public sealed class AugmentScorer
         return fit + ItemSynergy(augment, ctx, reasons) + Situational(augment, ctx, reasons);
     }
 
-    private double Fit(AugmentInfo augment, AugmentContext ctx, Dictionary<AugmentEffect, int> statCounts, List<ScoreReason>? reasons)
-    {
-        if (augment.IsRandom)
-            return RandomAugmentFit;
+    /// <summary>What a card gives, valued for your champion, before repeated stats are discounted.</summary>
+    private sealed record FitParts(IReadOnlyList<(AugmentEffect Effect, string Name, double Value)> Effects, double Factor);
 
+    private FitParts ComputeFitParts(AugmentInfo augment, AugmentContext ctx)
+    {
         var me = ctx.Me;
         var weights = ArchetypeProfiles.For(me.Archetype).StatWeights;
-        var strongest = new List<(string Name, double Value)>();
+        var effects = new List<(AugmentEffect, string, double)>();
 
         foreach (var (effect, stats) in StatEffects)
         {
@@ -174,30 +244,47 @@ public sealed class AugmentScorer
             var value = stats.Max(s => weights.GetValueOrDefault(s));
             if (effect == AugmentEffect.CritChance && me.Stats.CritChance >= 75)
                 value *= 0.3; // mostly past the 100% cap
-            value *= Math.Pow(RepeatedStatDecay, statCounts.GetValueOrDefault(effect));
-            strongest.Add((Describe(effect), value));
+            effects.Add((effect, Describe(effect), value));
         }
 
-        foreach (AugmentEffect effect in Enum.GetValues<AugmentEffect>())
+        foreach (var effect in MechanicEffects)
         {
-            if (effect == AugmentEffect.None || IsStat(effect) || !augment.Gives(effect))
-                continue;
-            strongest.Add((Describe(effect), MechanicValue(effect, me)));
+            if (augment.Gives(effect))
+                effects.Add((effect, Describe(effect), MechanicValue(effect, me)));
         }
+
+        return new FitParts(effects, TriggerFactor(augment.Triggers, ctx));
+    }
+
+    private static double CombineFit(AugmentInfo augment, FitParts parts, Dictionary<AugmentEffect, int> statCounts)
+    {
+        if (augment.IsRandom)
+            return RandomAugmentFit;
 
         var gives = augment.Effects == AugmentEffect.None
             ? UnknownEffectFit
-            : strongest.OrderByDescending(s => s.Value).Select((s, i) => s.Value * Math.Pow(ExtraEffectDecay, i)).Sum();
+            : parts.Effects
+                .Select(e => IsStat(e.Effect) ? e.Value * Math.Pow(RepeatedStatDecay, statCounts.GetValueOrDefault(e.Effect)) : e.Value)
+                .OrderByDescending(v => v)
+                .Select((v, i) => v * Math.Pow(ExtraEffectDecay, i))
+                .Sum();
 
-        var factor = TriggerFactor(augment.Triggers, ctx);
-        var fit = gives * factor;
+        var fit = gives * parts.Factor;
         if (augment.HasDrawback) fit -= DrawbackPenalty;
         if (augment.IsQuest) fit *= QuestFactor;
+        return fit;
+    }
 
-        if (reasons is not null)
+    private double Fit(AugmentInfo augment, AugmentContext ctx, Dictionary<AugmentEffect, int> statCounts, List<ScoreReason>? reasons)
+    {
+        var parts = ComputeFitParts(augment, ctx);
+        var fit = CombineFit(augment, parts, statCounts);
+
+        if (reasons is not null && !augment.IsRandom)
         {
-            var top = strongest.Where(s => s.Value >= 0.5).OrderByDescending(s => s.Value).Take(2).Select(s => s.Name).ToList();
-            if (factor < 0.35 && augment.Triggers != AugmentTrigger.None)
+            var me = ctx.Me;
+            var top = parts.Effects.Where(e => e.Value >= 0.5).OrderByDescending(e => e.Value).Take(2).Select(e => e.Name).ToList();
+            if (parts.Factor < 0.35 && augment.Triggers != AugmentTrigger.None)
                 reasons.Add(new($"little use for {me.Name} ({DescribeWorstTrigger(augment.Triggers, ctx)})", -1));
             else if (top.Count > 0 && fit >= 0.8)
                 reasons.Add(new($"{string.Join(" and ", top)} {(top.Count == 1 ? "fits" : "fit")} a {me.Archetype.DisplayName().ToLowerInvariant()}", fit * 0.5));
@@ -394,7 +481,12 @@ public sealed class AugmentScorer
     private static int CountItems(AugmentContext ctx, Func<ItemInfo, bool> predicate) =>
         ctx.Me.Items.Count(i => i.Kind == ItemKind.Legendary && predicate(i)) + ctx.PlannedItems.Count(predicate) / 2;
 
-    private static bool IsStat(AugmentEffect effect) => StatEffects.Any(s => s.Effect == effect);
+    private static readonly HashSet<AugmentEffect> StatEffectSet = StatEffects.Select(s => s.Effect).ToHashSet();
+
+    private static readonly AugmentEffect[] MechanicEffects =
+        Enum.GetValues<AugmentEffect>().Where(e => e != AugmentEffect.None && !StatEffectSet.Contains(e)).ToArray();
+
+    private static bool IsStat(AugmentEffect effect) => StatEffectSet.Contains(effect);
 
     private static IEnumerable<AugmentTrigger> Each(AugmentTrigger triggers) =>
         Enum.GetValues<AugmentTrigger>().Where(t => t != AugmentTrigger.None && (triggers & t) != 0);

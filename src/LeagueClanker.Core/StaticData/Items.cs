@@ -166,7 +166,8 @@ public sealed partial class ItemCatalog
         var inStore = !json.TryGetProperty("inStore", out var store) || store.GetBoolean();
         var restricted = json.TryGetProperty("requiredChampion", out _) || json.TryGetProperty("requiredAlly", out _);
 
-        if (!purchasable || !inStore || restricted || id > MaxStandardItemId)
+        var soldSomewhere = json.TryGetProperty("maps", out var maps) && maps.EnumerateObject().Any(m => m.Value.GetBoolean());
+        if (!purchasable || !inStore || restricted || !soldSomewhere || id > MaxStandardItemId)
             return ItemKind.Other;
         if (tags.Contains("Consumable") || tags.Contains("Trinket"))
             return ItemKind.Other;

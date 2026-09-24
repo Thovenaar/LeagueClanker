@@ -106,6 +106,12 @@ public sealed record AugmentInfo
     /// <summary>Items the augment upgrades or asks for, e.g. "Upgrade Infinity Edge". Worth little unless you build them.</summary>
     public IReadOnlyList<ItemInfo> MentionedItems { get; init; } = [];
 
+    /// <summary>Flat crit chance (0-100) the card grants, e.g. "Additionally, gain 25% critical strike chance".</summary>
+    public double CritChanceBonus { get; init; }
+
+    /// <summary>Bonus attack speed in percent the card grants outright.</summary>
+    public double AttackSpeedBonus { get; init; }
+
     /// <summary>It comes with a downside ("but ...", "cannot ...").</summary>
     public bool HasDrawback { get; init; }
 

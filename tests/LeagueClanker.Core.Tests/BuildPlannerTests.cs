@@ -106,6 +106,33 @@ public class BuildPlannerTests
     }
 
     [Fact]
+    public void NextPurchases_FollowTheLatestOrder_ButPromotionsNeedAPivot()
+    {
+        var game = GameAnalyzer.Analyze(TestData.Game([("Garen", [])], ApTeam), TestData.Static)!;
+        var planner = new BuildPlanner();
+        planner.Update(Ranking(game, TestData.Cloak, TestData.Veil, TestData.Cleaver, TestData.Plate, TestData.WoundBlade, TestData.Heart));
+
+        // Same three items up front, new order (e.g. an augment made Cleaver the priority): no pivot needed.
+        planner.Update(Ranking(game, TestData.Cleaver, TestData.Cloak, TestData.Veil, TestData.Plate, TestData.WoundBlade, TestData.Heart));
+
+        Assert.Null(planner.PendingPivot);
+        Assert.Equal([TestData.Cleaver, TestData.Cloak, TestData.Veil], planner.Upcoming.Take(3).Select(i => i.Item.Id));
+
+        // Plate jumping from fourth to first is a change in what you buy next: it stays put until you accept.
+        planner.Update(Ranking(game, TestData.Plate, TestData.Cleaver, TestData.Cloak, TestData.Veil, TestData.WoundBlade, TestData.Heart));
+
+        Assert.Equal([TestData.Cleaver, TestData.Cloak, TestData.Veil], planner.Upcoming.Take(3).Select(i => i.Item.Id));
+        Assert.True(planner.CanSwitch);
+    }
+
+    /// <summary>A recommendation with a fixed ranking and no situational reasons.</summary>
+    private static BuildRecommendation Ranking(GameAnalysis game, params int[] itemIds)
+    {
+        var ranked = itemIds.Select((id, i) => new ScoredItem(TestData.Static.Items.Get(id)!, 10 - i, [])).ToList();
+        return new BuildRecommendation(game, ranked.Take(BuildPlanner.PlanLength).ToList(), null, [], []) { Ranked = ranked };
+    }
+
+    [Fact]
     public void NewChampion_StartsAFreshPlan()
     {
         var planner = new BuildPlanner();

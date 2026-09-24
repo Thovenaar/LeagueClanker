@@ -43,6 +43,12 @@ public partial class MainWindow : Window
 
     private void OnPickOption(object sender, RoutedEventArgs e) => ViewModel.Augments.Pick(CardName(sender));
 
+    private void OnRerolledOption(object sender, RoutedEventArgs e)
+    {
+        ViewModel.Augments.MarkRerolled(CardName(sender));
+        AugmentSearch.Focus(); // type the new card right away
+    }
+
     private void OnAugmentSearchKeyDown(object sender, KeyEventArgs e)
     {
         if (e.Key == Key.Enter)

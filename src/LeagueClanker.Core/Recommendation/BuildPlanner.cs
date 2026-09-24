@@ -141,6 +141,14 @@ public sealed class BuildPlanner
                 _plan.Add(next);
         }
 
+        // What you buy next only changes through pivots, but the order among those items follows the game:
+        // a new augment can make your third item the one to buy first. Promoting a later item into your
+        // next purchases is a pivot, so the next few and the rest are ordered separately.
+        var rank = latest.Ranked.Select((s, index) => (s.Item.Id, index)).ToDictionary(x => x.Id, x => x.index);
+        _plan = _plan.Take(NearTerm).OrderBy(i => rank[i.Id])
+            .Concat(_plan.Skip(NearTerm).OrderBy(i => rank[i.Id]))
+            .ToList();
+
         Upcoming = _plan.Select(i => latest.Find(i.Id)!).ToList();
         PendingPivot = DetectPivot(latest);
     }

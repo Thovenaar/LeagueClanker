@@ -66,6 +66,8 @@ For ARAM: Mayhem augments, give it a snapshot, the offered cards, and the cards 
 dotnet run --project src/LeagueClanker.Cli -- --mayhem samples/mayhem/jinx-level7.json --picked "It's Critical" --offer "Critical Rhythm;Recursion;Celestial Body"
 ```
 
+Add `--rerolled "Recursion"` for cards whose reroll is used up.
+
 `--augments` lists all 225 augments with the tags the parser gave them. `--scan` reads an offer from a screenshot, or from the running game with `--scan screen`. Add `--verbose` to see every line of text it recognized:
 
 ```bash
@@ -107,6 +109,8 @@ Every player gets a full stat block in `StatBlock.cs`: AD, AP, attack speed, cri
 
 Accepting swaps just those items. Declining remembers them for the rest of the game. "Switch anyway" adopts the latest ranking whenever you want. Buying items from your build never counts as a pivot, and a new game or champion starts a fresh build.
 
+Your next three purchases keep the order of the latest ranking, so a new augment can move your third item to first without asking. Moving a later item into those three does need a pivot.
+
 ### Game modes
 
 The advisor reads `gameMode` and the map number from the live game. Summoner's Rift uses map 11 items. ARAM and ARAM: Mayhem (`KIWI`) use Howling Abyss items. Arena isn't supported.
@@ -115,9 +119,9 @@ The advisor reads `gameMode` and the map number from the live game. Summoner's R
 
 The app reads the offer off your screen. Once you reach a pick level (3, 7, 11 or 15) without having taken that many cards, it screenshots the League window every 2 seconds and runs Windows' built-in text recognition on it. That takes about 130 ms. It only looks at the middle of the screen, which skips chat and the HUD, and it blacks out its own window so it never reads its own suggestions. `AugmentTextMatcher` matches the text against the card names by edit distance. That way OCR slips like "CRITICA1" and names that wrap over two lines still count, and a stray card name of another tier elsewhere on screen is ignored. When cards show up, the app switches to the Augments tab with a chime. A reroll changes the offer, and the ranking follows.
 
-It can't see which card you click, only that the cards disappeared, so it asks. Press *I picked this* on the card you took and it joins your cards for the next offer.
+It can't see which card you click, only that the cards disappeared, so it asks. Press *I picked this* on the card you took and it joins your cards for the next offer. When one or two cards change while the rest stay, those were rerolls: they're marked as used up and the advice updates.
 
-You can always type cards instead: type part of a name and mark each match as *Offered* (on screen now) or *Picked* (you already have it). Enter adds the top match to the offer. That covers misread names, cards you picked before starting the app, and exclusive fullscreen, where screenshots come back black.
+You can always type cards instead: type part of a name and mark each match as *Offered* (on screen now) or *Picked* (you already have it). Enter adds the top match to the offer. After rerolling a card in game, press *Rerolled* on it and type the card you got. That covers misread names, cards you picked before starting the app, and exclusive fullscreen, where screenshots come back black.
 
 `Augments/` ranks the three cards in an augment offer by the best final set of four they lead to, without win rates:
 
@@ -127,6 +131,30 @@ You can always type cards instead: type part of a name and mark each match as *O
 4. `AugmentAdvisor` simulates your remaining picks 1,500 times per option with Mayhem's rules: picks at levels 3, 7, 11 and 15, one tier per offer, the first two offers never both Silver, one reroll per card. It ranks each option by the average value of the final set. That's how a weaker card that sets up combos can beat a stronger card that leads nowhere.
 
 Card tier odds aren't published, so the simulation treats Silver, Gold and Prismatic as equally likely.
+
+It also says which cards to reroll. Each card in an offer has its own reroll, and unused rerolls are gone once you pick. So rerolling a card you won't take can only help: the new card either beats your best one or you ignore it. The real questions are which card to keep, and whether even that one is weak enough to reroll. To answer them, the advisor scores every card a reroll could give you, and marks each offered card:
+
+- **KEEP**: your best card.
+- **REROLL**: you won't take it, so reroll it.
+- **REROLL LAST**: your best card, but a reroll usually beats it. Reroll the others first, and this one only if it's still your best.
+- **REROLLED**: its reroll is used up.
+
+Each card also shows how often a reroll beats it. For example: "Keep Critical Rhythm. Reroll Recursion and Celestial Body: you won't take them, so a reroll can only help." Or: "Reroll Minionmancer and Celestial Body first. If All For You is still your best card after that, reroll it too: a reroll beats it 75% of the time."
+
+Picked augments also shape the item advice. `AugmentRules` turns each picked card into a situation, just like the enemy-based rules, so it ranks items, labels them and explains itself:
+
+> Your Critical Rhythm augment pays off on crits, so I suggest Infinity Edge, but Phantom Dancer is also ok.
+
+- A card that pays off on something (attacks, crits, abilities, health, shields) boosts the items that feed it.
+- "Upgrade X" cards push X, and quest cards push the items the quest asks for.
+- Crit chance and attack speed from cards count toward the caps, so crit chance on items is worth less once cards bring you close to 100%.
+- A card that already answers a threat lowers that threat's weight, the same as owning an item for it. A magic resist card against an AP team makes more magic resist items less urgent.
+
+To try it from the CLI, add the cards you picked to a snapshot:
+
+```bash
+dotnet run --project src/LeagueClanker.Cli -- samples/mayhem/jinx-level7.json --picked "It's Critical;Critical Rhythm"
+```
 
 ### Rules
 
@@ -160,7 +188,6 @@ To add a rule, implement `IBuildRule`, return a `Situation` with a label, a sent
 - Augment tags come from description text. Expect some cards to be tagged wrong until they've been reviewed with `--augments`.
 - Card names are matched in English, so screen reading needs the League client in English.
 - Screen reading has only been tested on a mock screenshot, not on real games yet.
-- Picked augments don't change the item advice yet, e.g. a crit augment should push crit items up.
 - The core-item lists and weights are my best guess for patch 16.18. Real win-rate data per matchup would beat them.
 
 ## Legal
