@@ -4,6 +4,8 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
+using LeagueClanker.Core.ItemSets;
 using LeagueClanker.Core.LiveClient;
 
 namespace LeagueClanker.Core.LeagueClient;
@@ -49,6 +51,10 @@ public sealed class ChampSelectPlayer
 
     /// <summary>"top", "jungle", "middle", "bottom", "utility", or "" when roles aren't assigned (blind pick, ARAM).</summary>
     public string? AssignedPosition { get; init; }
+
+    /// <summary>Summoner spells on the first (D) and second (F) key. Only visible for your own team.</summary>
+    public int Spell1Id { get; init; }
+    public int Spell2Id { get; init; }
 }
 
 public sealed class GameflowSession
@@ -94,6 +100,14 @@ public sealed class PerkPage
 
 public sealed record PerkPageRequest(string Name, int PrimaryStyleId, int SubStyleId, IReadOnlyList<int> SelectedPerkIds, bool Current = true);
 
+/// <summary>What Apply writes into the client. The app uses the client; demos and tests use fakes.</summary>
+public interface IChampSelectWriter
+{
+    Task<ApplyResult> WriteRunesAsync(Runes.RunePage page, string pageName, CancellationToken ct);
+    Task<ApplyResult> WriteSpellsAsync(int first, int second, CancellationToken ct);
+    Task<ApplyResult> WriteItemSetAsync(ItemSetDefinition set, CancellationToken ct);
+}
+
 /// <summary>The rune page calls, behind an interface so the overwrite logic can be tested without a client.</summary>
 public interface IRunePageStore
 {
@@ -125,9 +139,12 @@ public interface IClientSource
 /// while it runs. It's the same API the client's own interface uses, and what rune importers like Porofessor and Blitz use.
 /// Riot doesn't document or support it, so a client update can change it.
 /// </summary>
-public sealed class LeagueClientApi : IClientSource, IRunePageStore, IDisposable
+public sealed class LeagueClientApi : IClientSource, IRunePageStore, IChampSelectWriter, ISnapshotSource, IDisposable
 {
     private readonly HttpClient _http;
+
+    // The raw responses behind the last champ select read, for saving a snapshot that replays with --champselect.
+    private readonly Dictionary<string, string> _lastRaw = [];
 
     // Mastery only changes after a game, so it's read once per connection.
     private IReadOnlyList<ChampionMastery>? _mastery;
@@ -202,6 +219,7 @@ public sealed class LeagueClientApi : IClientSource, IRunePageStore, IDisposable
 
     public async Task<ClientSnapshot?> TryGetChampSelectAsync(CancellationToken ct)
     {
+        _lastRaw.Clear();
         var session = await GetOrNullAsync<ChampSelectSession>("lol-champ-select/v1/session", ct);
         if (session is null)
             return null;
@@ -211,6 +229,52 @@ public sealed class LeagueClientApi : IClientSource, IRunePageStore, IDisposable
         var pickable = await GetOrNullAsync<List<int>>("lol-champ-select/v1/pickable-champion-ids", ct);
         _mastery ??= await GetOrNullAsync<List<ChampionMastery>>("lol-champion-mastery/v1/local-player/champion-mastery", ct);
         return new ClientSnapshot(session, gameflow, lobby) { PickableChampionIds = pickable ?? [], Mastery = _mastery ?? [] };
+    }
+
+    /// <summary>The last champ select as JSON in the shape <see cref="FileClientSource"/> reads. Null outside champ select.</summary>
+    public string? SnapshotJson
+    {
+        get
+        {
+            if (!_lastRaw.TryGetValue("lol-champ-select/v1/session", out var session))
+                return null;
+            JsonNode? Node(string path) => _lastRaw.TryGetValue(path, out var raw) ? JsonNode.Parse(raw) : null;
+            return new JsonObject
+            {
+                ["champSelect"] = JsonNode.Parse(session),
+                ["gameflow"] = Node("lol-gameflow/v1/session"),
+                ["lobby"] = Node("lol-lobby/v2/lobby"),
+                ["pickableChampionIds"] = Node("lol-champ-select/v1/pickable-champion-ids"),
+                ["mastery"] = Node("lol-champion-mastery/v1/local-player/champion-mastery"),
+            }.ToJsonString();
+        }
+    }
+
+    public async Task<ApplyResult> WriteRunesAsync(Runes.RunePage page, string pageName, CancellationToken ct) =>
+        await new RunePageWriter(this).ApplyAsync(page, pageName, ct);
+
+    public async Task<ApplyResult> WriteSpellsAsync(int first, int second, CancellationToken ct)
+    {
+        using var response = await _http.PatchAsJsonAsync("lol-champ-select/v1/session/my-selection", new { spell1Id = first, spell2Id = second }, Json.Options, ct);
+        await EnsureSuccessAsync(response, ct);
+        return new ApplyResult(true, "Set your summoner spells.");
+    }
+
+    /// <summary>Adds the set to your item sets. Reads your sets first and writes them back unchanged, apart from ours.</summary>
+    public async Task<ApplyResult> WriteItemSetAsync(ItemSetDefinition set, CancellationToken ct)
+    {
+        using var summoner = await GetOrNullAsync<JsonDocument>("lol-summoner/v1/current-summoner", ct);
+        if (summoner?.RootElement.TryGetProperty("summonerId", out var idElement) != true)
+            return new ApplyResult(false, "Couldn't find your account in the client, so no item set was added.");
+
+        var path = $"lol-item-sets/v1/item-sets/{idElement.GetInt64()}/sets";
+        using var getResponse = await _http.GetAsync(path, ct);
+        if (!getResponse.IsSuccessStatusCode || JsonNode.Parse(await getResponse.Content.ReadAsStringAsync(ct)) is not { } existing)
+            return new ApplyResult(false, "Couldn't read your item sets, so none was added. Your own sets weren't touched.");
+
+        using var putResponse = await _http.PutAsync(path, new StringContent(ItemSetBuilder.Merge(existing, set).ToJsonString(), Encoding.UTF8, "application/json"), ct);
+        await EnsureSuccessAsync(putResponse, ct);
+        return new ApplyResult(true, $"Added the item set \"{set.Title}\" to the shop.");
     }
 
     public Task<PerkPage?> GetCurrentPageAsync(CancellationToken ct) => GetOrNullAsync<PerkPage>("lol-perks/v1/currentpage", ct);
@@ -251,7 +315,9 @@ public sealed class LeagueClientApi : IClientSource, IRunePageStore, IDisposable
             using var response = await _http.GetAsync(path, ct);
             if (!response.IsSuccessStatusCode)
                 return null;
-            return await response.Content.ReadFromJsonAsync<T>(Json.Options, ct);
+            var json = await response.Content.ReadAsStringAsync(ct);
+            _lastRaw[path] = json;
+            return JsonSerializer.Deserialize<T>(json, Json.Options);
         }
         catch (Exception ex) when (ex is HttpRequestException or JsonException || (ex is TaskCanceledException && !ct.IsCancellationRequested))
         {
@@ -282,11 +348,13 @@ public sealed record Lockfile(int Port, string Password)
 }
 
 /// <summary>A saved <see cref="ClientSnapshot"/> JSON file, for demos and tests without a client.</summary>
-public sealed class FileClientSource(string path) : IClientSource
+public sealed class FileClientSource(string path) : IClientSource, ISnapshotSource
 {
+    public string? SnapshotJson { get; private set; }
+
     public async Task<ClientSnapshot?> TryGetChampSelectAsync(CancellationToken ct)
     {
-        await using var stream = File.OpenRead(path);
-        return await JsonSerializer.DeserializeAsync<ClientSnapshot>(stream, Json.Options, ct);
+        SnapshotJson = await File.ReadAllTextAsync(path, ct);
+        return JsonSerializer.Deserialize<ClientSnapshot>(SnapshotJson, Json.Options);
     }
 }

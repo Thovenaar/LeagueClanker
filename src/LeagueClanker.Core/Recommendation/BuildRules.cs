@@ -108,8 +108,9 @@ public sealed class TankShredRule : IBuildRule
 
     public Situation? Evaluate(GameAnalysis game)
     {
+        // No enemies yet: blind pick champ select builds a pre-game item set before anyone is visible.
         var damage = game.Me.Archetype.DamageTypeOf();
-        if (damage == DamageType.None)
+        if (damage == DamageType.None || game.Enemies.Players.Count == 0)
             return null;
 
         var physical = damage == DamageType.Physical;

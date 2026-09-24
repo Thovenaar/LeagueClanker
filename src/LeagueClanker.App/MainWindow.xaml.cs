@@ -2,7 +2,6 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
-using LeagueClanker.Core.Runes;
 
 namespace LeagueClanker.App;
 
@@ -67,9 +66,23 @@ public partial class MainWindow : Window
             ViewModel.ChampSelect.SelectPlaystyle(option.Value);
     }
 
-    private void OnStatsSiteChecked(object sender, RoutedEventArgs e) => ViewModel.ChampSelect.SelectSource(RuneSourceKind.StatsSite);
+    private void OnToggleSettings(object sender, RoutedEventArgs e) => ViewModel.ToggleSettings();
 
-    private void OnOwnRulesChecked(object sender, RoutedEventArgs e) => ViewModel.ChampSelect.SelectSource(RuneSourceKind.OwnRules);
+    private void OnSaveSnapshot(object sender, RoutedEventArgs e) => ViewModel.SaveSnapshot();
+
+    private void OnOpenLog(object sender, RoutedEventArgs e) => Shell.Open(AppPaths.LogFile);
+
+    private void OnOpenSnapshots(object sender, RoutedEventArgs e)
+    {
+        System.IO.Directory.CreateDirectory(AppPaths.SnapshotFolder);
+        Shell.Open(AppPaths.SnapshotFolder);
+    }
+
+    private void OnOpenUpdate(object sender, RoutedEventArgs e)
+    {
+        if (ViewModel.UpdateUrl is { } url)
+            Shell.Open(url);
+    }
 
     private async void OnApplyRunes(object sender, RoutedEventArgs e) => await ViewModel.ChampSelect.ApplyAsync();
 

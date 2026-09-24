@@ -22,7 +22,7 @@ In League Classic it recommends from the old item shop, with the old stats:
 
 <img src="docs/screenshots/classic.png" alt="League Classic build" width="400">
 
-In champ select it shows your lane opponent, champions that beat them before you lock in, and how your pick does against them. You pick how you'll play, and one click writes the matching rune page into the client:
+In champ select it shows your lane opponent, champions that beat them before you lock in, and how your pick does against them. You pick how you'll play, and one click writes the matching rune page, summoner spells and a shop item set into the client:
 
 <img src="docs/screenshots/champselect.png" alt="Champ select with playstyle and rune page" width="400">
 
@@ -90,7 +90,7 @@ dotnet run --project src/LeagueClanker.Cli -- --mayhem samples/mayhem/jinx-level
 
 Add `--rerolled "Recursion"` for cards whose reroll is used up, and `--golden "Celestial Body"` for the card with the golden reroll.
 
-For rune pages, name a champion. Add a role, a playstyle, the mode or enemies to see how the page changes, and `--source rules` to skip op.gg:
+For rune pages, name a champion. Add a role, a playstyle, the mode or enemies to see how the page changes, and `--source rules` to skip op.gg. It also prints the summoner spells, skill order and shop item set that *Apply* would write:
 
 ```bash
 dotnet run --project src/LeagueClanker.Cli -- --runes Ezreal --position bottom --style mage
@@ -126,11 +126,13 @@ gh workflow run release.yml -f version=0.2.0
 
 Tick *dry run* (or add `-f dry_run=true`) to build and test without publishing. The exe is then kept as a workflow artifact.
 
+`tools/Capture-Screenshots.ps1` regenerates the README screenshots from the demo samples. `CLAUDE.md` and the skills in `.claude/skills` describe the conventions for tests, the README, screenshots, external data and releases.
+
 ## Is it allowed
 
 During a game the app reads Riot's official Live Client Data API on localhost, and Data Dragon. It doesn't read game memory, inject into the client, send input, or draw inside the game. It's an ordinary window next to the game, so Vanguard has nothing to object to.
 
-In champ select it reads the League client's local API, the same one Porofessor, Blitz and Mobalytics use to import runes. Writing your rune page when you press *Apply* is the only thing it changes. Riot doesn't document that API, but it has tolerated rune importers for years.
+In champ select it reads the League client's local API, the same one Porofessor, Blitz and Mobalytics use to import runes. The only things it changes are what *Apply* writes: your rune page, your summoner spells and an item set for the shop. With *Apply automatically* turned on in the settings, that happens when you lock in. Riot doesn't document that API, but it has tolerated rune importers for years.
 
 It only uses what the client shows you: picks as they lock in, your own role, mastery and champions. It doesn't try to reveal what champ select hides, like player names in ranked or enemy picks in blind pick. That's what gets tools banned, while counters and matchup stats are what every approved app shows.
 
@@ -190,7 +192,25 @@ The rune page comes from the source you choose, and the app remembers the choice
 
 When op.gg has no page for your playstyle (AD Thresh), or doesn't answer, you get the rules' page with a line saying so. Runes are named, not numbered, so if Riot removes one, the first rune of that row takes its place.
 
-*Apply to my rune page* overwrites your current page. Preset pages can't be edited, so then it updates a page it wrote before ("LeagueClanker Jinx"), or makes a new one if you have a free page slot. If neither works, it asks you to select one of your own pages. It never overwrites a page you didn't select.
+*Apply* overwrites your current rune page. Preset pages can't be edited, so then it updates a page it wrote before ("LeagueClanker Jinx"), or makes a new one if you have a free page slot. If neither works, it asks you to select one of your own pages. It never overwrites a page you didn't select.
+
+### Champ select: spells, skill order and item set
+
+The same source decides the rest of what *Apply* writes. The settings choose which parts it writes.
+
+- **Summoner spells.** op.gg's most played pair for your champion and role. A pair has to fit the role: no Smite outside the jungle, always Smite in it. Without op.gg it's Flash plus a role spell: Smite in the jungle, Teleport top, Ignite mid, Heal for bottom marksmen, Exhaust for enchanters. ARAM gets Mark. Flash stays on the key you keep it on, and League Classic gets its own copies of the spells.
+- **Skill order.** Which ability to max first and the first six levels, from op.gg's most played order.
+- **Item set.** A set named "LeagueClanker Jinx" in the shop's recommended tab. It has starting items (op.gg's most played start, or a Doran's item, jungle pet or World Atlas), the item advisor's core build for this game with your playstyle against the enemies you can see, boots, situational items, and op.gg's most played three-item core. Your own item sets are read first and written back untouched. Only a set LeagueClanker wrote for the same champion gets replaced.
+
+### Settings, logs and snapshots
+
+The gear in the title bar opens the settings: the stats source, what *Apply* writes, *Apply automatically*, sounds, and the update check. Settings are saved in `%LOCALAPPDATA%\LeagueClanker\settings.json`.
+
+Errors the app recovers from, like op.gg not answering, go to `%LOCALAPPDATA%\LeagueClanker\log.txt`. The settings have a button to open it.
+
+The ⤓ button saves what the app sees right now, the live game or champ select, to `Documents\LeagueClanker\snapshots`. Player names are replaced with "Player1", "Player2" and so on, so you can send it with a bug report. A saved game replays with `--demo`, and a saved champ select with `--champselect`.
+
+At startup the app asks GitHub for the latest release. When there's a newer version, a link to it appears in the bottom right corner.
 
 ### Game modes
 
@@ -294,7 +314,7 @@ To add a rule, implement `IBuildRule`, return a `Situation` with a label, a sent
 - Card names are matched in English, so screen reading needs the League client in English.
 - Screen reading has only been tested on a mock screenshot, not on real games yet.
 - The core-item lists and weights are my best guess for patch 16.18. Real win-rate data per matchup would beat them.
-- Writing rune pages has been tested against a simulated client, not yet against a real one. The client's local API and op.gg's JSON API are both undocumented and can change.
+- Writing rune pages, summoner spells and item sets has been tested against a simulated client, not yet against a real one. The client's local API and op.gg's JSON API are both undocumented and can change.
 - Enemy roles are guessed until the game starts. Flex picks (a mid Gragas, a top Seraphine) can land in the wrong role, and so can the lane opponent.
 - The rule pages and keystone lists are hand-made for patch 16.19. New keystones need adding to `KeystoneFit` before op.gg pages with them are used.
 - Rune pages assume today's runes. League Classic's old runes and masteries aren't supported.
@@ -307,7 +327,7 @@ To add a rule, implement `IBuildRule`, return a `Situation` with a label, a sent
 
 Augment data comes from the [League of Legends Wiki](https://wiki.leagueoflegends.com/en-us/Module:MayhemAugmentData/data) under CC BY-SA 3.0.
 
-Rune statistics, role play rates and matchups come from [op.gg](https://www.op.gg). LeagueClanker isn't affiliated with op.gg.
+Rune pages, summoner spells, skill orders, starting and core items, role play rates and matchups come from [op.gg](https://www.op.gg). LeagueClanker isn't affiliated with op.gg.
 
 
 LeagueClanker isn't endorsed by Riot Games and doesn't reflect the views or opinions of Riot Games or anyone officially involved in producing or managing Riot Games properties. Riot Games, and all associated properties are trademarks or registered trademarks of Riot Games, Inc.

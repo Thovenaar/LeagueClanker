@@ -9,6 +9,7 @@ using LeagueClanker.Core.LiveClient;
 using LeagueClanker.Core.Matchups;
 using LeagueClanker.Core.Opgg;
 using LeagueClanker.Core.Runes;
+using LeagueClanker.Core.Spells;
 using LeagueClanker.Core.StaticData;
 using LeagueClanker.Vision;
 using System.Windows.Interop;
@@ -28,19 +29,28 @@ public partial class App : Application
 
     private readonly CancellationTokenSource _cts = new();
 
+    // What champ select reads from: the client, or a saved snapshot in demos. Used for saving snapshots.
+    private ISnapshotSource? _champSelectSource;
+
     protected override async void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
+        StartLogging();
 
-        var viewModel = new MainViewModel();
+        var viewModel = new MainViewModel(new SettingsViewModel(AppSettings.Load()));
         MainWindow = new MainWindow { DataContext = viewModel };
         MainWindow.Show();
 
         var demoPath = ResolvePath(e.Args, "--demo");
         var scanImage = ResolvePath(e.Args, "--scan-image");
         var champSelectDemo = ResolvePath(e.Args, "--champselect");
-        var settings = AppSettings.Load();
         IGameDataSource source = demoPath is null ? new LiveClientApi() : SequenceGameDataSource.FromPath(demoPath);
+        viewModel.SnapshotProvider = () =>
+            viewModel.IsLive && (source as ISnapshotSource)?.SnapshotJson is { } game ? (game, "game")
+            : viewModel.ShowChampSelect && _champSelectSource?.SnapshotJson is { } champSelect ? (champSelect, "champselect")
+            : null;
+        if (viewModel.Settings.CheckForUpdates)
+            _ = CheckForUpdatesAsync(viewModel);
 
         try
         {
@@ -58,13 +68,8 @@ public partial class App : Application
             var opgg = new OpggClient(userAgent: userAgent);
             var runes = new RuneAdvisor(new RuleRuneSource(data.Runes), new OpggRuneSource(data.Runes, opgg));
             var matchups = new MatchupAdvisor(opgg, data.Champions);
-            viewModel.ChampSelect.Configure(data, runes, matchups, settings.RuneSource);
+            viewModel.ChampSelect.Configure(new ChampSelectServices(data, runes, matchups, new SpellAdvisor(data.Spells, opgg), opgg));
             viewModel.Matchups = matchups;
-            viewModel.ChampSelect.SourceChanged += (_, runeSource) =>
-            {
-                settings.RuneSource = runeSource;
-                settings.Save();
-            };
             _ = RunChampSelectAsync(viewModel, data, champSelectDemo);
 
             await foreach (var update in advisor.RunAsync(PollInterval, _cts.Token))
@@ -75,12 +80,39 @@ public partial class App : Application
         }
         catch (Exception ex)
         {
+            Log.Error("Build advisor stopped", ex);
             viewModel.Status = $"Error: {ex.Message}";
         }
         finally
         {
             (source as IDisposable)?.Dispose();
         }
+    }
+
+    // Everything the app recovers from, and anything it doesn't, ends up in %LOCALAPPDATA%\LeagueClanker\log.txt.
+    private void StartLogging()
+    {
+        Log.Sink = FileLog.Write;
+        Log.Write($"LeagueClanker {AppVersion} started");
+        DispatcherUnhandledException += (_, e) =>
+        {
+            Log.Error("Unhandled error", e.Exception);
+            if (MainWindow?.DataContext is MainViewModel viewModel)
+                viewModel.Status = $"Error: {e.Exception.Message} (details in the log)";
+            e.Handled = true;
+        };
+        AppDomain.CurrentDomain.UnhandledException += (_, e) => Log.Write($"Crash: {e.ExceptionObject}");
+        TaskScheduler.UnobservedTaskException += (_, e) =>
+        {
+            Log.Error("Unobserved task error", e.Exception);
+            e.SetObserved();
+        };
+    }
+
+    private async Task CheckForUpdatesAsync(MainViewModel viewModel)
+    {
+        if (await UpdateChecker.CheckAsync(AppVersion, _cts.Token) is { } update)
+            viewModel.ShowUpdate(update.Version, update.Url);
     }
 
     /// <summary>
@@ -91,15 +123,12 @@ public partial class App : Application
     private async Task RunChampSelectAsync(MainViewModel viewModel, StaticGameData data, string? demoPath)
     {
         var champSelect = viewModel.ChampSelect;
-        IClientSource? demo = demoPath is null ? null : new FileClientSource(demoPath);
+        var demo = demoPath is null ? null : new FileClientSource(demoPath);
         Lockfile? lockfile = null;
         LeagueClientApi? client = null;
 
-        champSelect.ApplyHandler = demo is not null
-            ? (_, name) => Task.FromResult(new ApplyResult(true, $"Demo: this would overwrite your current rune page as \"{name}\"."))
-            : (page, name) => client is null
-                ? Task.FromResult(new ApplyResult(false, "The League client isn't running."))
-                : new RunePageWriter(client).ApplyAsync(page, name, _cts.Token);
+        champSelect.Writer = demo is not null ? new DemoWriter() : new ClientWriter(() => client);
+        _champSelectSource = demo;
 
         using var timer = new PeriodicTimer(PollInterval);
         try
@@ -125,6 +154,8 @@ public partial class App : Application
                         client?.Dispose();
                         lockfile = found;
                         client = found is null ? null : new LeagueClientApi(found);
+                        _champSelectSource = client;
+                        Log.Write(client is null ? "League client closed" : $"Connected to the League client on port {found!.Port}");
                         snapshot = client is null ? null : await client.TryGetChampSelectAsync(_cts.Token);
                     }
                 }
@@ -137,6 +168,7 @@ public partial class App : Application
         }
         catch (Exception ex) when (ex is IOException or System.Text.Json.JsonException)
         {
+            Log.Error("Champ select stopped", ex);
             viewModel.Status = $"Champ select error: {ex.Message}";
         }
         finally
@@ -156,6 +188,7 @@ public partial class App : Application
         }
         catch (Exception ex) when (ex is HttpRequestException or FormatException or IOException)
         {
+            Log.Error("Loading augment data", ex);
             picker.SetCatalog(null, $"Couldn't load augment data: {ex.Message}");
             return null;
         }
@@ -185,7 +218,7 @@ public partial class App : Application
                 catch (Exception ex) when (ex is not OperationCanceledException)
                 {
                     // A failed capture (e.g. the game window closing mid-scan) is retried on the next tick.
-                    System.Diagnostics.Debug.WriteLine($"Augment scan failed: {ex.Message}");
+                    Log.Error("Augment scan", ex);
                 }
             }
         }

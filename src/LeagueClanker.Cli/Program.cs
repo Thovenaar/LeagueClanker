@@ -1,12 +1,14 @@
 using LeagueClanker.Core;
 using LeagueClanker.Core.Analysis;
 using LeagueClanker.Core.Augments;
+using LeagueClanker.Core.ItemSets;
 using LeagueClanker.Core.LeagueClient;
 using LeagueClanker.Core.LiveClient;
 using LeagueClanker.Core.Matchups;
 using LeagueClanker.Core.Opgg;
 using LeagueClanker.Core.Recommendation;
 using LeagueClanker.Core.Runes;
+using LeagueClanker.Core.Spells;
 using LeagueClanker.Core.StaticData;
 using LeagueClanker.Vision;
 
@@ -69,6 +71,7 @@ if (args is ["--runes", var championName, ..])
     var enemies = Champions(Option("--enemies"));
     var request = new RuneRequest(champion, ParseStyle(Option("--style")) ?? Playstyles.Default(champion, position), position, mode) { Enemies = enemies };
     PrintRunes(request, await RuneAdvisorFor().RecommendAsync(request, RuneSource(), cts.Token));
+    await PrintExtrasAsync(new ChampSelectState(champion, position, mode, [], enemies), request.Playstyle);
     return;
 }
 
@@ -93,6 +96,7 @@ if (args is ["--champselect", ..])
     };
     var recommendation = await RuneAdvisorFor().RecommendAsync(request, RuneSource(), cts.Token);
     PrintRunes(request, recommendation);
+    await PrintExtrasAsync(state, request.Playstyle);
     PrintMatchup(await new MatchupAdvisor(opgg, data.Champions).AnalyzeAsync(
         new MatchupRequest(champion, state.IsLocked, state.Position, state.Mode, state.Enemies) { Pickable = state.Pickable.Count > 0 ? state.Pickable : null, Mastery = state.Mastery },
         cts.Token));
@@ -250,6 +254,29 @@ async Task<BuildRecommendation?> RecommendAsync(string path, IReadOnlyList<Augme
 }
 
 RuneAdvisor RuneAdvisorFor() => new(new RuleRuneSource(data.Runes), new OpggRuneSource(data.Runes, opgg));
+
+// Summoner spells, skill order and the shop item set, as champ select's Apply would write them.
+async Task PrintExtrasAsync(ChampSelectState state, Archetype playstyle)
+{
+    var champion = state.Champion!;
+    var spells = await new SpellAdvisor(data.Spells, opgg).RecommendAsync(new SpellRequest(champion, playstyle, state.Position, state.Mode, state.Spells), RuneSource(), cts.Token);
+    if (spells is not null)
+        Console.WriteLine($"  Spells: {data.Spells.Get(spells.First)?.Name} + {data.Spells.Get(spells.Second)?.Name} ({spells.Source})");
+
+    var aram = state.Mode is GameMode.Aram or GameMode.AramMayhem;
+    var stats = RuneSource() == RuneSourceKind.StatsSite ? await opgg.GetChampionAsync(champion.Key, aram, OpggClient.RoleFor(state.Position, playstyle), cts.Token) : null;
+    if (stats?.SkillOrder is { } skills)
+        Console.WriteLine($"  Skills: max {string.Join(" > ", skills.MaxOrder)}, levels 1-6 {string.Join(" ", skills.Levels.Take(6))}");
+
+    if (state.ToGameData() is { } game && GameAnalyzer.Analyze(game, data, playstyle: playstyle) is { } analysis)
+    {
+        var set = ItemSetBuilder.Build(new RecommendationEngine(data).Recommend(analysis), data.Items, stats);
+        Console.WriteLine($"  Item set \"{set.Title}\":");
+        foreach (var block in set.Blocks)
+            Console.WriteLine($"    {block.Title}: {string.Join(", ", block.Items.Select(i => (i.Count > 1 ? $"{i.Count}x " : "") + data.Items.Get(i.Id)?.Name))}");
+    }
+    Console.WriteLine();
+}
 
 List<ChampionInfo> Champions(string? names) =>
     (names ?? "").Split(';', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)

@@ -17,10 +17,35 @@ public sealed record OpggMatchup(int OpponentKey, int Games, int Wins)
     public double WinRate => Games == 0 ? 0 : (double)Wins / Games;
 }
 
-/// <summary>One champion in one role (or ARAM): its rune pages, its matchups, and the role it's played in most.</summary>
+/// <summary>A set of items or spells and how often it was picked. <see cref="Ids"/> can repeat, e.g. two potions.</summary>
+public sealed record OpggChoice(IReadOnlyList<int> Ids, int Games, int Wins)
+{
+    public double WinRate => Games == 0 ? 0 : (double)Wins / Games;
+}
+
+/// <param name="MaxOrder">Which ability to max first, second and third, e.g. Q, W, E.</param>
+/// <param name="Levels">The ability taken at each level, from the most played order.</param>
+public sealed record OpggSkillOrder(IReadOnlyList<string> MaxOrder, IReadOnlyList<string> Levels, int Games, int Wins)
+{
+    public double WinRate => Games == 0 ? 0 : (double)Wins / Games;
+}
+
+/// <summary>One champion in one role (or ARAM): its rune pages, matchups, the role it's played in most, and its build.</summary>
 public sealed record OpggChampion(IReadOnlyList<OpggPage> Pages, IReadOnlyList<OpggMatchup> Matchups, Position MainRole)
 {
     public int TotalGames => Pages.Sum(p => p.Games);
+
+    /// <summary>Summoner spell pairs, most played first.</summary>
+    public IReadOnlyList<OpggChoice> Spells { get; init; } = [];
+
+    public IReadOnlyList<OpggChoice> StarterItems { get; init; } = [];
+
+    /// <summary>The first three finished items, in buy order.</summary>
+    public IReadOnlyList<OpggChoice> CoreItems { get; init; } = [];
+
+    public IReadOnlyList<OpggChoice> Boots { get; init; } = [];
+
+    public OpggSkillOrder? SkillOrder { get; init; }
 }
 
 /// <summary>
@@ -125,7 +150,30 @@ public sealed class OpggClient : IMatchupData
             ? Array(summary, "positions").Select(p => Positions.Parse(p.GetProperty("name").GetString())).FirstOrDefault()
             : Position.None;
 
-        return new OpggChampion(pages, matchups, mainRole);
+        IReadOnlyList<OpggChoice> Choices(string property) => Array(data, property)
+            .Where(c => c.TryGetProperty("ids", out var ids) && ids.ValueKind == JsonValueKind.Array)
+            .Select(c => new OpggChoice(c.GetProperty("ids").EnumerateArray().Select(i => i.GetInt32()).ToList(),
+                c.GetProperty("play").GetInt32(), c.GetProperty("win").GetInt32()))
+            .OrderByDescending(c => c.Games)
+            .ToList();
+
+        var skills = Array(data, "skill_masteries").OrderByDescending(s => s.GetProperty("play").GetInt32()).FirstOrDefault();
+        var skillOrder = skills.ValueKind == JsonValueKind.Object
+            ? new OpggSkillOrder(
+                Array(skills, "ids").Select(i => i.GetString() ?? "").ToList(),
+                Array(skills, "builds").OrderByDescending(b => b.GetProperty("play").GetInt32()).Select(b => Array(b, "order").Select(o => o.GetString() ?? "").ToList())
+                    .FirstOrDefault() ?? [],
+                skills.GetProperty("play").GetInt32(), skills.GetProperty("win").GetInt32())
+            : null;
+
+        return new OpggChampion(pages, matchups, mainRole)
+        {
+            Spells = Choices("summoner_spells"),
+            StarterItems = Choices("starter_items"),
+            CoreItems = Choices("core_items"),
+            Boots = Choices("boots"),
+            SkillOrder = skillOrder,
+        };
     }
 
     internal static IReadOnlyDictionary<int, IReadOnlyDictionary<Position, double>> ParseRoleRates(string json)

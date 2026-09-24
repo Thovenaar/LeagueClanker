@@ -1,3 +1,4 @@
+using LeagueClanker.Core.LiveClient;
 using LeagueClanker.Core.Runes;
 using LeagueClanker.Core.StaticData;
 
@@ -17,6 +18,44 @@ public sealed record ChampSelectState(
 
     /// <summary>Your mastery points per champion key.</summary>
     public IReadOnlyDictionary<int, int> Mastery { get; init; } = new Dictionary<int, int>();
+
+    /// <summary>The summoner spells you have selected now, on your first and second key.</summary>
+    public (int First, int Second) Spells { get; init; }
+
+    /// <summary>
+    /// The game as it will look at the start: everyone at level 1 without items. The item advisor can then recommend a
+    /// build before the game, for the shop's item set. Your playstyle is passed to the analyzer separately.
+    /// </summary>
+    public AllGameData? ToGameData()
+    {
+        if (Champion is not { } me)
+            return null;
+
+        LivePlayer Player(ChampionInfo champion, string team, string name, Position position = Position.None) => new()
+        {
+            ChampionName = champion.Name,
+            RawChampionName = $"game_character_displayname_{champion.Id}",
+            RiotId = name,
+            Team = team,
+            Level = 1,
+            Position = position == Position.Support ? "UTILITY" : position == Position.None ? "" : position.ToString().ToUpperInvariant(),
+            SummonerSpells = position == Position.Jungle
+                ? new LiveSummonerSpells { SummonerSpellOne = new LiveSummonerSpell { DisplayName = "Smite" } }
+                : null,
+        };
+
+        return new AllGameData
+        {
+            ActivePlayer = new ActivePlayer { RiotId = "You#LC", Level = 1 },
+            AllPlayers =
+            [
+                Player(me, "ORDER", "You#LC", Position),
+                .. Allies.Select((c, i) => Player(c, "ORDER", $"Ally{i}#LC")),
+                .. Enemies.Select((c, i) => Player(c, "CHAOS", $"Enemy{i}#LC")),
+            ],
+            GameData = new LiveGameInfo { GameMode = Mode.ClientModeName(), MapNumber = Mode.MapId() },
+        };
+    }
 
     /// <summary>Changes when anything that affects the rune page or the matchup changes.</summary>
     public string Fingerprint =>
@@ -49,6 +88,7 @@ public sealed record ChampSelectState(
             Picks(session.MyTeam.Where(p => p != me)), Picks(session.TheirTeam))
         {
             IsLocked = isLocked,
+            Spells = (me?.Spell1Id ?? 0, me?.Spell2Id ?? 0),
             Pickable = snapshot.PickableChampionIds.ToHashSet(),
             Mastery = snapshot.Mastery.GroupBy(m => m.ChampionId).ToDictionary(g => g.Key, g => g.Max(m => m.ChampionPoints)),
         };

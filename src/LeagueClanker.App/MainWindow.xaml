@@ -78,12 +78,23 @@
                     <TextBlock Text="{Binding Status}" Foreground="{StaticResource MutedBrush}" FontSize="11" Margin="10,1,0,0" VerticalAlignment="Center" />
                 </StackPanel>
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,0,6,0">
+                    <Button Style="{StaticResource ChromeButton}" Content="&#x2913;" ToolTip="Save a snapshot of what the app sees (for bug reports)"
+                            Click="OnSaveSnapshot" AutomationProperties.Name="Save snapshot" />
+                    <Button Style="{StaticResource ChromeButton}" Content="&#x2699;" ToolTip="Settings" Click="OnToggleSettings" AutomationProperties.Name="Settings" />
                     <Button Style="{StaticResource ChromeButton}" Content="📌" ToolTip="Toggle always on top" Click="OnPinClick" />
                     <Button Style="{StaticResource ChromeButton}" Content="✕" ToolTip="Close" Click="OnCloseClick" />
                 </StackPanel>
             </Grid>
 
-            <TextBlock DockPanel.Dock="Bottom" Text="{Binding Footer}" Foreground="{StaticResource MutedBrush}" FontSize="10" Margin="12,4,12,8" />
+            <StackPanel DockPanel.Dock="Bottom" Margin="12,4,12,8">
+                <TextBlock Text="{Binding Notice}" Foreground="{StaticResource MutedBrush}" FontSize="10" TextWrapping="Wrap" Margin="0,0,0,3"
+                           Visibility="{Binding Notice, Converter={StaticResource HasContent}}" />
+                <DockPanel>
+                    <Button DockPanel.Dock="Right" Style="{StaticResource LinkButton}" Content="{Binding UpdateText}" Click="OnOpenUpdate"
+                            Visibility="{Binding UpdateText, Converter={StaticResource HasContent}}" ToolTip="Open the download page" />
+                    <TextBlock Text="{Binding Footer}" Foreground="{StaticResource MutedBrush}" FontSize="10" />
+                </DockPanel>
+            </StackPanel>
 
             <Grid>
             <!-- ===== Champ select: playstyle and rune page ===== -->
@@ -165,10 +176,10 @@
                         <DockPanel Margin="0,12,0,5">
                             <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
                                 <RadioButton Style="{StaticResource ChipButton}" GroupName="RuneSource" Content="op.gg" Margin="0,0,6,0"
-                                             IsChecked="{Binding UseStatsSite, Mode=OneWay}" Checked="OnStatsSiteChecked"
+                                             IsChecked="{Binding Settings.UseStatsSite}"
                                              ToolTip="Most played page on op.gg that fits your playstyle. Falls back to LeagueClanker's own page." />
                                 <RadioButton Style="{StaticResource ChipButton}" GroupName="RuneSource" Content="Own rules"
-                                             IsChecked="{Binding UseOwnRules, Mode=OneWay}" Checked="OnOwnRulesChecked"
+                                             IsChecked="{Binding Settings.UseOwnRules}"
                                              ToolTip="LeagueClanker's own page for your playstyle, adjusted to the enemy picks." />
                             </StackPanel>
                             <TextBlock Style="{StaticResource SectionHeader}" Text="RUNES" Margin="0" VerticalAlignment="Center" />
@@ -204,8 +215,31 @@
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
 
-                        <Button Style="{StaticResource PrimaryButton}" Content="Apply to my rune page" HorizontalAlignment="Left" Margin="0,8,0,0"
-                                IsEnabled="{Binding CanApply}" Click="OnApplyRunes" />
+                        <StackPanel Visibility="{Binding SpellRows, Converter={StaticResource HasContent}}">
+                            <TextBlock Style="{StaticResource SectionHeader}" Text="SUMMONER SPELLS" />
+                            <ItemsControl ItemsSource="{Binding SpellRows}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <StackPanel Orientation="Horizontal" />
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate DataType="{x:Type local:RuneRow}">
+                                        <ContentControl Content="{Binding}" ContentTemplate="{StaticResource RuneRowTemplate}" Margin="0,0,16,0" />
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                            <TextBlock Text="{Binding SpellLine}" Foreground="{StaticResource MutedBrush}" FontSize="10" TextWrapping="Wrap" />
+                        </StackPanel>
+
+                        <StackPanel Visibility="{Binding SkillOrder, Converter={StaticResource HasContent}}">
+                            <TextBlock Style="{StaticResource SectionHeader}" Text="SKILL ORDER" />
+                            <TextBlock Text="{Binding SkillOrder}" FontSize="12" FontWeight="SemiBold" />
+                            <TextBlock Text="{Binding SkillLevels}" Foreground="{StaticResource MutedBrush}" FontSize="11" />
+                        </StackPanel>
+
+                        <Button Style="{StaticResource PrimaryButton}" Content="{Binding ApplyLabel}" HorizontalAlignment="Left" Margin="0,10,0,0"
+                                IsEnabled="{Binding CanApply}" Click="OnApplyRunes" AutomationProperties.Name="Apply" />
                         <TextBlock Text="{Binding ApplyStatus}" Foreground="{StaticResource MutedBrush}" FontSize="11" TextWrapping="Wrap" Margin="0,6,0,0"
                                    Visibility="{Binding ApplyStatus, Converter={StaticResource HasContent}}" />
                     </StackPanel>
@@ -503,6 +537,52 @@
                         <TextBlock Text="Your stats come from the game. Everyone else's are base stats at their level plus items. Hover a row for details."
                                    Foreground="{StaticResource MutedBrush}" FontSize="10" TextWrapping="Wrap" Margin="0,8,0,0" />
                     </StackPanel>
+                </StackPanel>
+            </ScrollViewer>
+
+            <!-- ===== Settings: covers the other panels while open ===== -->
+            <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="12,0,12,0" Background="{StaticResource PanelBrush}"
+                          Visibility="{Binding ShowSettings, Converter={StaticResource BoolToVisibility}}">
+                <StackPanel DataContext="{Binding Settings}" Margin="0,2,0,8">
+                    <DockPanel>
+                        <Button DockPanel.Dock="Right" Style="{StaticResource LinkButton}" Content="Done" Click="OnToggleSettings" VerticalAlignment="Center" />
+                        <TextBlock Text="Settings" FontSize="16" FontWeight="SemiBold" />
+                    </DockPanel>
+
+                    <TextBlock Style="{StaticResource SectionHeader}" Text="STATS SOURCE" />
+                    <TextBlock Text="For runes, summoner spells, skill order, starting items and matchups. Own rules work offline."
+                               Foreground="{StaticResource MutedBrush}" FontSize="11" TextWrapping="Wrap" Margin="0,0,0,6" />
+                    <StackPanel Orientation="Horizontal">
+                        <RadioButton Style="{StaticResource ChipButton}" GroupName="SettingsSource" Content="op.gg" Margin="0,0,6,0" IsChecked="{Binding UseStatsSite}" />
+                        <RadioButton Style="{StaticResource ChipButton}" GroupName="SettingsSource" Content="Own rules" IsChecked="{Binding UseOwnRules}" />
+                    </StackPanel>
+
+                    <TextBlock Style="{StaticResource SectionHeader}" Text="CHAMP SELECT" />
+                    <CheckBox Style="{StaticResource SettingCheck}" IsChecked="{Binding ApplySpells}">
+                        <TextBlock Text="Apply also sets your summoner spells" TextWrapping="Wrap" />
+                    </CheckBox>
+                    <CheckBox Style="{StaticResource SettingCheck}" IsChecked="{Binding ApplyItemSet}">
+                        <TextBlock Text="Apply also adds an item set to the in-game shop" TextWrapping="Wrap" />
+                    </CheckBox>
+                    <CheckBox Style="{StaticResource SettingCheck}" IsChecked="{Binding AutoApply}">
+                        <TextBlock Text="Apply automatically when you lock in" TextWrapping="Wrap" />
+                    </CheckBox>
+
+                    <TextBlock Style="{StaticResource SectionHeader}" Text="GENERAL" />
+                    <CheckBox Style="{StaticResource SettingCheck}" IsChecked="{Binding PlaySounds}">
+                        <TextBlock Text="Play a sound for pivot suggestions and augment offers" TextWrapping="Wrap" />
+                    </CheckBox>
+                    <CheckBox Style="{StaticResource SettingCheck}" IsChecked="{Binding CheckForUpdates}">
+                        <TextBlock Text="Check for updates at startup" TextWrapping="Wrap" />
+                    </CheckBox>
+
+                    <TextBlock Style="{StaticResource SectionHeader}" Text="TROUBLESHOOTING" />
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                        <Button Style="{StaticResource SmallButton}" Content="Open log" Click="OnOpenLog" Margin="0,0,6,0" />
+                        <Button Style="{StaticResource SmallButton}" Content="Open snapshots folder" Click="OnOpenSnapshots" />
+                    </StackPanel>
+                    <TextBlock Text="&#x2913; in the title bar saves what the app sees right now, with player names replaced. Send the file along when something looks wrong."
+                               Foreground="{StaticResource MutedBrush}" FontSize="10" TextWrapping="Wrap" />
                 </StackPanel>
             </ScrollViewer>
             </Grid>

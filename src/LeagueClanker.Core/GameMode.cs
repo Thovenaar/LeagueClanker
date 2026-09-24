@@ -54,6 +54,15 @@ public static class GameModes
 
     public static bool HasAugments(this GameMode mode) => mode == GameMode.AramMayhem;
 
+    /// <summary>The client's name for the mode, as Data Dragon lists it for summoner spells.</summary>
+    public static string ClientModeName(this GameMode mode) => mode switch
+    {
+        GameMode.Aram => "ARAM",
+        GameMode.AramMayhem => "KIWI",
+        GameMode.LeagueClassic => "JADE",
+        _ => "CLASSIC",
+    };
+
     /// <summary>League Classic uses its own item copies (77xxxx ids); every other mode uses the standard items.</summary>
     public static bool UsesClassicItems(this GameMode mode) => mode == GameMode.LeagueClassic;
 

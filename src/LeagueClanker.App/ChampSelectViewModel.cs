@@ -1,11 +1,16 @@
 using System.ComponentModel;
 using System.Net.Http;
 using System.Runtime.CompilerServices;
+using System.Text.Json;
 using LeagueClanker.Core;
 using LeagueClanker.Core.Analysis;
+using LeagueClanker.Core.ItemSets;
 using LeagueClanker.Core.LeagueClient;
 using LeagueClanker.Core.Matchups;
+using LeagueClanker.Core.Opgg;
+using LeagueClanker.Core.Recommendation;
 using LeagueClanker.Core.Runes;
+using LeagueClanker.Core.Spells;
 using LeagueClanker.Core.StaticData;
 
 namespace LeagueClanker.App;
@@ -16,29 +21,32 @@ public sealed record RuneRow(string Name, string IconUrl);
 
 public sealed record CounterRow(string Name, string IconUrl, string WinRate, string Games, bool YouPlayIt);
 
+/// <summary>Everything the champ select panel needs, handed over once the static data is loaded.</summary>
+public sealed record ChampSelectServices(StaticGameData Data, RuneAdvisor Runes, MatchupAdvisor Matchups, SpellAdvisor Spells, OpggClient Opgg);
+
 /// <summary>
-/// Champ select: pick how you'll play your champion, see the rune page for it, and write that page into the client.
-/// The playstyle carries over into the game, where it decides the item build.
+/// Champ select: your lane matchup, how you'll play your champion, and the rune page, spells, skill order and item set
+/// for it. Apply writes them into the client. The playstyle carries over into the game, where it decides the build.
 /// </summary>
 public sealed class ChampSelectViewModel : INotifyPropertyChanged
 {
     // Your playstyle per champion this session, so hovering another champion and coming back keeps your choice.
     private readonly Dictionary<string, Archetype> _chosen = [];
 
-    private StaticGameData? _data;
-    private RuneAdvisor? _advisor;
-    private MatchupAdvisor? _matchups;
+    private ChampSelectServices? _services;
     private ChampSelectState? _state;
-    private RuneRecommendation? _recommendation;
+    private RuneRecommendation? _runes;
+    private SpellRecommendation? _spells;
+    private OpggChampion? _opgg;
     private int _requestVersion;
     private int _matchupVersion;
+    private string? _autoAppliedFor;
 
     private bool _isActive;
     private string _championName = "";
     private string _championIconUrl = "";
     private string _situation = "";
     private IReadOnlyList<PlaystyleOption> _playstyles = [];
-    private RuneSourceKind _source;
     private string _primaryName = "";
     private IReadOnlyList<RuneRow> _primaryRunes = [];
     private string _secondaryName = "";
@@ -46,9 +54,12 @@ public sealed class ChampSelectViewModel : INotifyPropertyChanged
     private IReadOnlyList<RuneRow> _shards = [];
     private IReadOnlyList<string> _reasons = [];
     private string _sourceLine = "";
+    private IReadOnlyList<RuneRow> _spellRows = [];
+    private string _spellLine = "";
+    private string _skillOrder = "";
+    private string _skillLevels = "";
     private string _applyStatus = "";
     private bool _canApply;
-    private bool _isBusy;
     private bool _hasLane;
     private string _laneTitle = "";
     private string _opponentText = "";
@@ -59,16 +70,28 @@ public sealed class ChampSelectViewModel : INotifyPropertyChanged
     private string _enemyRoles = "";
     private string _laneNote = "";
 
+    public ChampSelectViewModel(SettingsViewModel settings)
+    {
+        Settings = settings;
+        Settings.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(SettingsViewModel.RuneSource))
+            {
+                ApplyStatus = "";
+                _ = RecomputeAsync();
+            }
+        };
+    }
+
     public event PropertyChangedEventHandler? PropertyChanged;
 
     /// <summary>Raised when the playstyle for your champion changes, by default or by you.</summary>
     public event EventHandler<(string ChampionId, Archetype Playstyle)>? PlaystyleSelected;
 
-    /// <summary>Raised when you switch between op.gg and the rules, so the choice can be saved.</summary>
-    public event EventHandler<RuneSourceKind>? SourceChanged;
+    public SettingsViewModel Settings { get; }
 
-    /// <summary>Writes a page into the League client. Set by the app; the demo replaces it.</summary>
-    public Func<RunePage, string, Task<ApplyResult>>? ApplyHandler { get; set; }
+    /// <summary>Writes into the League client. Set by the app; demos use <see cref="DemoWriter"/>.</summary>
+    public IChampSelectWriter? Writer { get; set; }
 
     public bool IsActive { get => _isActive; private set => Set(ref _isActive, value); }
     public bool HasChampion => _state?.Champion is not null;
@@ -79,8 +102,6 @@ public sealed class ChampSelectViewModel : INotifyPropertyChanged
     public string Situation { get => _situation; private set => Set(ref _situation, value); }
 
     public IReadOnlyList<PlaystyleOption> Playstyles { get => _playstyles; private set => Set(ref _playstyles, value); }
-    public bool UseStatsSite => _source == RuneSourceKind.StatsSite;
-    public bool UseOwnRules => _source == RuneSourceKind.OwnRules;
     public string PrimaryName { get => _primaryName; private set => Set(ref _primaryName, value); }
     public IReadOnlyList<RuneRow> PrimaryRunes { get => _primaryRunes; private set => Set(ref _primaryRunes, value); }
     public string SecondaryName { get => _secondaryName; private set => Set(ref _secondaryName, value); }
@@ -88,9 +109,23 @@ public sealed class ChampSelectViewModel : INotifyPropertyChanged
     public IReadOnlyList<RuneRow> Shards { get => _shards; private set => Set(ref _shards, value); }
     public IReadOnlyList<string> Reasons { get => _reasons; private set => Set(ref _reasons, value); }
     public string SourceLine { get => _sourceLine; private set => Set(ref _sourceLine, value); }
+
+    /// <summary>The two summoner spells, first key first.</summary>
+    public IReadOnlyList<RuneRow> SpellRows { get => _spellRows; private set => Set(ref _spellRows, value); }
+    public string SpellLine { get => _spellLine; private set => Set(ref _spellLine, value); }
+
+    /// <summary>"Max Q > W > E". Empty without op.gg data.</summary>
+    public string SkillOrder { get => _skillOrder; private set => Set(ref _skillOrder, value); }
+
+    /// <summary>"Levels 1-6: Q W E Q Q R"</summary>
+    public string SkillLevels { get => _skillLevels; private set => Set(ref _skillLevels, value); }
+
     public string ApplyStatus { get => _applyStatus; private set => Set(ref _applyStatus, value); }
     public bool CanApply { get => _canApply; private set => Set(ref _canApply, value); }
-    public bool IsBusy { get => _isBusy; private set => Set(ref _isBusy, value); }
+
+    /// <summary>"Apply runes, spells and item set", depending on the settings.</summary>
+    public string ApplyLabel =>
+        "Apply " + string.Join(", ", new[] { "runes", Settings.ApplySpells ? "spells" : null, Settings.ApplyItemSet ? "item set" : null }.OfType<string>());
 
     /// <summary>True on Summoner's Rift with a known role: then there's a lane opponent to show, or to wait for.</summary>
     public bool HasLane { get => _hasLane; private set => Set(ref _hasLane, value); }
@@ -115,14 +150,7 @@ public sealed class ChampSelectViewModel : INotifyPropertyChanged
 
     public Archetype? SelectedPlaystyle => Playstyles.FirstOrDefault(p => p.IsSelected)?.Value;
 
-    public void Configure(StaticGameData data, RuneAdvisor advisor, MatchupAdvisor matchups, RuneSourceKind source)
-    {
-        _data = data;
-        _advisor = advisor;
-        _matchups = matchups;
-        _source = source;
-        Raise(nameof(UseStatsSite), nameof(UseOwnRules));
-    }
+    public void Configure(ChampSelectServices services) => _services = services;
 
     /// <summary>Called on every poll. Null means you're not in champ select.</summary>
     public void Update(ChampSelectState? state)
@@ -130,6 +158,7 @@ public sealed class ChampSelectViewModel : INotifyPropertyChanged
         if (state is null)
         {
             _state = null;
+            _autoAppliedFor = null;
             IsActive = false;
             return;
         }
@@ -143,7 +172,7 @@ public sealed class ChampSelectViewModel : INotifyPropertyChanged
 
         Raise(nameof(HasChampion));
         _ = RecomputeMatchupAsync();
-        if (state.Champion is not { } champion || _data is null)
+        if (state.Champion is not { } champion || _services is null)
         {
             ChampionName = "Pick or hover a champion";
             ChampionIconUrl = "";
@@ -154,7 +183,7 @@ public sealed class ChampSelectViewModel : INotifyPropertyChanged
         }
 
         ChampionName = champion.Name;
-        ChampionIconUrl = _data.ChampionIconUrl(champion.Id);
+        ChampionIconUrl = _services.Data.ChampionIconUrl(champion.Id);
         Situation = SituationText(state);
         if (championChanged)
         {
@@ -174,37 +203,48 @@ public sealed class ChampSelectViewModel : INotifyPropertyChanged
         _ = RecomputeAsync();
     }
 
-    public void SelectSource(RuneSourceKind source)
-    {
-        if (source == _source)
-            return;
-        _source = source;
-        Raise(nameof(UseStatsSite), nameof(UseOwnRules));
-        SourceChanged?.Invoke(this, source);
-        ApplyStatus = "";
-        _ = RecomputeAsync();
-    }
+    /// <summary>The settings for spells and the item set changed: the button says what it will write.</summary>
+    public void RefreshApplyLabel() => Raise(nameof(ApplyLabel));
 
+    /// <summary>Writes the rune page, and the spells and item set when the settings say so.</summary>
     public async Task ApplyAsync()
     {
-        if (_recommendation is not { } recommendation || _state?.Champion is not { } champion || ApplyHandler is null)
+        if (_runes is not { } runes || _state is not { Champion: { } champion } state || Writer is null || _services is null)
             return;
 
         CanApply = false;
-        ApplyStatus = "Writing your rune page...";
-        try
+        ApplyStatus = "Writing into the client...";
+        var messages = new List<string>();
+        async Task Try(string what, Func<Task<ApplyResult>> write)
         {
-            var result = await ApplyHandler(recommendation.Page, RunePageWriter.PageName(champion));
-            ApplyStatus = result.Message;
+            try
+            {
+                messages.Add((await write()).Message);
+            }
+            catch (Exception ex) when (ex is HttpRequestException or InvalidOperationException or TaskCanceledException or JsonException)
+            {
+                Log.Error($"Writing {what}", ex);
+                messages.Add($"Couldn't write the {what}: {ex.Message}");
+            }
         }
-        catch (Exception ex) when (ex is HttpRequestException or InvalidOperationException or TaskCanceledException)
-        {
-            ApplyStatus = $"Couldn't write the page: {ex.Message}";
-        }
-        finally
-        {
-            CanApply = true;
-        }
+
+        await Try("rune page", () => Writer.WriteRunesAsync(runes.Page, RunePageWriter.PageName(champion), default));
+        if (Settings.ApplySpells && _spells is { } spells)
+            await Try("summoner spells", () => Writer.WriteSpellsAsync(spells.First, spells.Second, default));
+        if (Settings.ApplyItemSet && BuildItemSet(state) is { } set)
+            await Try("item set", () => Writer.WriteItemSetAsync(set, default));
+
+        ApplyStatus = string.Join(" ", messages);
+        CanApply = true;
+    }
+
+    /// <summary>A build for the game ahead: everyone at level 1, with your playstyle, against the enemies you can see.</summary>
+    private ItemSetDefinition? BuildItemSet(ChampSelectState state)
+    {
+        if (_services is null || state.ToGameData() is not { } game || GameAnalyzer.Analyze(game, _services.Data, playstyle: SelectedPlaystyle) is not { } analysis)
+            return null;
+        var recommendation = new RecommendationEngine(_services.Data).Recommend(analysis);
+        return ItemSetBuilder.Build(recommendation, _services.Data.Items, _opgg);
     }
 
     private void ShowPlaystyle(Archetype selected)
@@ -216,31 +256,79 @@ public sealed class ChampSelectViewModel : INotifyPropertyChanged
 
     private async Task RecomputeAsync()
     {
-        if (_state is not { Champion: { } champion } state || _advisor is null || _data is null || SelectedPlaystyle is not { } playstyle)
+        if (_state is not { Champion: { } champion } state || _services is not { } services || SelectedPlaystyle is not { } playstyle)
             return;
-        if (_data.Runes.IsEmpty)
+        if (services.Data.Runes.IsEmpty)
         {
             Reasons = ["Couldn't load the rune data from Data Dragon. Restart the app when you're online."];
             return;
         }
 
         var version = ++_requestVersion;
-        IsBusy = true;
         CanApply = false;
-        var request = new RuneRequest(champion, playstyle, state.Position, state.Mode) { Enemies = state.Enemies };
-        var recommendation = await _advisor.RecommendAsync(request, _source);
+        var source = Settings.RuneSource;
+        var runeRequest = new RuneRequest(champion, playstyle, state.Position, state.Mode) { Enemies = state.Enemies };
+        var runes = await services.Runes.RecommendAsync(runeRequest, source);
+        var spells = await services.Spells.RecommendAsync(new SpellRequest(champion, playstyle, state.Position, state.Mode, state.Spells), source);
+        var opgg = source == RuneSourceKind.StatsSite ? await LoadOpggAsync(champion, playstyle, state, services.Opgg) : null;
         if (version != _requestVersion)
             return; // A newer request (another champion, playstyle or source) is on its way.
 
-        IsBusy = false;
-        _recommendation = recommendation;
-        ShowPage(recommendation, _data.Runes);
-        CanApply = ApplyHandler is not null;
+        _runes = runes;
+        _spells = spells;
+        _opgg = opgg;
+        ShowPage(runes, services.Data.Runes);
+        ShowSpells(spells, services.Data);
+        ShowSkills(opgg?.SkillOrder);
+        CanApply = Writer is not null;
+
+        // Auto-apply once per champion, playstyle and source after you lock in.
+        var applyKey = $"{champion.Id}|{playstyle}|{source}";
+        if (Settings.AutoApply && state.IsLocked && Writer is not null && _autoAppliedFor != applyKey)
+        {
+            _autoAppliedFor = applyKey;
+            await ApplyAsync();
+        }
+    }
+
+    private static async Task<OpggChampion?> LoadOpggAsync(ChampionInfo champion, Archetype playstyle, ChampSelectState state, OpggClient opgg)
+    {
+        try
+        {
+            var aram = state.Mode is GameMode.Aram or GameMode.AramMayhem;
+            return state.Mode is GameMode.SummonersRift or GameMode.Aram or GameMode.AramMayhem
+                ? await opgg.GetChampionAsync(champion.Key, aram, OpggClient.RoleFor(state.Position, playstyle), default)
+                : null;
+        }
+        catch (Exception ex) when (ex is HttpRequestException or JsonException or TaskCanceledException)
+        {
+            Log.Error("op.gg build data", ex);
+            return null;
+        }
+    }
+
+    private void ShowSpells(SpellRecommendation? spells, StaticGameData data)
+    {
+        SpellRows = spells is null
+            ? []
+            : new[] { spells.First, spells.Second }.Select(id => new RuneRow(data.Spells.Get(id)?.Name ?? id.ToString(), data.SpellIconUrl(id))).ToList();
+        SpellLine = spells switch
+        {
+            null => "",
+            { Games: { } games, WinRate: { } rate } => $"{spells.Reason} {rate:P1} win rate over {games:N0} games.",
+            _ => spells.Reason,
+        };
+    }
+
+    private void ShowSkills(OpggSkillOrder? skills)
+    {
+        SkillOrder = skills is { MaxOrder.Count: > 0 } ? $"Max {string.Join(" > ", skills.MaxOrder)}" : "";
+        SkillLevels = skills is { Levels.Count: >= 6 } ? $"Levels 1-6: {string.Join(" ", skills.Levels.Take(6))}" : "";
     }
 
     private async Task RecomputeMatchupAsync()
     {
-        if (_state is not { } state || _matchups is null || _data is null)
+        if (_state is not { } state || _services is not { } services)
             return;
 
         var version = ++_matchupVersion;
@@ -249,11 +337,11 @@ public sealed class ChampSelectViewModel : INotifyPropertyChanged
             Pickable = state.Pickable.Count > 0 ? state.Pickable : null,
             Mastery = state.Mastery,
         };
-        var report = await _matchups.AnalyzeAsync(request);
+        var report = await services.Matchups.AnalyzeAsync(request);
         if (version != _matchupVersion)
             return;
 
-        ShowMatchup(report, state, _data);
+        ShowMatchup(report, state, services.Data);
     }
 
     private void ShowMatchup(MatchupReport? report, ChampSelectState state, StaticGameData data)
@@ -280,7 +368,7 @@ public sealed class ChampSelectViewModel : INotifyPropertyChanged
         EnemyRoles = report.EnemyRoles.Count == 0
             ? ""
             : $"Enemy roles{(report.RolesAreGuessed ? " (guessed)" : "")}: "
-              + string.Join(" \u00b7 ", report.EnemyRoles.Select(r => $"{r.Champion.Name} {r.Position.DisplayName().ToLowerInvariant()}"));
+              + string.Join(" · ", report.EnemyRoles.Select(r => $"{r.Champion.Name} {r.Position.DisplayName().ToLowerInvariant()}"));
         LaneNote = report.Note ?? "";
     }
 

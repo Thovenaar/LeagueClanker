@@ -10,7 +10,7 @@ public interface IGameDataSource
 }
 
 /// <summary>Reads the official Live Client Data API that the game exposes on localhost while a match runs.</summary>
-public sealed class LiveClientApi : IGameDataSource, IDisposable
+public sealed class LiveClientApi : IGameDataSource, ISnapshotSource, IDisposable
 {
     public static readonly Uri DefaultBaseAddress = new("https://127.0.0.1:2999/");
 
@@ -30,6 +30,9 @@ public sealed class LiveClientApi : IGameDataSource, IDisposable
         };
     }
 
+    /// <summary>The last full response, unchanged, for saving a snapshot.</summary>
+    public string? SnapshotJson { get; private set; }
+
     public async Task<AllGameData?> TryGetAsync(CancellationToken ct)
     {
         try
@@ -38,8 +41,12 @@ public sealed class LiveClientApi : IGameDataSource, IDisposable
             if (!response.IsSuccessStatusCode)
                 return null;
 
-            var data = await response.Content.ReadFromJsonAsync<AllGameData>(Json.Options, ct);
-            return IsPlayable(data) ? data : null;
+            var json = await response.Content.ReadAsStringAsync(ct);
+            var data = JsonSerializer.Deserialize<AllGameData>(json, Json.Options);
+            if (!IsPlayable(data))
+                return null;
+            SnapshotJson = json;
+            return data;
         }
         catch (HttpRequestException)
         {
@@ -61,25 +68,32 @@ public sealed class LiveClientApi : IGameDataSource, IDisposable
 }
 
 /// <summary>Replays a saved allgamedata JSON file. Used for demo mode and development without a live game.</summary>
-public sealed class FileGameDataSource(string path) : IGameDataSource
+public sealed class FileGameDataSource(string path) : IGameDataSource, ISnapshotSource
 {
+    public string? SnapshotJson { get; private set; }
+
     public async Task<AllGameData?> TryGetAsync(CancellationToken ct)
     {
-        await using var stream = File.OpenRead(path);
-        var data = await JsonSerializer.DeserializeAsync<AllGameData>(stream, Json.Options, ct);
+        var json = await File.ReadAllTextAsync(path, ct);
+        var data = JsonSerializer.Deserialize<AllGameData>(json, Json.Options);
+        SnapshotJson = json;
         return LiveClientApi.IsPlayable(data) ? data : null;
     }
 }
 
 /// <summary>Replays snapshots in order, moving to the next one every few polls and staying on the last. Used to demo pivots.</summary>
-public sealed class SequenceGameDataSource(IReadOnlyList<string> paths, int pollsPerSnapshot = 5) : IGameDataSource
+public sealed class SequenceGameDataSource(IReadOnlyList<string> paths, int pollsPerSnapshot = 5) : IGameDataSource, ISnapshotSource
 {
     private int _polls;
+    private FileGameDataSource? _current;
+
+    public string? SnapshotJson => _current?.SnapshotJson;
 
     public Task<AllGameData?> TryGetAsync(CancellationToken ct)
     {
         var index = Math.Min(_polls++ / pollsPerSnapshot, paths.Count - 1);
-        return new FileGameDataSource(paths[index]).TryGetAsync(ct);
+        _current = new FileGameDataSource(paths[index]);
+        return _current.TryGetAsync(ct);
     }
 
     /// <summary>A folder replays every *.json in name order; a file is a single snapshot.</summary>

@@ -80,13 +80,21 @@ public sealed class MainViewModel : INotifyPropertyChanged
     public bool ShowSwitchHint { get => _showSwitchHint; private set => Set(ref _showSwitchHint, value); }
     public string SwitchHint { get => _switchHint; private set => Set(ref _switchHint, value); }
 
-    public MainViewModel()
+    public MainViewModel(SettingsViewModel settings)
     {
+        Settings = settings;
+        ChampSelect = new ChampSelectViewModel(settings);
+        Settings.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName is nameof(SettingsViewModel.ApplySpells) or nameof(SettingsViewModel.ApplyItemSet))
+                ChampSelect.RefreshApplyLabel();
+        };
+
         // A card offer on screen needs your attention now, so bring its tab forward.
         Augments.OfferDetected += (_, _) =>
         {
             SelectTab(Tab.Augments);
-            SystemSounds.Asterisk.Play();
+            Chime();
         };
 
         ChampSelect.PlaystyleSelected += (_, choice) => UsePlaystyle(choice.ChampionId, choice.Playstyle);
@@ -102,8 +110,63 @@ public sealed class MainViewModel : INotifyPropertyChanged
 
     private const string WaitingStatus = "Waiting for a game... (Practice Tool works too)";
 
+    public SettingsViewModel Settings { get; }
+
     /// <summary>Playstyle and rune page for champ select. Shown while you're in champ select and no game runs.</summary>
-    public ChampSelectViewModel ChampSelect { get; } = new();
+    public ChampSelectViewModel ChampSelect { get; }
+
+    private bool _showSettings;
+    private string _notice = "";
+    private string _updateText = "";
+
+    public bool ShowSettings { get => _showSettings; private set => Set(ref _showSettings, value); }
+
+    /// <summary>A short message under the content, e.g. where a snapshot went.</summary>
+    public string Notice { get => _notice; private set => Set(ref _notice, value); }
+
+    /// <summary>"v0.5.0 is available". Empty when you're up to date.</summary>
+    public string UpdateText { get => _updateText; private set => Set(ref _updateText, value); }
+
+    public string? UpdateUrl { get; private set; }
+
+    /// <summary>Hands over the raw JSON of what's on screen: the live game, or champ select. Set by the app.</summary>
+    public Func<(string Json, string Kind)?>? SnapshotProvider { get; set; }
+
+    public void ToggleSettings() => ShowSettings = !ShowSettings;
+
+    public void ShowUpdate(string version, string url)
+    {
+        UpdateUrl = url;
+        UpdateText = $"v{version} is available";
+    }
+
+    /// <summary>Saves the live game or champ select, with player names replaced, and shows the file.</summary>
+    public void SaveSnapshot()
+    {
+        if (SnapshotProvider?.Invoke() is not { } snapshot)
+        {
+            Notice = "Nothing to save yet: start a game or enter champ select first.";
+            return;
+        }
+
+        try
+        {
+            var path = SnapshotStore.Save(snapshot.Json, snapshot.Kind);
+            Notice = $"Saved {System.IO.Path.GetFileName(path)} (player names replaced).";
+            Shell.ShowInExplorer(path);
+        }
+        catch (Exception ex) when (ex is System.IO.IOException or UnauthorizedAccessException or System.Text.Json.JsonException)
+        {
+            Log.Error("Saving a snapshot", ex);
+            Notice = $"Couldn't save the snapshot: {ex.Message}";
+        }
+    }
+
+    private void Chime()
+    {
+        if (Settings.PlaySounds)
+            SystemSounds.Asterisk.Play();
+    }
 
     public bool ShowChampSelect => ChampSelect.IsActive && !IsLive;
 
@@ -217,7 +280,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
         PivotSummary = pivot?.Summary ?? "";
         PivotReasons = pivot?.Reasons.Select(r => $"Because {char.ToLowerInvariant(r[0])}{r[1..]}").ToList() ?? [];
         if (pivot is not null && pivot.Summary != _lastPivotSummary)
-            SystemSounds.Asterisk.Play(); // You're playing, not watching this window: make new suggestions noticeable.
+            Chime(); // You're playing, not watching this window: make new suggestions noticeable.
         _lastPivotSummary = pivot?.Summary;
 
         ShowSwitchHint = pivot is null && _planner.CanSwitch;

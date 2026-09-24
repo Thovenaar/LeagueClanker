@@ -10,6 +10,11 @@ public sealed record StaticGameData(string Version, ItemCatalog Items, ChampionC
     /// <summary>Empty when the rune data couldn't be loaded; the item advisor works without it.</summary>
     public RuneCatalog Runes { get; init; } = RuneCatalog.Empty;
 
+    public SummonerSpellCatalog Spells { get; init; } = SummonerSpellCatalog.Empty;
+
+    public string SpellIconUrl(int spellId) =>
+        Spells.Get(spellId) is { } spell ? $"https://ddragon.leagueoflegends.com/cdn/{Version}/img/spell/{spell.Image}" : "";
+
     public string ItemIconUrl(int itemId) => $"https://ddragon.leagueoflegends.com/cdn/{Version}/img/item/{itemId}.png";
     public string ChampionIconUrl(string championId) => $"https://ddragon.leagueoflegends.com/cdn/{Version}/img/champion/{championId}.png";
 }
@@ -29,20 +34,22 @@ public sealed class DataDragonClient(HttpClient? http = null, string? cacheDirec
         var championJson = await GetCachedAsync(version, "champion.json", ct);
         return new StaticGameData(version, ItemCatalog.Parse(itemJson), ChampionCatalog.Parse(championJson))
         {
-            Runes = await LoadRunesAsync(version, ct),
+            Runes = await LoadOptionalAsync(version, "runesReforged.json", RuneCatalog.Parse, RuneCatalog.Empty, ct),
+            Spells = await LoadOptionalAsync(version, "summoner.json", SummonerSpellCatalog.Parse, SummonerSpellCatalog.Empty, ct),
         };
     }
 
-    // Older caches predate rune support; offline, the build advisor still runs without runes.
-    private async Task<RuneCatalog> LoadRunesAsync(string version, CancellationToken ct)
+    // Older caches predate runes and spells; offline, the build advisor still runs without them.
+    private async Task<T> LoadOptionalAsync<T>(string version, string file, Func<string, T> parse, T empty, CancellationToken ct)
     {
         try
         {
-            return RuneCatalog.Parse(await GetCachedAsync(version, "runesReforged.json", ct));
+            return parse(await GetCachedAsync(version, file, ct));
         }
         catch (Exception ex) when (ex is HttpRequestException or JsonException)
         {
-            return RuneCatalog.Empty;
+            Log.Error($"Couldn't load {file}", ex);
+            return empty;
         }
     }
 
