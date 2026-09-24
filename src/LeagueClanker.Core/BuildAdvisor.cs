@@ -80,7 +80,9 @@ public sealed class BuildAdvisor(IGameDataSource source, StaticGameData data)
 
     // Recompute whenever something that moves stats or threat changes: items, levels, kills and deaths.
     // Gold ticks alone don't change the build.
+    // The game's result counts too, so the recap sees the win or loss in the last seconds.
     private static string Fingerprint(AllGameData game) =>
         string.Join('|', game.AllPlayers.Select(p =>
-            $"{p.ChampionName}:{p.Level}:{p.Scores.Kills}/{p.Scores.Deaths}:{string.Join(',', p.Items.Select(i => i.ItemID).Order())}"));
+            $"{p.ChampionName}:{p.Level}:{p.Scores.Kills}/{p.Scores.Deaths}:{string.Join(',', p.Items.Select(i => i.ItemID).Order())}"))
+        + "|" + game.Events?.Events.LastOrDefault(e => e.EventName == "GameEnd")?.Result;
 }

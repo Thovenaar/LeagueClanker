@@ -5,6 +5,7 @@ using System.Windows;
 using LeagueClanker.Core;
 using LeagueClanker.Core.Analysis;
 using LeagueClanker.Core.Augments;
+using LeagueClanker.Core.History;
 using LeagueClanker.Core.LeagueClient;
 using LeagueClanker.Core.LiveClient;
 using LeagueClanker.Core.Matchups;
@@ -19,9 +20,10 @@ namespace LeagueClanker.App;
 
 /// <summary>
 /// Usage: LeagueClanker.App.exe [--demo samples/ap-heavy.json | --demo samples/pivot-demo] [--scan-image screenshot.png]
-///                              [--champselect samples/champselect/leona-support.json]
+///                              [--champselect samples/champselect/leona-support.json] [--games samples/history/games.json]
 /// Without --demo it polls the Live Client Data API while a game is running, and the League client during champ select.
 /// A demo folder replays its snapshots in order, which shows pivots happening.
+/// --games shows a copy of a saved game history instead of your own.
 /// </summary>
 public partial class App : Application
 {
@@ -32,6 +34,9 @@ public partial class App : Application
 
     // What champ select reads from: the client, or a saved snapshot in demos. Used for saving snapshots.
     private ISnapshotSource? _champSelectSource;
+
+    // Match history from the client, read once per connection and again after each game.
+    private IReadOnlyList<PlayedGame> _matchHistory = [];
 
     protected override async void OnStartup(StartupEventArgs e)
     {
@@ -45,6 +50,7 @@ public partial class App : Application
         var demoPath = ResolvePath(e.Args, "--demo");
         var scanImage = ResolvePath(e.Args, "--scan-image");
         var champSelectDemo = ResolvePath(e.Args, "--champselect");
+        var gamesDemo = ResolvePath(e.Args, "--games");
         IGameDataSource source = demoPath is null ? new LiveClientApi() : SequenceGameDataSource.FromPath(demoPath);
         viewModel.SnapshotProvider = () =>
             viewModel.IsLive && (source as ISnapshotSource)?.SnapshotJson is { } game ? (game, "game")
@@ -77,6 +83,16 @@ public partial class App : Application
                 data, runes, matchups, new SpellAdvisor(data.Spells, opgg), opgg, new DraftAdvisor(opgg, data.Champions), notes));
             viewModel.Matchups = matchups;
             viewModel.Notes = notes;
+            var recaps = new RecapStore(gamesDemo is null ? Path.Combine(AppPaths.DataFolder, "games.json") : CopyToTemp(gamesDemo));
+            viewModel.UseRecaps(recaps, data);
+            void RefreshStats() => viewModel.SetStats(PersonalStats.Combine(recaps.Games, _matchHistory, data.Champions));
+            RefreshStats();
+            _refreshStats = RefreshStats;
+            viewModel.GamePlayed += (_, _) =>
+            {
+                RefreshStats();
+                _historyStale = true;
+            };
 
             // op.gg's data for your champion: popular items for the build, starting items at the start.
             GameAnalysis? liveGame = null;
@@ -119,6 +135,31 @@ public partial class App : Application
         finally
         {
             (source as IDisposable)?.Dispose();
+        }
+    }
+
+    private static string CopyToTemp(string path)
+    {
+        var copy = Path.Combine(Path.GetTempPath(), $"leagueclanker-{Guid.NewGuid():N}.json");
+        File.Copy(path, copy);
+        return copy;
+    }
+
+    private Action? _refreshStats;
+    private bool _historyStale = true;
+
+    // Up to 30 games, with details for the 15 newest to find lane opponents. Slow on purpose: it's a one-off per session.
+    private async Task LoadMatchHistoryAsync(LeagueClientApi client)
+    {
+        try
+        {
+            _matchHistory = await client.GetMatchHistoryAsync(games: 30, withDetails: 15, _cts.Token);
+            Log.Write($"Read {_matchHistory.Count} Summoner's Rift games from the match history");
+            _refreshStats?.Invoke();
+        }
+        catch (Exception ex) when (ex is HttpRequestException or System.Text.Json.JsonException or InvalidOperationException or TaskCanceledException)
+        {
+            Log.Error("Reading the match history", ex);
         }
     }
 
@@ -196,12 +237,18 @@ public partial class App : Application
                 else
                 {
                     snapshot = client is null ? null : await client.TryGetChampSelectAsync(_cts.Token);
+                    if (client is not null && _historyStale)
+                    {
+                        _historyStale = false;
+                        _ = LoadMatchHistoryAsync(client);
+                    }
                     if (snapshot is null && LeagueClientApi.FindLockfile() is var found && found != lockfile)
                     {
                         client?.Dispose();
                         lockfile = found;
                         client = found is null ? null : new LeagueClientApi(found);
                         _champSelectSource = client;
+                        _historyStale = client is not null;
                         Log.Write(client is null ? "League client closed" : $"Connected to the League client on port {found!.Port}");
                         snapshot = client is null ? null : await client.TryGetChampSelectAsync(_cts.Token);
                     }

@@ -344,6 +344,33 @@ public sealed class LeagueClientApi : IClientSource, IRunePageStore, IChampSelec
         return new ApplyResult(true, $"Set the runes and spells for your Swiftplay champion {slot + 1}.");
     }
 
+    /// <summary>
+    /// Your recent Summoner's Rift games from the client's match history. The list only has your own row, so the most
+    /// recent games' details are fetched one by one to find your lane opponents. Empty when the client doesn't answer.
+    /// </summary>
+    public async Task<IReadOnlyList<History.PlayedGame>> GetMatchHistoryAsync(int games, int withDetails, CancellationToken ct)
+    {
+        using var summoner = await GetOrNullAsync<JsonDocument>("lol-summoner/v1/current-summoner", ct);
+        var puuid = summoner?.RootElement.TryGetProperty("puuid", out var id) == true ? id.GetString() : null;
+
+        using var listResponse = await _http.GetAsync($"lol-match-history/v1/products/lol/current-summoner/matches?begIndex=0&endIndex={games - 1}", ct);
+        if (!listResponse.IsSuccessStatusCode)
+            return [];
+        var list = await listResponse.Content.ReadAsStringAsync(ct);
+
+        var detailed = new Dictionary<long, History.PlayedGame>();
+        foreach (var gameId in History.MatchHistory.GamesWithoutOpponents(list).Take(withDetails))
+        {
+            using var detail = await _http.GetAsync($"lol-match-history/v1/games/{gameId}", ct);
+            if (detail.IsSuccessStatusCode && History.MatchHistory.Parse(await detail.Content.ReadAsStringAsync(ct), puuid).FirstOrDefault() is { } game)
+                detailed[gameId] = game;
+        }
+
+        // Details replace the list's rows where we have them; the rest keep champion and result without an opponent.
+        var fromList = History.MatchHistory.Parse(list, puuid);
+        return [.. detailed.Values, .. fromList.Where(g => !detailed.Values.Any(d => d.Played == g.Played))];
+    }
+
     public Task<PerkPage?> GetCurrentPageAsync(CancellationToken ct) => GetOrNullAsync<PerkPage>("lol-perks/v1/currentpage", ct);
 
     public async Task<IReadOnlyList<PerkPage>> GetPagesAsync(CancellationToken ct) =>

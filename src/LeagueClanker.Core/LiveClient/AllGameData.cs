@@ -8,6 +8,22 @@ public sealed class AllGameData
     public ActivePlayer? ActivePlayer { get; init; }
     public List<LivePlayer> AllPlayers { get; init; } = [];
     public LiveGameInfo? GameData { get; init; }
+    public LiveEvents? Events { get; init; }
+}
+
+public sealed class LiveEvents
+{
+    // The API really does nest a list called "Events" in an object called "events".
+    public List<LiveEvent> Events { get; init; } = [];
+}
+
+public sealed class LiveEvent
+{
+    /// <summary>"GameStart", "ChampionKill", "GameEnd", ...</summary>
+    public string? EventName { get; init; }
+
+    /// <summary>On "GameEnd": "Win" or "Lose", from your side.</summary>
+    public string? Result { get; init; }
 }
 
 public sealed class ActivePlayer

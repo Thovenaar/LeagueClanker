@@ -4,6 +4,7 @@ using System.Runtime.CompilerServices;
 using System.Windows;
 using LeagueClanker.Core;
 using LeagueClanker.Core.Analysis;
+using LeagueClanker.Core.History;
 using LeagueClanker.Core.ItemSets;
 using LeagueClanker.Core.Matchups;
 using LeagueClanker.Core.Opgg;
@@ -14,6 +15,8 @@ using LeagueClanker.Core.StaticData;
 namespace LeagueClanker.App;
 
 public sealed record ItemRow(int Rank, string Name, int Gold, string IconUrl, IReadOnlyList<string> Reasons);
+
+public sealed record ChampionStatRow(string Name, string IconUrl, string Record, string WinRate);
 
 public sealed record PlayerRow(
     string Name, string IconUrl, int Level, bool IsMe, string Note,
@@ -106,7 +109,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
         {
             if (e.PropertyName != nameof(ChampSelectViewModel.IsActive))
                 return;
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(ShowChampSelect)));
+            Raise(nameof(ShowChampSelect), nameof(ShowHistory));
             if (!IsLive)
                 Status = ChampSelectStatus;
         };
@@ -205,7 +208,76 @@ public sealed class MainViewModel : INotifyPropertyChanged
     /// <summary>Raised when a game starts or your champion or role changes, so the app can fetch op.gg data for it.</summary>
     public event EventHandler<GameAnalysis>? LiveChampionChanged;
 
-    /// <summary>"1,300 gold: buy Caulfield's Warhammer (1,050g) toward Black Cleaver (1,950g left)."</summary>
+    private readonly GameRecorder _recorder = new();
+    private string _lastGameTitle = "";
+    private IReadOnlyList<string> _lastGameLines = [];
+    private IReadOnlyList<ChampionStatRow> _championStats = [];
+    private string _statsNote = "";
+
+    /// <summary>Where recaps are kept. Set by the app; without it, games aren't recorded.</summary>
+    public RecapStore? Recaps { get; private set; }
+
+    /// <summary>Starts recording games, and shows the last one until the next game or champ select.</summary>
+    public void UseRecaps(RecapStore store, StaticGameData data)
+    {
+        _data ??= data;
+        Recaps = store;
+        if (store.Games.Count > 0)
+            ShowRecap(store.Games[0]);
+    }
+
+    /// <summary>A game ended and its recap was saved, so your stats can be refreshed.</summary>
+    public event EventHandler<GameRecap>? GamePlayed;
+
+    /// <summary>"Victory · Garen (bruiser) · 31:24"</summary>
+    public string LastGameTitle { get => _lastGameTitle; private set => Set(ref _lastGameTitle, value); }
+
+    public IReadOnlyList<string> LastGameLines { get => _lastGameLines; private set => Set(ref _lastGameLines, value); }
+    public IReadOnlyList<ChampionStatRow> ChampionStats { get => _championStats; private set => Set(ref _championStats, value); }
+    public string StatsNote { get => _statsNote; private set => Set(ref _statsNote, value); }
+
+    /// <summary>Between games: the last game's recap and your champions.</summary>
+    public bool ShowHistory => !IsLive && !ShowChampSelect && (LastGameTitle.Length > 0 || ChampionStats.Count > 0);
+
+    /// <summary>Shows your most played champions, from recaps and match history.</summary>
+    public void SetStats(PersonalStats stats)
+    {
+        if (_data is not { } data)
+            return;
+        var champions = stats.Champions().Take(6)
+            .Select(c => (Champion: data.Champions.GetByKey(c.ChampionKey), c.Record))
+            .Where(c => c.Champion is not null)
+            .Select(c => new ChampionStatRow(c.Champion!.Name, data.ChampionIconUrl(c.Champion.Id), c.Record.ToString(), $"{c.Record.WinRate:P0}"))
+            .ToList();
+        ChampionStats = champions;
+        StatsNote = stats.Games.Count == 0 ? "" : $"From your last {stats.Games.Count} Summoner's Rift games.";
+        ChampSelect.SetStats(stats);
+        Raise(nameof(ShowHistory));
+    }
+
+    private void ShowRecap(GameRecap recap)
+    {
+        if (_data is not { } data)
+            return;
+        string Name(int id) => data.Items.Get(id)?.Name ?? id.ToString();
+        var result = recap.Win switch { true => "Victory", false => "Defeat", null => "Game over" };
+        LastGameTitle = $"{result} \u00b7 {recap.ChampionName} ({recap.Playstyle.DisplayName().ToLowerInvariant()}) \u00b7 {TimeSpan.FromSeconds(recap.DurationSeconds):mm\\:ss}";
+
+        var lines = new List<string>();
+        if (recap.LaneOpponent is { } opponent && data.Champions.Get(opponent) is { } lane)
+            lines.Add($"{recap.Position.DisplayName()} vs {lane.Name}.");
+        if (recap.FinalItems.Count > 0)
+            lines.Add($"You built {string.Join(", ", recap.FinalItems.Select(Name))}. {recap.AdvisedAndBuilt} of {recap.FinalItems.Count} were in LeagueClanker's build.");
+        if (recap.Pivots.Count > 0)
+        {
+            var taken = recap.Pivots.Count(p => p.Accepted);
+            lines.Add($"Pivots: you took {taken} of {recap.Pivots.Count}. "
+                      + string.Join(" ", recap.Pivots.Select(p => $"{(p.Accepted ? "Took" : "Kept your build over")} \"{p.Summary}\" at {TimeSpan.FromSeconds(p.GameTime):mm\\:ss}.")));
+        }
+        LastGameLines = lines;
+        Raise(nameof(ShowHistory));
+    }
+
     public string BuyText { get => _buyText; private set => Set(ref _buyText, value); }
 
     /// <summary>Full-build tips: swaps, elixirs, control wards.</summary>
@@ -266,13 +338,21 @@ public sealed class MainViewModel : INotifyPropertyChanged
             _lastPivotSummary = null;
             _liveChampionKey = null;
             _opggChampion = null;
+            if (IsLive && _recorder.Finish(DateTime.Now) is { } recap)
+            {
+                Recaps?.Add(recap);
+                ShowRecap(recap);
+                GamePlayed?.Invoke(this, recap);
+            }
             IsLive = false;
-            Raise(nameof(ShowChampSelect), nameof(ShowFullLive), nameof(ShowCompactLive));
+            Raise(nameof(ShowChampSelect), nameof(ShowFullLive), nameof(ShowCompactLive), nameof(ShowHistory));
             Status = ChampSelectStatus;
             return;
         }
 
         _gold = update.Gold;
+        if (Recaps is not null)
+            _recorder.Observe(rec);
         if (ReferenceEquals(rec, _planner.Latest))
         {
             RenderBuy(); // only the gold changed
@@ -295,12 +375,16 @@ public sealed class MainViewModel : INotifyPropertyChanged
 
     public void AcceptPivot()
     {
+        if (_planner.PendingPivot is { } pivot)
+            _recorder.Pivot(pivot.Summary, accepted: true);
         _planner.Accept();
         Render();
     }
 
     public void DeclinePivot()
     {
+        if (_planner.PendingPivot is { } pivot)
+            _recorder.Pivot(pivot.Summary, accepted: false);
         _planner.Decline();
         Render();
     }
@@ -318,7 +402,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
 
         var me = rec.Game.Me;
         IsLive = true;
-        Raise(nameof(ShowChampSelect), nameof(ShowFullLive), nameof(ShowCompactLive));
+        Raise(nameof(ShowChampSelect), nameof(ShowFullLive), nameof(ShowCompactLive), nameof(ShowHistory));
         Status = $"Live · {TimeSpan.FromSeconds(rec.Game.GameTimeSeconds):mm\\:ss} · {rec.Game.Mode.DisplayName()}";
         ChampionLine = me.Name;
         PlaystyleLabel = $"{me.Archetype.DisplayName()} ▾";

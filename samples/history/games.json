@@ -1,0 +1,257 @@
+[
+  {
+    "Played": "2026-09-24T21:12:00",
+    "ChampionId": "Garen",
+    "ChampionName": "Garen",
+    "ChampionKey": 86,
+    "Mode": "SummonersRift",
+    "Playstyle": "Bruiser",
+    "Position": "Top",
+    "DurationSeconds": 1884.0,
+    "Win": true,
+    "FinalItems": [
+      3047,
+      6631,
+      3071,
+      3053,
+      3742
+    ],
+    "AdvisedItems": [
+      3047,
+      6631,
+      3071,
+      3053,
+      3065
+    ],
+    "Pivots": [
+      {
+        "GameTime": 852.0,
+        "Summary": "Plated Steelcaps instead of Mercury's Treads",
+        "Accepted": true
+      },
+      {
+        "GameTime": 1488.0,
+        "Summary": "Spirit Visage instead of Dead Man's Plate",
+        "Accepted": false
+      }
+    ],
+    "LaneOpponent": "Darius"
+  },
+  {
+    "Played": "2026-09-24T20:20:00",
+    "ChampionId": "Garen",
+    "ChampionName": "Garen",
+    "ChampionKey": 86,
+    "Mode": "SummonersRift",
+    "Playstyle": "Bruiser",
+    "Position": "Top",
+    "DurationSeconds": 1620,
+    "Win": false,
+    "FinalItems": [
+      3047,
+      6631,
+      3071
+    ],
+    "AdvisedItems": [
+      3047,
+      6631,
+      3071
+    ],
+    "Pivots": [],
+    "LaneOpponent": "Darius"
+  },
+  {
+    "Played": "2026-09-23T22:05:00",
+    "ChampionId": "Jinx",
+    "ChampionName": "Jinx",
+    "ChampionKey": 222,
+    "Mode": "SummonersRift",
+    "Playstyle": "Marksman",
+    "Position": "Bottom",
+    "DurationSeconds": 2040,
+    "Win": true,
+    "FinalItems": [
+      3006,
+      3031,
+      3094,
+      3046,
+      3036
+    ],
+    "AdvisedItems": [
+      3006,
+      3031,
+      3094,
+      3046,
+      3036
+    ],
+    "Pivots": [],
+    "LaneOpponent": "Ashe"
+  },
+  {
+    "Played": "2026-09-23T21:15:00",
+    "ChampionId": "Leona",
+    "ChampionName": "Leona",
+    "ChampionKey": 89,
+    "Mode": "SummonersRift",
+    "Playstyle": "Tank",
+    "Position": "Support",
+    "DurationSeconds": 1740,
+    "Win": true,
+    "FinalItems": [
+      3111,
+      3190,
+      3109,
+      3742
+    ],
+    "AdvisedItems": [
+      3111,
+      3190,
+      3109,
+      3742
+    ],
+    "Pivots": [],
+    "LaneOpponent": "Nautilus"
+  },
+  {
+    "Played": "2026-09-22T20:40:00",
+    "ChampionId": "Garen",
+    "ChampionName": "Garen",
+    "ChampionKey": 86,
+    "Mode": "SummonersRift",
+    "Playstyle": "Bruiser",
+    "Position": "Top",
+    "DurationSeconds": 1500,
+    "Win": true,
+    "FinalItems": [
+      3047,
+      6631,
+      3071
+    ],
+    "AdvisedItems": [
+      3047,
+      6631,
+      3071
+    ],
+    "Pivots": [],
+    "LaneOpponent": "Darius"
+  },
+  {
+    "Played": "2026-09-22T19:50:00",
+    "ChampionId": "Jinx",
+    "ChampionName": "Jinx",
+    "ChampionKey": 222,
+    "Mode": "SummonersRift",
+    "Playstyle": "Marksman",
+    "Position": "Bottom",
+    "DurationSeconds": 1800,
+    "Win": false,
+    "FinalItems": [
+      3006,
+      3031,
+      3094
+    ],
+    "AdvisedItems": [
+      3006,
+      3031,
+      3094
+    ],
+    "Pivots": [],
+    "LaneOpponent": "Caitlyn"
+  },
+  {
+    "Played": "2026-09-21T21:00:00",
+    "ChampionId": "Leona",
+    "ChampionName": "Leona",
+    "ChampionKey": 89,
+    "Mode": "SummonersRift",
+    "Playstyle": "Tank",
+    "Position": "Support",
+    "DurationSeconds": 1980,
+    "Win": true,
+    "FinalItems": [
+      3111,
+      3190,
+      3109,
+      3742
+    ],
+    "AdvisedItems": [
+      3111,
+      3190,
+      3109,
+      3742
+    ],
+    "Pivots": [],
+    "LaneOpponent": "Thresh"
+  },
+  {
+    "Played": "2026-09-21T20:10:00",
+    "ChampionId": "Jinx",
+    "ChampionName": "Jinx",
+    "ChampionKey": 222,
+    "Mode": "SummonersRift",
+    "Playstyle": "Marksman",
+    "Position": "Bottom",
+    "DurationSeconds": 1680,
+    "Win": true,
+    "FinalItems": [
+      3006,
+      3031,
+      3094
+    ],
+    "AdvisedItems": [
+      3006,
+      3031,
+      3094
+    ],
+    "Pivots": [],
+    "LaneOpponent": "Ezreal"
+  },
+  {
+    "Played": "2026-09-20T21:30:00",
+    "ChampionId": "Leona",
+    "ChampionName": "Leona",
+    "ChampionKey": 89,
+    "Mode": "SummonersRift",
+    "Playstyle": "Tank",
+    "Position": "Support",
+    "DurationSeconds": 1560,
+    "Win": false,
+    "FinalItems": [
+      3111,
+      3190
+    ],
+    "AdvisedItems": [
+      3111,
+      3190
+    ],
+    "Pivots": [],
+    "LaneOpponent": "Nautilus"
+  },
+  {
+    "Played": "2026-09-20T20:40:00",
+    "ChampionId": "Garen",
+    "ChampionName": "Garen",
+    "ChampionKey": 86,
+    "Mode": "SummonersRift",
+    "Playstyle": "Bruiser",
+    "Position": "Top",
+    "DurationSeconds": 1920,
+    "Win": true,
+    "FinalItems": [
+      3047,
+      6631,
+      3071,
+      3053,
+      3742
+    ],
+    "AdvisedItems": [
+      3047,
+      6631,
+      3071,
+      3053,
+      3742
+    ],
+    "Pivots": [],
+    "LaneOpponent": "Teemo"
+  }
+]

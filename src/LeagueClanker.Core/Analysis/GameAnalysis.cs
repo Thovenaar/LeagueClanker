@@ -120,6 +120,9 @@ public sealed record GameAnalysis(PlayerProfile Me, TeamProfile Allies, TeamProf
     /// <summary>ARAM: Mayhem augments you picked. They shape the item advice like any other game fact.</summary>
     public IReadOnlyList<AugmentInfo> Augments { get; init; } = [];
 
+    /// <summary>True for a win, false for a loss, null while the game runs. The game reports it in its last seconds.</summary>
+    public bool? Result { get; init; }
+
     /// <summary>Items players of your champion buy most on op.gg. <see cref="PopularItemsRule"/> nudges them up. Empty to ignore.</summary>
     public IReadOnlySet<int> PopularItems { get; init; } = new HashSet<int>();
 
@@ -152,6 +155,12 @@ public static class GameAnalyzer
             Mode = mode,
             Augments = augments ?? [],
             PopularItems = popularItems ?? new HashSet<int>(),
+            Result = data.Events?.Events.LastOrDefault(e => e.EventName == "GameEnd")?.Result switch
+            {
+                "Win" => true,
+                "Lose" => false,
+                _ => null,
+            },
         };
     }
 

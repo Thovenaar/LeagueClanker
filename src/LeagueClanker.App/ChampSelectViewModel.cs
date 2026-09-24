@@ -4,6 +4,7 @@ using System.Runtime.CompilerServices;
 using System.Text.Json;
 using LeagueClanker.Core;
 using LeagueClanker.Core.Analysis;
+using LeagueClanker.Core.History;
 using LeagueClanker.Core.ItemSets;
 using LeagueClanker.Core.LeagueClient;
 using LeagueClanker.Core.Matchups;
@@ -39,6 +40,7 @@ public sealed class ChampSelectViewModel : INotifyPropertyChanged
     private readonly Dictionary<string, Archetype> _chosen = [];
 
     private ChampSelectServices? _services;
+    private PersonalStats? _stats;
     private ChampSelectState? _state;
     private RuneRecommendation? _runes;
     private SpellRecommendation? _spells;
@@ -215,6 +217,16 @@ public sealed class ChampSelectViewModel : INotifyPropertyChanged
     public Archetype? SelectedPlaystyle => Playstyles.FirstOrDefault(p => p.IsSelected)?.Value;
 
     public void Configure(ChampSelectServices services) => _services = services;
+
+    /// <summary>Your own record, shown next to counter picks and the matchup.</summary>
+    public void SetStats(PersonalStats stats)
+    {
+        _stats = stats;
+        _ = RecomputeMatchupAsync();
+    }
+
+    private string YourRecord(int championKey) =>
+        _stats?.With(championKey) is { Games: >= PersonalStats.MinGames } record ? $"you {record}" : "";
 
     /// <summary>Called on every poll. Null means you're not in champ select.</summary>
     public void Update(ChampSelectState? state)
@@ -486,9 +498,12 @@ public sealed class ChampSelectViewModel : INotifyPropertyChanged
         MatchupText = report.Matchup is { } m && state.Champion is { } me
             ? $"{me.Name} vs {m.Opponent.Name}: {m.WinRate:P1} win rate over {m.Games:N0} games · {m.Verdict}"
             : "";
+        if (report.Opponent is { } against && _stats?.Against(against.Key) is { Games: > 0 } yours)
+            MatchupText = (MatchupText.Length > 0 ? MatchupText + ". " : "") + $"Your games against {against.Name}: {yours}.";
         CounterHeader = report.Opponent is null ? "" : $"GOOD PICKS VS {report.Opponent.Name.ToUpperInvariant()}";
         CounterPicks = report.CounterPicks
-            .Select(c => new CounterRow(c.Champion.Name, data.ChampionIconUrl(c.Champion.Id), $"{c.WinRate:P1}", $"{c.Games:N0} games", c.YouPlayIt))
+            .Select(c => new CounterRow(c.Champion.Name, data.ChampionIconUrl(c.Champion.Id), $"{c.WinRate:P1}",
+                YourRecord(c.Champion.Key) is { Length: > 0 } record ? record : $"{c.Games:N0} games", c.YouPlayIt))
             .ToList();
         EnemyRoles = report.EnemyRoles.Count == 0
             ? ""

@@ -38,6 +38,10 @@ For playing on one screen there's a compact mode, with just the next item, what 
 
 <img src="docs/screenshots/compact.png" alt="Compact mode" width="400">
 
+Between games it recaps the last one, with how much of LeagueClanker's build you followed, and shows your record per champion. In champ select your record against the enemy laner shows up next to the matchup:
+
+<img src="docs/screenshots/history.png" alt="Last game recap and your champions" width="400">
+
 The screenshots come from the demo snapshots in `samples/`, not a live game.
 
 ## Download
@@ -77,6 +81,12 @@ dotnet run --project src/LeagueClanker.App -- --champselect samples/champselect/
 `samples/champselect/top-vs-darius.json` is a top laner who hasn't locked in yet, against a Darius, so it shows counter picks. `samples/champselect/ban-phase.json` is the same player during bans, with an all-AD team. `samples/champselect/swiftplay.json` is a Swiftplay lobby with two champions.
 
 `samples/arena/jinx-round5.json` is an Arena game and `samples/mayhem/ashe-classic.json` an ARAM: Mayhem Classic game.
+
+`--games` shows a copy of a saved game history instead of your own, so the recap and your champions appear without playing. It combines with `--champselect`:
+
+```bash
+dotnet run --project src/LeagueClanker.App -- --games samples/history/games.json
+```
 
 Point it at a folder to replay snapshots in order, one every 10 seconds. `samples/pivot-demo` is a Garen game where the enemy team switches from AD to AP items, which triggers a pivot suggestion:
 
@@ -124,6 +134,12 @@ dotnet run --project src/LeagueClanker.Cli -- --matchup - --position top --enemi
 dotnet run --project src/LeagueClanker.Cli -- --scan samples/mayhem/offer-mock.png --verbose
 ```
 
+`--history` prints your record per champion and per lane opponent, from the League client's match history and the games the app saved. Give it a file to read other saved games instead:
+
+```bash
+dotnet run --project src/LeagueClanker.Cli -- --history samples/history/games.json
+```
+
 To turn one of your own games into a sample, save the API response while in a match:
 
 ```bash
@@ -148,7 +164,7 @@ During a game the app reads Riot's official Live Client Data API on localhost, a
 
 In champ select it reads the League client's local API, the same one Porofessor, Blitz and Mobalytics use to import runes. The only things it changes are what *Apply* writes: your rune page, your summoner spells and an item set for the shop. With *Apply automatically* turned on in the settings, that happens when you lock in. Riot doesn't document that API, but it has tolerated rune importers for years.
 
-It only uses what the client shows you: picks as they lock in, your own role, mastery and champions. It doesn't try to reveal what champ select hides, like player names in ranked or enemy picks in blind pick. That's what gets tools banned, while counters and matchup stats are what every approved app shows.
+It also reads your own match history from that API, for your record per champion. It only uses what the client shows you: picks as they lock in, your own role, mastery, champions and past games. It doesn't try to reveal what champ select hides, like player names in ranked or enemy picks in blind pick. That's what gets tools banned, while counters and matchup stats are what every approved app shows.
 
 Riot's third-party policy allows apps that highlight decisions with multiple choices rather than dictate them. That's why every suggestion comes with an alternative and a reason.
 
@@ -231,6 +247,16 @@ The same source decides the rest of what *Apply* writes. The settings choose whi
 - **Tips.** Once all six item slots hold finished items, it suggests swapping your weakest item when a new one scores at least a point higher for this game. From 25 minutes, with 500 gold spare, it suggests an elixir for your playstyle. Supports, junglers and full builds get a reminder to carry a Control Ward.
 - **op.gg's popular items.** With op.gg as the stats source, the two most played cores for your champion get a small nudge in the ranking (the `PopularItemsRule`). The game's situations still decide, so a popular item that doesn't fit this game stays low. You can turn this off in the settings.
 - **Compact mode.** The ▭ button in the title bar shrinks the window to the next item, what to buy and the matchup.
+
+### Between games: recap and your stats
+
+`History/` keeps track of the games you play. While a game runs, `GameRecorder` notes every item LeagueClanker put in your build and every pivot you took or turned down. When the game's API goes away, it writes a recap to `%LOCALAPPDATA%\LeagueClanker\games.json`, which keeps your last 200 games. Games under 5 minutes, like remakes and Practice Tool peeks, get no recap. The result comes from the game's end event. When the app misses it, for example because you left early, the recap has no result and doesn't count toward your record.
+
+The recap says who you laned against, your final legendary items and boots, how many of them were in LeagueClanker's build, and each pivot with its time. It shows whenever you're not in champ select or a game.
+
+Your record per champion counts Summoner's Rift games only, normal, ranked and Swiftplay. It combines two sources. The recaps cover every game the app watched. When the League client is running, the app also reads your last 30 games from its match history, with the full scoreboard of the 15 newest to find your lane opponent. A game in both counts once (the same champion, starting within 10 minutes). The window lists your 6 most played champions.
+
+In champ select, counter picks you've played at least 3 times (`PersonalStats.MinGames`) show your record instead of the game count. The matchup line adds your record against the enemy laner once you've met them.
 
 ### Settings, logs and snapshots
 
@@ -369,6 +395,8 @@ To add a rule, implement `IBuildRule`, return a `Situation` with a label, a sent
 - In League Classic, champion knowledge (roles, healers, crowd control) and base stats describe today's champions, not the old kits.
 - Runes and masteries aren't read in any mode, so they're missing from everyone's stats but yours.
 - The limited "Classic ARAM" variant, with classic items on Howling Abyss, gets the normal ARAM items.
+- Reading the match history has been tested against saved responses, not yet against a real client. Lane opponents from the history come from the 15 newest games only.
+- The recap's lane opponent is the enemy the game puts in your role. In games without roles, or when the game guesses wrong, it's missing or wrong.
 
 ## Legal
 

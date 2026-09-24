@@ -156,7 +156,7 @@ $shots = [ordered]@{
         $p
     }
     champselect = {
-        $p = Start-App "--champselect", "samples/champselect/top-vs-darius.json"
+        $p = Start-App "--champselect", "samples/champselect/top-vs-darius.json", "--games", "samples/history/games.json"
         Start-Sleep -Seconds 8
         Save-Window $p "champselect.png"
         $p
@@ -165,6 +165,12 @@ $shots = [ordered]@{
         $p = Start-App "--champselect", "samples/champselect/ban-phase.json"
         Start-Sleep -Seconds 8
         Save-Window $p "draft.png"
+        $p
+    }
+    history = {
+        $p = Start-App "--games", "samples/history/games.json"
+        Start-Sleep -Seconds 6
+        Save-Window $p "history.png"
         $p
     }
     settings = {

@@ -95,11 +95,16 @@
         <DockPanel>
             <!-- Title bar: drag to move -->
             <Grid DockPanel.Dock="Top" Height="34" Background="Transparent" MouseLeftButtonDown="OnTitleBarMouseDown">
-                <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="12,0,0,0">
-                    <TextBlock Text="LeagueClanker" FontWeight="SemiBold" Foreground="{StaticResource AccentBrush}" />
-                    <TextBlock Text="{Binding Status}" Foreground="{StaticResource MutedBrush}" FontSize="11" Margin="10,1,0,0" VerticalAlignment="Center" />
-                </StackPanel>
-                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,0,6,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <DockPanel VerticalAlignment="Center" Margin="12,0,4,0">
+                    <TextBlock DockPanel.Dock="Left" Text="LeagueClanker" FontWeight="SemiBold" Foreground="{StaticResource AccentBrush}" />
+                    <TextBlock Text="{Binding Status}" ToolTip="{Binding Status}" Foreground="{StaticResource MutedBrush}" FontSize="11" Margin="10,1,0,0"
+                               VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                </DockPanel>
+                <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,0,6,0">
                     <Button Style="{StaticResource ChromeButton}" Content="&#x2913;" ToolTip="Save a snapshot of what the app sees (for bug reports)"
                             Click="OnSaveSnapshot" AutomationProperties.Name="Save snapshot" />
                     <Button Style="{StaticResource ChromeButton}" Content="&#x25AD;" ToolTip="Compact mode: just the next item, what to buy and the matchup"
@@ -121,6 +126,42 @@
             </StackPanel>
 
             <Grid>
+            <!-- ===== Between games: the last game's recap and your champions ===== -->
+            <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="12,0,12,0"
+                          Visibility="{Binding ShowHistory, Converter={StaticResource BoolToVisibility}}">
+                <StackPanel Margin="0,2,0,6">
+                    <StackPanel Visibility="{Binding LastGameTitle, Converter={StaticResource HasContent}}">
+                        <TextBlock Style="{StaticResource SectionHeader}" Text="LAST GAME" Margin="0,4,0,5" />
+                        <TextBlock Text="{Binding LastGameTitle}" FontSize="14" FontWeight="SemiBold" TextWrapping="Wrap" />
+                        <ItemsControl ItemsSource="{Binding LastGameLines}" Margin="0,4,0,0">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding}" FontSize="11" TextWrapping="Wrap" Margin="0,0,0,3" Foreground="{StaticResource MutedBrush}" />
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                    <StackPanel Visibility="{Binding ChampionStats, Converter={StaticResource HasContent}}">
+                        <TextBlock Style="{StaticResource SectionHeader}" Text="YOUR CHAMPIONS" />
+                        <ItemsControl ItemsSource="{Binding ChampionStats}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate DataType="{x:Type local:ChampionStatRow}">
+                                    <Border Background="{StaticResource CardBrush}" CornerRadius="4" Padding="6,3" Margin="0,0,0,3">
+                                        <DockPanel>
+                                            <TextBlock DockPanel.Dock="Right" Text="{Binding WinRate}" FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center" Margin="8,0,0,0" />
+                                            <TextBlock DockPanel.Dock="Right" Text="{Binding Record}" Foreground="{StaticResource MutedBrush}" FontSize="11" VerticalAlignment="Center" />
+                                            <Image Source="{Binding IconUrl}" Width="20" Height="20" />
+                                            <TextBlock Text="{Binding Name}" FontSize="11" Margin="6,0,0,0" VerticalAlignment="Center" />
+                                        </DockPanel>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <TextBlock Text="{Binding StatsNote}" Foreground="{StaticResource MutedBrush}" FontSize="10" TextWrapping="Wrap" />
+                    </StackPanel>
+                </StackPanel>
+            </ScrollViewer>
+
             <!-- ===== Champ select: playstyle and rune page ===== -->
             <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="12,0,12,0"
                           Visibility="{Binding ShowChampSelect, Converter={StaticResource BoolToVisibility}}">

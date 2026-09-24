@@ -1,6 +1,7 @@
 using LeagueClanker.Core;
 using LeagueClanker.Core.Analysis;
 using LeagueClanker.Core.Augments;
+using LeagueClanker.Core.History;
 using LeagueClanker.Core.ItemSets;
 using LeagueClanker.Core.LeagueClient;
 using LeagueClanker.Core.LiveClient;
@@ -30,6 +31,8 @@ using LeagueClanker.Vision;
 //   LeagueClanker.Cli --matchup <champion | -> --position top --enemies "A;B;C" [--allies "D;E"] [--hover] [--ban]
 //                                             guess enemy roles, show your lane matchup, or counter picks with "-" or --hover;
 //                                             --allies adds the team comp check, --ban adds ban suggestions
+//   LeagueClanker.Cli --history [games.json]  your Summoner's Rift record per champion and lane opponent, from the League
+//                                             client's match history plus the app's saved games (or the given file)
 
 Console.OutputEncoding = System.Text.Encoding.UTF8;
 using var cts = new CancellationTokenSource();
@@ -74,6 +77,36 @@ if (args is ["--runes", var championName, ..])
     var request = new RuneRequest(champion, ParseStyle(Option("--style")) ?? Playstyles.Default(champion, position), position, mode) { Enemies = enemies };
     PrintRunes(request, await RuneAdvisorFor().RecommendAsync(request, RuneSource(), cts.Token));
     await PrintExtrasAsync(new ChampSelectState(champion, position, mode, [], enemies), request.Playstyle);
+    return;
+}
+
+if (args is ["--history", ..])
+{
+    IReadOnlyList<PlayedGame> history = [];
+    using (var client = LeagueClientApi.TryConnect())
+    {
+        if (client is null)
+            Console.WriteLine("The League client isn't running, so only saved games count.");
+        else
+            history = await client.GetMatchHistoryAsync(games: 30, withDetails: 15, cts.Token);
+    }
+    var recapsPath = args.Length > 1 ? args[1]
+        : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "LeagueClanker", "games.json");
+    var recaps = new RecapStore(recapsPath).Games;
+    Console.WriteLine($"{history.Count} games from the match history, {recaps.Count} saved by the app.\n");
+    foreach (var game in history)
+        Console.WriteLine($"  {game.Played:yyyy-MM-dd HH:mm}  {data.Champions.GetByKey(game.ChampionKey)?.Name,-12} {(game.Win ? "win " : "loss")}  "
+                          + $"{game.Position.DisplayName(),-8} vs {(game.OpponentKey is { } o ? data.Champions.GetByKey(o)?.Name : "?")}");
+
+    var stats = PersonalStats.Combine(recaps, history, data.Champions);
+    Console.WriteLine($"\nYour champions ({stats.Games.Count} games):");
+    foreach (var (key, record) in stats.Champions())
+        Console.WriteLine($"  {data.Champions.GetByKey(key)?.Name,-12} {record,-8} {record.WinRate:P0}");
+    var opponents = stats.Games.Where(g => g.OpponentKey is not null).Select(g => g.OpponentKey!.Value).Distinct()
+        .Select(k => (Key: k, Record: stats.Against(k))).Where(o => o.Record.Games >= PersonalStats.MinGames).OrderByDescending(o => o.Record.Games);
+    Console.WriteLine("\nLane opponents you've met 3 times or more:");
+    foreach (var (key, record) in opponents)
+        Console.WriteLine($"  {data.Champions.GetByKey(key)?.Name,-12} {record,-8} {record.WinRate:P0}");
     return;
 }
 
