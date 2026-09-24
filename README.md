@@ -112,7 +112,7 @@ For ARAM: Mayhem augments, give it a snapshot, the offered cards, and the cards 
 dotnet run --project src/LeagueClanker.Cli -- --mayhem samples/mayhem/jinx-level7.json --picked "It's Critical" --offer "Critical Rhythm;Recursion;Celestial Body"
 ```
 
-Add `--rerolled "Recursion"` for cards whose reroll is used up, and `--golden "Celestial Body"` for the card with the golden reroll.
+Add `--rerolled "Recursion"` for cards whose reroll is used up, and `--golden "Celestial Body"` for the card with the golden reroll. It uses arammayhem.com's win rates unless you add `--no-community`.
 
 For rune pages, name a champion. Add a role, a playstyle, the mode or enemies to see how the page changes, and `--source rules` to skip op.gg. It also prints the summoner spells, skill order and shop item set that *Apply* would write:
 
@@ -133,6 +133,8 @@ dotnet run --project src/LeagueClanker.Cli -- --matchup - --position top --enemi
 ```bash
 dotnet run --project src/LeagueClanker.Cli -- --scan samples/mayhem/offer-mock.png --verbose
 ```
+
+`samples/mayhem/offer-1440p.png` is a real offer at 2560x1440, the kind plain text recognition couldn't read.
 
 `--history` prints your record per champion and per lane opponent, from the League client's match history and the games the app saved. Give it a file to read other saved games instead:
 
@@ -173,6 +175,8 @@ In champ select it reads the League client's local API, the same one Porofessor,
 It also reads your own match history from that API, for your record per champion, and the client's language, to read augment cards in it. It only uses what the client shows you: picks as they lock in, your own role, mastery, champions and past games. It doesn't try to reveal what champ select hides, like player names in ranked or enemy picks in blind pick. That's what gets tools banned, while counters and matchup stats are what every approved app shows.
 
 Riot's third-party policy allows apps that highlight decisions with multiple choices rather than dictate them. That's why every suggestion comes with an alternative and a reason.
+
+One setting goes against that policy: Riot asks apps not to show augment win rates during a game, and LeagueClanker starts its Mayhem card scores from arammayhem.com's win rates. It's on by default because this is a local tool. Turn off *Start Mayhem augment scores from arammayhem.com's win rates* in the settings to score cards from their effects alone.
 
 ## How it works
 
@@ -254,7 +258,10 @@ The same source decides the rest of what *Apply* writes. The settings choose whi
 - **Starting items.** In the first two minutes of a Summoner's Rift game, before you buy anything, it shows what to start with: op.gg's most played start, or a Doran's item, a jungle pet or World Atlas.
 - **Tips.** Once all six item slots hold finished items, it suggests swapping your weakest item when a new one scores at least a point higher for this game. From 25 minutes, with 500 gold spare, it suggests an elixir for your playstyle. Supports, junglers and full builds get a reminder to carry a Control Ward.
 - **op.gg's popular items.** With op.gg as the stats source, the two most played cores for your champion get a small nudge in the ranking (the `PopularItemsRule`). The game's situations still decide, so a popular item that doesn't fit this game stays low. You can turn this off in the settings.
-- **Compact mode.** The ▭ button in the title bar shrinks the window to the next item, what to buy and the matchup.
+- **Your items and slots.** A "You have" row shows your finished items and boots. The plan below it only lists what fits in your remaining slots, and when all six are full it points to the swap tips.
+- **Other ways to go.** Under your plan, up to 3 alternatives each take the build a different way: an answer to the game ("Vs tanks: Void Staff") or a different kind of item ("Tankier: Zhonya's Hourglass", "More AP: Rabadon's Deathcap").
+- **Finishing what you started.** When you own parts worth at least a quarter of an item in your plan (`BuildPlanner.StartedShare`), that item comes next, and a pivot won't drop it. An item also needs to outscore the one ahead of it by 0.5 (`ReorderMargin`) to move ahead, so two close items don't swap places every time your stats change.
+- **Compact mode.** The ▭ button in the title bar shrinks the window to the next item, what to buy and the matchup. When augment cards are on screen, it shows which to take and which to reroll above that.
 
 ### Between games: recap and your stats
 
@@ -262,13 +269,13 @@ The same source decides the rest of what *Apply* writes. The settings choose whi
 
 The recap says who you laned against, your final legendary items and boots, how many of them were in LeagueClanker's build, and each pivot with its time. It shows whenever you're not in champ select or a game.
 
-Your record per champion counts Summoner's Rift games only, normal, ranked and Swiftplay. It combines two sources. The recaps cover every game the app watched. When the League client is running, the app also reads your last 30 games from its match history, with the full scoreboard of the 15 newest to find your lane opponent. A game in both counts once (the same champion, starting within 10 minutes). The window lists your 6 most played champions.
+Your record per champion counts Summoner's Rift games only: normal, ranked, Swiftplay and League Classic. League Classic shows up in the match history as "JADE" on map 453, with champion ids from 60000 (60021 is Miss Fortune). It combines two sources. The recaps cover every game the app watched. When the League client is running, the app also reads your last 30 games from its match history (20 per request), with the full scoreboard of the 15 newest to find your lane opponent. A game in both counts once (the same champion, starting within 10 minutes). The window lists your 6 most played champions.
 
 In champ select, counter picks you've played at least 3 times (`PersonalStats.MinGames`) show your record instead of the game count. The matchup line adds your record against the enemy laner once you've met them.
 
 ### Settings, logs and snapshots
 
-The gear in the title bar opens the settings: the stats source, what *Apply* writes, *Apply automatically*, compact mode, op.gg's popular items, sounds, and the update check. Settings are saved in `%LOCALAPPDATA%\LeagueClanker\settings.json`.
+The gear in the title bar opens the settings: the stats source, what *Apply* writes, *Apply automatically*, compact mode, op.gg's popular items, arammayhem.com's augment win rates, sounds, and the update check. Settings are saved in `%LOCALAPPDATA%\LeagueClanker\settings.json`.
 
 <img src="docs/screenshots/settings.png" alt="Settings" width="400">
 
@@ -310,7 +317,7 @@ What changes in League Classic:
 
 ### ARAM: Mayhem and Arena augments
 
-The app reads the offer off your screen. In Mayhem, once you reach a pick level (3, 7, 11 or 15) without having taken that many cards, it screenshots the League window every 2 seconds and runs Windows' built-in text recognition on it. That takes about 130 ms. It only looks at the middle of the screen, which skips chat and the HUD, and it blacks out its own window so it never reads its own suggestions. `AugmentTextMatcher` matches the text against the card names by edit distance. That way OCR slips like "CRITICA1" and names that wrap over two lines still count, and a stray card name of another tier elsewhere on screen is ignored.
+The app reads the offer off your screen. In Mayhem, once you reach a pick level (3, 7, 11 or 15) without having taken that many cards, it screenshots the League window every 2 seconds and runs Windows' built-in text recognition on it. The cards have light text on dark, glowing art, which plain recognition often can't read, so it first reads a black and white version of the screen where only bright pixels stay (`ScreenImage.HighContrast`), and the plain image when that finds fewer than three cards. That takes about 130 ms, twice that when both run. It only looks at the middle of the screen, which skips chat and the HUD, and it blacks out its own window so it never reads its own suggestions. `AugmentTextMatcher` matches the text against the card names by edit distance. That way OCR slips like "CRITICA1" and names that wrap over two lines still count, and a stray card name of another tier elsewhere on screen is ignored.
 
 The League client can run in another language. When it does, the app asks the client for its language and downloads the card names in it from Community Dragon (`AugmentTranslations`), joined to the English names on each card's id. That covers 223 of 225 Mayhem cards and 253 of 257 Arena cards. Text recognition then runs in that language, which Windows can only do when the language is installed (Settings, Time & language, Language & region). Without it, the Augments tab says so and reads in English, which still catches names that stay the same. You can also type a card's name in your language. When cards show up, the app switches to the Augments tab with a chime. A reroll changes the offer, and the ranking follows.
 
@@ -318,14 +325,17 @@ Arena offers augments between rounds, and the game doesn't report rounds. So in 
 
 It can't see which card you click, only that the cards disappeared, so it asks. Press *I picked this* on the card you took and it joins your cards for the next offer. When one or two cards change while the rest stay, those were rerolls: they're marked as used up and the advice updates.
 
-You can always type cards instead: type part of a name and mark each match as *Offered* (on screen now) or *Picked* (you already have it). Enter adds the top match to the offer. After rerolling a card in game, press *Rerolled* on it and type the card you got. That covers misread names, cards you picked before starting the app, and exclusive fullscreen, where screenshots come back black.
+*Read cards now* next to the search box reads the screen right away, even when no pick is due, and says so when it finds no cards. You can always type cards instead: type part of a name and mark each match as *Offered* (on screen now) or *Picked* (you already have it). Enter adds the top match to the offer. After rerolling a card in game, press *Rerolled* on it and type the card you got. That covers misread names, cards you picked before starting the app, and exclusive fullscreen, where screenshots come back black.
 
-`Augments/` ranks the three cards in an augment offer by the best final set of four they lead to, without win rates:
+`Augments/` ranks the three cards in an augment offer by the best final set of four they lead to:
 
 1. `AugmentDataClient` downloads the wiki's augment data (225 Mayhem cards, 257 Arena cards) and caches it for a day. Riot's own data has neither.
 2. `AugmentTagger` tags each card with what it gives (attack speed, true damage, shields, ...) and what it needs or scales with (attacking, crits, pets, AP ratio, ...), from the description text. A hand-kept list fixes cards the patterns misread and tags cards the wiki describes by what they do rather than by stats. Only random and economy cards (transmutes, Pandora's Box, rerolls, gold) stay untagged: 17 in Arena and 6 in Mayhem.
-3. `AugmentScorer` values a card by its fit with your champion, its pairings with the cards you picked (a card that pays off on attacks wants attack speed), your items (on-hit items, "Upgrade Infinity Edge"), and the game situation from the item rules.
-4. `AugmentAdvisor` simulates your remaining picks 1,500 times per option with Mayhem's rules: picks at levels 3, 7, 11 and 15, one tier per offer, the first two offers never both Silver, one reroll per card. It ranks each option by the average value of the final set. That's how a weaker card that sets up combos can beat a stronger card that leads nowhere.
+3. In Mayhem, `CommunityAugments` gives each card a starting score from arammayhem.com: 0.2 points per percentage point of win rate above or below 50%, at most 1.5 either way, so a 54% card gets +0.8 and a 44% card -1.1. A card that's among the ones players of your champion take most gets another 0.4. The pages are cached for a day. Without them, or with the setting off, cards score from their effects alone.
+4. `AugmentScorer` values a card by its fit with your champion, its pairings with the cards you picked (a card that pays off on attacks wants attack speed), your items (on-hit items, "Upgrade Infinity Edge"), and the game situation from the item rules.
+5. `AugmentAdvisor` simulates your remaining picks 1,500 times per option with Mayhem's rules: picks at levels 3, 7, 11 and 15, one tier per offer, the first two offers never both Silver, one reroll per card. It ranks each option by the average value of the final set. That's how a weaker card that sets up combos can beat a stronger card that leads nowhere. When two options' averages are within 0.2 (`AugmentAdvisor.CloseCall`), which is simulation noise, the card that's stronger right now goes first.
+
+Cards built around something only some champions have (spinning abilities, pets, stealth, stacks) score by that alone: Spin To Win fits Garen fully, whatever else it mentions. Cards that replace Flash or Mark with another summoner spell count that as a cost.
 
 Card tier odds aren't published, so the simulation treats Silver, Gold and Prismatic as equally likely.
 
@@ -388,23 +398,23 @@ To add a rule, implement `IBuildRule`, return a `Situation` with a label, a sent
 - Only stats, keyword traits and the passives `ItemScaling` can read count. Stacks without a number in the description (Heartsteel's health, Mejai's Glory) and mana-based passives (Archangel's Staff, Manamune) are invisible to the scorer. The core-item bonus papers over some of this.
 - "Buy now" plans toward your next item only. It doesn't pick up a cheap part of a later item when your gold doesn't fit the next one.
 - Your own archetype comes from Riot's class tags plus a short override list. Off-meta picks like AP Shaco get the wrong item pool. A manual archetype picker in the window would fix it.
-- Riot's policy rules out showing win rates for augments and Arena items, so the augment advisor reasons from card effects only.
+- Community win rates cover Mayhem only. Arena cards still score from their effects alone. The win rates are over all champions; only "a top pick on your champion" is champion-specific.
 - In Arena the whole lobby counts as enemies, because the API doesn't show your duo partner. Rules that count enemies (tanks, healers) fire more easily with 15 of them.
 - Swiftplay slot writing has been tested against a simulated client only, like the rest of what *Apply* writes.
 - Augment tags come from description text. Expect some cards to be tagged wrong until they've been reviewed with `--augments`.
 - Screen reading in other languages has been tested with typed and simulated text only, not on a real non-English client. Reading the client's language needs the League client running.
-- Screen reading has only been tested on a mock screenshot, not on real games yet.
+- Screen reading has been tested in real ARAM: Mayhem games at 2560x1440 in borderless mode. Other resolutions and Arena's card layout haven't been tried yet.
 - The core-item lists and weights are my best guess for patch 16.18. Real win-rate data per matchup would beat them.
-- Writing rune pages, summoner spells and item sets has been tested against a simulated client, not yet against a real one. The client's local API and op.gg's JSON API are both undocumented and can change.
+- Writing rune pages and item sets works in a real client (the item set sits next to other apps' sets, which stay untouched). Summoner spells and Swiftplay slots have only been tested against a simulated client. The client's local API and op.gg's JSON API are both undocumented and can change.
 - Enemy roles are guessed until the game starts. Flex picks (a mid Gragas, a top Seraphine) can land in the wrong role, and so can the lane opponent.
 - The team comp check reads champion classes, a hand-kept crowd control list and the ability tooltips. A champion with one strong stun that isn't on the list counts as having little crowd control, because the tooltips need 3 abilities with it.
 - The rule pages and keystone lists are hand-made for patch 16.19. New keystones need adding to `KeystoneFit` before op.gg pages with them are used.
 - Rune pages assume today's runes. League Classic's old runes and masteries aren't supported.
-- League Classic's mode string is unverified until someone saves a snapshot from a real game (see *Running it from source*). The classic-item check covers the likely cases.
+- League Classic's match history says "JADE" on map 453. The live game's mode string hasn't been captured yet, but the app detects the mode by map 453 and the classic items either way.
 - In League Classic, champion knowledge (roles, healers, crowd control) and base stats describe today's champions, not the old kits.
 - Runes and masteries aren't read in any mode, so they're missing from everyone's stats but yours.
 - The limited "Classic ARAM" variant, with classic items on Howling Abyss, gets the normal ARAM items.
-- Reading the match history has been tested against saved responses, not yet against a real client. Lane opponents from the history come from the 15 newest games only.
+- Lane opponents from the match history come from the 15 newest games only.
 - The recap's lane opponent is the enemy the game puts in your role. In games without roles, or when the game guesses wrong, it's missing or wrong.
 
 ## Legal
@@ -414,6 +424,8 @@ Augment data comes from the League of Legends Wiki under CC BY-SA 3.0: [Mayhem](
 Rune pages, summoner spells, skill orders, starting and core items, role play rates and matchups come from [op.gg](https://www.op.gg). LeagueClanker isn't affiliated with op.gg.
 
 Augment names in other languages come from [Community Dragon](https://www.communitydragon.org). LeagueClanker isn't affiliated with Community Dragon.
+
+Mayhem augment win rates and champion favorites come from [arammayhem.com](https://arammayhem.com). LeagueClanker isn't affiliated with arammayhem.com.
 
 
 LeagueClanker isn't endorsed by Riot Games and doesn't reflect the views or opinions of Riot Games or anyone officially involved in producing or managing Riot Games properties. Riot Games, and all associated properties are trademarks or registered trademarks of Riot Games, Inc.

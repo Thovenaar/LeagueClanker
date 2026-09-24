@@ -16,7 +16,7 @@ internal static partial class AugmentTagger
     [
         new(AugmentEffect.AttackDamage, AugmentTrigger.AttackDamage, new(@"attack damage|\bAD\b", RegexOptions.Compiled)),
         new(AugmentEffect.AbilityPower, AugmentTrigger.AbilityPower, new(@"ability power|\bAP\b", RegexOptions.Compiled)),
-        new(AugmentEffect.AttackSpeed, AugmentTrigger.None, new(@"attack speed", RegexOptions.Compiled)),
+        new(AugmentEffect.AttackSpeed, AugmentTrigger.Attacks, new(@"attack speed", RegexOptions.Compiled)),
         new(AugmentEffect.CritChance, AugmentTrigger.Crits, new(@"critical strike chance", RegexOptions.Compiled)),
         new(AugmentEffect.CritDamage, AugmentTrigger.None, new(@"critical (strike )?damage", RegexOptions.Compiled)),
         new(AugmentEffect.AbilityHaste, AugmentTrigger.AbilityHaste, new(@"(?<!item |summoner spell )ability haste", RegexOptions.Compiled)),
@@ -64,7 +64,7 @@ internal static partial class AugmentTagger
         (AugmentTrigger.AllySupport, new(@"(heal|shield|buff)[^.]{0,40}\b(ally|allies|allied)\b|\b(ally|allies|allied)\b[^.]{0,40}(heal|shield)", RegexOptions.Compiled | RegexOptions.IgnoreCase)),
         (AugmentTrigger.Shields, new(@"upon gaining a shield|your heals and shields", RegexOptions.Compiled | RegexOptions.IgnoreCase)),
         (AugmentTrigger.LowHealth, new(@"below \d+% (of your )?maximum health|missing health|dropping below", RegexOptions.Compiled | RegexOptions.IgnoreCase)),
-        (AugmentTrigger.Immobilize, new(@"immobiliz|grounding", RegexOptions.Compiled | RegexOptions.IgnoreCase)),
+        (AugmentTrigger.Immobilize, new(@"(?<!you become |you are |affected by any )immobiliz|grounding", RegexOptions.Compiled | RegexOptions.IgnoreCase)),
         (AugmentTrigger.Takedowns, new(@"takedown|\bkill", RegexOptions.Compiled | RegexOptions.IgnoreCase)),
         (AugmentTrigger.Dashes, new(@"dashing|blinking|abilities with dashes|dashes or blinks", RegexOptions.Compiled | RegexOptions.IgnoreCase)),
         (AugmentTrigger.Pets, new(@"\bpets?\b", RegexOptions.Compiled | RegexOptions.IgnoreCase)),
@@ -97,6 +97,8 @@ internal static partial class AugmentTagger
             ["Stats on Stats on Stats!"] = (AugmentEffect.AdaptiveForce | AugmentEffect.Health | AugmentEffect.AbilityHaste, AugmentTrigger.None, AugmentEffect.None),
             // Only worth it for champions whose kit has a shield.
             ["Bolstered"] = (AugmentEffect.Shield, AugmentTrigger.Shields, AugmentEffect.None),
+            // Heroic Swing's shots apply your on-hit effects at 25%: a dash with some damage, not an on-hit card.
+            ["Spin Me Right Round"] = (AugmentEffect.Dash | AugmentEffect.Damage, AugmentTrigger.None, AugmentEffect.OnHit),
 
             // Cards the patterns miss because the wiki describes them by what they do, not by stat names.
             ["All For You"] = (AugmentEffect.HealShieldPower, AugmentTrigger.AllySupport, AugmentEffect.None),
@@ -141,6 +143,13 @@ internal static partial class AugmentTagger
             ["Wisdom of Ages"] = (AugmentEffect.AdaptiveForce | AugmentEffect.Health, AugmentTrigger.None, AugmentEffect.None),
         };
 
+    /// <summary>Triggers the patterns read into a card that it doesn't have.</summary>
+    private static readonly Dictionary<string, AugmentTrigger> WrongTriggers = new(StringComparer.OrdinalIgnoreCase)
+    {
+        // Its shots scale with attack speed, but the card doesn't ask you to attack.
+        ["Spin Me Right Round"] = AugmentTrigger.Attacks,
+    };
+
     public static AugmentInfo Tag(string name, Dictionary<string, object?> entry, ItemCatalog? items)
     {
         var rawDescription = entry.GetValueOrDefault("description") as string ?? "";
@@ -156,6 +165,8 @@ internal static partial class AugmentTagger
             effects = (effects | fix.Add) & ~fix.Remove;
             triggers |= fix.AddTriggers;
         }
+        if (WrongTriggers.TryGetValue(name, out var wrong))
+            triggers &= ~wrong;
 
         return new AugmentInfo
         {
@@ -224,7 +235,7 @@ internal static partial class AugmentTagger
     [GeneratedRegex(@"(?<=[.!?])\s+")]
     private static partial Regex SentenceRegex();
 
-    [GeneratedRegex(@"(per [\d.]+ (bonus |maximum )?|equal to [\d.]+% (of your )?(bonus |total |maximum )?|\(\+ [\d.]+% (bonus |of your )?(maximum )?|% of your (bonus |maximum )?|convert all of your (bonus )?|based on your (bonus |missing )?)$")]
+    [GeneratedRegex(@"(per [\d.]+%? (bonus |maximum )?|equal to [\d.]+% (of your )?(bonus |total |maximum )?|\(\+ [\d.]+% (bonus |of your )?(maximum )?|% of your (bonus |maximum )?|convert all of your (bonus )?|based on your (bonus |missing )?)$")]
     private static partial Regex ScalingRegex();
 
     [GeneratedRegex(@"([\d.]+%?|[\d.]+ to [\d.]+) (bonus |total |maximum |increased )?$")]
@@ -239,7 +250,7 @@ internal static partial class AugmentTagger
     [GeneratedRegex(@"below [\d.]+% (of your )?(maximum )?$")]
     private static partial Regex LowHealthRegex();
 
-    [GeneratedRegex(@"\bbut\b|cannot|can no longer|permanently sealed|health cost|costs are doubled|reduce your damage", RegexOptions.IgnoreCase)]
+    [GeneratedRegex(@"\bbut\b|cannot|can no longer|permanently sealed|health cost|costs are doubled|reduce your damage|replace (a|one of your) summoner spells?", RegexOptions.IgnoreCase)]
     private static partial Regex DrawbackRegex();
 
     [GeneratedRegex(@"random [\w-]+ augments?|random augments?|random Prismatic|random Gold", RegexOptions.IgnoreCase)]

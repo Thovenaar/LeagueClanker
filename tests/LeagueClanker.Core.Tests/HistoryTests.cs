@@ -123,6 +123,20 @@ public class HistoryTests
     }
 
     [Fact]
+    public void MatchHistory_CountsLeagueClassic()
+    {
+        // A real client reports League Classic as "JADE" on map 453, with champion ids from 60000.
+        var games = MatchHistory.Parse("""
+            {"games": {"games": [
+              {"gameId": 21, "gameMode": "JADE", "mapId": 453, "gameCreation": 1790000000000,
+               "participants": [{"participantId": 6, "championId": 60222, "stats": {"win": true}, "timeline": {"lane": "BOTTOM", "role": "CARRY"}}]}
+            ]}}
+            """, puuid: null);
+
+        Assert.Equal((222, Position.Bottom), (games.Single().ChampionKey, games.Single().Position)); // League Classic's 60222 is Jinx
+    }
+
+    [Fact]
     public void Analyze_ReadsTheResultFromTheGameEndEvent()
     {
         var game = TestData.Game(allies: [("Garen", [])], enemies: [("Annie", [])]);

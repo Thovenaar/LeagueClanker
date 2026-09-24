@@ -35,6 +35,8 @@ public partial class MainWindow : Window
         _ => "",
     };
 
+    private void OnScanNow(object sender, RoutedEventArgs e) => ViewModel.Augments.RequestScan();
+
     private void OnOfferSuggestion(object sender, RoutedEventArgs e) => ViewModel.Augments.AddToOffer(CardName(sender));
 
     private void OnPickedSuggestion(object sender, RoutedEventArgs e) => ViewModel.Augments.AddToPicked(CardName(sender));

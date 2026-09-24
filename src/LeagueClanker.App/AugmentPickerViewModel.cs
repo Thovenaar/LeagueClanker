@@ -46,6 +46,8 @@ public sealed class AugmentPickerViewModel : INotifyPropertyChanged
     private AugmentInfo? _golden;
     private readonly Queue<(int Used, bool Golden)> _pendingReplacements = new();
     private bool _offerFromScreen;
+    private bool _offerOnScreen;
+    private string _rankedFor = "";
     private int _scansWithoutOffer;
 
     private string _searchText = "";
@@ -85,6 +87,9 @@ public sealed class AugmentPickerViewModel : INotifyPropertyChanged
     public IReadOnlyList<AugmentOptionRow> Ranked { get => _ranked; private set => Set(ref _ranked, value); }
     public string AdviceText { get => _adviceText; private set => Set(ref _adviceText, value); }
 
+    /// <summary>Cards are on your screen right now. Compact mode shows the advice while this is true.</summary>
+    public bool OfferOnScreen { get => _offerOnScreen; private set => Set(ref _offerOnScreen, value); }
+
     /// <summary>"Keep X. Reroll Y and Z: ..." Empty when no card can be rerolled.</summary>
     public string RerollText { get => _rerollText; private set => Set(ref _rerollText, value); }
     public bool IsRanking { get => _isRanking; private set => Set(ref _isRanking, value); }
@@ -118,6 +123,16 @@ public sealed class AugmentPickerViewModel : INotifyPropertyChanged
         UpdateStatus(_errors.GetValueOrDefault(set));
     }
 
+    private CommunityAugments? _community;
+
+    /// <summary>Win rates from a stats site for this game's champion, or null to score from card effects alone.</summary>
+    public void SetCommunity(CommunityAugments? community)
+    {
+        _community = community;
+        _rankedFor = "";
+        _ = RankAsync();
+    }
+
     /// <summary>Called on every game update: items, levels and enemies change the ranking.</summary>
     public void SetGame(BuildRecommendation game, IReadOnlyList<ItemInfo> plannedItems)
     {
@@ -128,6 +143,14 @@ public sealed class AugmentPickerViewModel : INotifyPropertyChanged
         _level = game.Game.Me.Level;
         if (_offer.Count == 0)
             UpdateStatus(null);
+
+        // Live updates come every 2 seconds and a ranking simulates 1,500 games per card, so only rank again
+        // when something the ranking uses changed.
+        var key = $"{_level}|{string.Join(",", game.Game.Me.Items.Select(i => i.Id))}|{string.Join(",", plannedItems.Select(i => i.Id))}"
+                  + $"|{string.Join(",", game.Situations.Select(s => s.Label))}";
+        if (key == _rankedFor)
+            return;
+        _rankedFor = key;
         _ = RankAsync();
     }
 
@@ -141,6 +164,8 @@ public sealed class AugmentPickerViewModel : INotifyPropertyChanged
         _lastDetectedCards = [];
         ClearRerolls();
         _offerFromScreen = false;
+        OfferOnScreen = false;
+        _rankedFor = "";
         _scansWithoutOffer = 0;
         SearchText = "";
         Changed();
@@ -175,6 +200,9 @@ public sealed class AugmentPickerViewModel : INotifyPropertyChanged
         Changed();
     }
 
+    /// <summary>You took a card from the offer ("I picked this"), so the pick is done.</summary>
+    public event EventHandler? OfferPicked;
+
     /// <summary>You took this card from the offer: it joins your set and the offer is done.</summary>
     public void Pick(string name)
     {
@@ -184,7 +212,9 @@ public sealed class AugmentPickerViewModel : INotifyPropertyChanged
         _offer.Clear();
         ClearRerolls();
         _offerFromScreen = false;
+        OfferOnScreen = false;
         Changed();
+        OfferPicked?.Invoke(this, EventArgs.Empty);
     }
 
     /// <summary>You rerolled this card in game: it leaves the offer and the card you type next replaces it.</summary>
@@ -225,6 +255,27 @@ public sealed class AugmentPickerViewModel : INotifyPropertyChanged
     /// Result of reading the screen. A new set of cards replaces the offer (a reroll changes one card).
     /// The same cards again are ignored, so a name you corrected by hand stays corrected.
     /// </summary>
+    /// <summary>Raised by the "Read cards now" button: scan once, even when no pick is due.</summary>
+    public event EventHandler? ScanRequested;
+
+    public void RequestScan()
+    {
+        Status = "Reading your screen...";
+        ScanRequested?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>Result of a scan you asked for. Says so when nothing was found, instead of waiting quietly.</summary>
+    public void OnRequestedScan(IReadOnlyList<AugmentInfo> detected, string? problem)
+    {
+        if (detected.Count >= 2)
+        {
+            _lastDetected = null; // show it even if the same cards were read before
+            OnScan(detected, problem);
+        }
+        else
+            Status = problem ?? "No cards found on your screen. Open the offer in game, or type the cards.";
+    }
+
     public void OnScan(IReadOnlyList<AugmentInfo> detected, string? problem = null)
     {
         if (problem != _scanProblem)
@@ -253,6 +304,7 @@ public sealed class AugmentPickerViewModel : INotifyPropertyChanged
             _offer.Clear();
             _offer.AddRange(detected.Where(a => !_picked.Contains(a)));
             _offerFromScreen = true;
+            OfferOnScreen = true;
             Changed();
             Status = $"Read from your screen: {string.Join(", ", detected)}. Fix a card by removing it and typing the right one.";
             OfferDetected?.Invoke(this, EventArgs.Empty);
@@ -260,6 +312,7 @@ public sealed class AugmentPickerViewModel : INotifyPropertyChanged
         else if (detected.Count == 0 && _offerFromScreen && _offer.Count > 0 && ++_scansWithoutOffer == 2)
         {
             // We can't see which card was clicked, only that the cards are gone.
+            OfferOnScreen = false;
             Status = "The offer closed. Which card did you take? Press \"I picked this\" on it.";
         }
     }
@@ -358,6 +411,7 @@ public sealed class AugmentPickerViewModel : INotifyPropertyChanged
             Picked = _picked.ToList(),
             PlannedItems = _plannedItems,
             Situations = _game.Situations,
+            Community = _community,
         };
 
         IsRanking = true;

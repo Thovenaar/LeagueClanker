@@ -59,6 +59,9 @@ public sealed record AugmentAdvice(IReadOnlyList<AugmentOption> Ranked)
     /// <summary>Which cards to reroll before picking. Null when no card can be rerolled.</summary>
     public RerollAdvice? Reroll { get; init; }
 
+    /// <summary>The runner-up is only called "also ok" when its expected value is this close to the best card's.</summary>
+    public const double AlsoOkGap = 1.0;
+
     /// <summary>"Take X: pairs with Y, uses your crit items. Z is also ok."</summary>
     public string Text
     {
@@ -68,7 +71,7 @@ public sealed record AugmentAdvice(IReadOnlyList<AugmentOption> Ranked)
             if (Best.Partners.Count > 0 && Best.Expected - Best.Now > 0.5)
                 reasons.Add($"sets up {string.Join(" and ", Best.Partners.Take(2).Select(p => p.Name))}");
             var text = reasons.Count > 0 ? $"Take {Best.Augment.Name}: {string.Join(", ", reasons)}." : $"Take {Best.Augment.Name}.";
-            return Ranked.Count > 1 ? $"{text} {Ranked[1].Augment.Name} is also ok." : text;
+            return Ranked.Count > 1 && Ranked[0].Expected - Ranked[1].Expected < AlsoOkGap ? $"{text} {Ranked[1].Augment.Name} is also ok." : text;
         }
     }
 }
@@ -81,6 +84,9 @@ public sealed record AugmentAdvice(IReadOnlyList<AugmentOption> Ranked)
 /// <param name="augmentSet">Mayhem never offers Silver twice in a row at the start; Arena has no such rule.</param>
 public sealed class AugmentAdvisor(AugmentCatalog catalog, AugmentScorer? scorer = null, int simulations = 1500, AugmentSet augmentSet = AugmentSet.Mayhem)
 {
+    /// <summary>Expected values closer than this are a coin flip at this many simulations.</summary>
+    public const double CloseCall = 0.2;
+
     private const int TotalSelections = 4;
     private const int OfferSize = 3;
     private const int PartnerThreshold = 1; // how often a card must be picked alongside to count as a partner
@@ -123,6 +129,10 @@ public sealed class AugmentAdvisor(AugmentCatalog catalog, AugmentScorer? scorer
             .OrderByDescending(o => o.Expected)
             .ThenByDescending(o => o.Now)
             .ToList();
+
+        // Simulated futures that differ by less than the noise shouldn't decide: then the card that's better now wins.
+        if (ranked.Count > 1 && ranked[0].Expected - ranked[1].Expected < CloseCall && ranked[1].Now > ranked[0].Now)
+            (ranked[0], ranked[1]) = (ranked[1], ranked[0]);
 
         return new AugmentAdvice(ranked) { Reroll = AdviseRerolls(ranked, picked, pools, rerolls ?? new RerollState(), card => Evaluate(card, _rerollSimulations).Expected, seed) };
     }

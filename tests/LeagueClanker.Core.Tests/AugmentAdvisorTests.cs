@@ -19,6 +19,27 @@ public class AugmentAdvisorTests
     }
 
     [Fact]
+    public void ASpinningCard_FitsASpinnerFully()
+    {
+        // Spin To Win also mentions ability hits and ultimates; those shouldn't water down Garen's spin.
+        var spin = new AugmentInfo
+        {
+            Name = "Spin To Win", Tier = AugmentTier.Silver, Description = "",
+            Effects = AugmentEffect.AbilityHaste | AugmentEffect.Damage,
+            Triggers = AugmentTrigger.AbilityHits | AugmentTrigger.Ultimate | AugmentTrigger.Spinning,
+        };
+        var plain = spin with { Triggers = AugmentTrigger.AbilityHits | AugmentTrigger.Ultimate };
+        var scorer = new AugmentScorer();
+        var reasons = new List<ScoreReason>();
+
+        var garen = scorer.Value(spin, [], Context("Garen"), reasons);
+
+        Assert.True(garen > scorer.Value(plain, [], Context("Garen")), $"got {garen:0.00}");
+        Assert.Contains(reasons, r => r.Text == "Garen has spinning abilities");
+        Assert.True(scorer.Value(spin, [], Context("Jinx")) < 0.1);
+    }
+
+    [Fact]
     public void ChampionSpecificCards_OnlyScoreForChampionsThatCanUseThem()
     {
         var packLeader = TestAugments.Get("Pack Leader");

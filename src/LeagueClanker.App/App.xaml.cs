@@ -126,15 +126,38 @@ public partial class App : Application
                     : new HashSet<int>();
                 viewModel.SetOpggChampion(champion);
             }
+            // arammayhem.com's win rates for Mayhem cards, and the cards players of your champion take most.
+            async Task LoadCommunityAugmentsAsync()
+            {
+                if (liveGame is not { Mode: GameMode.AramMayhem } game || !viewModel.Settings.UseCommunityAugments)
+                {
+                    viewModel.Augments.SetCommunity(null);
+                    return;
+                }
+                try
+                {
+                    var community = await new CommunityAugmentClient().LoadAsync(game.Me.Champion.Name, _cts.Token);
+                    if (liveGame == game)
+                        viewModel.Augments.SetCommunity(community.Count > 0 ? community : null);
+                }
+                catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or IOException)
+                {
+                    Log.Error($"Loading augment win rates from {CommunityAugments.Source}", ex);
+                    viewModel.Augments.SetCommunity(null);
+                }
+            }
             viewModel.LiveChampionChanged += (_, game) =>
             {
                 liveGame = game;
                 _ = LoadLiveOpggAsync();
+                _ = LoadCommunityAugmentsAsync();
             };
             viewModel.Settings.PropertyChanged += (_, e) =>
             {
                 if (e.PropertyName is nameof(SettingsViewModel.UsePopularItems) or nameof(SettingsViewModel.RuneSource))
                     _ = LoadLiveOpggAsync();
+                if (e.PropertyName is nameof(SettingsViewModel.UseCommunityAugments))
+                    _ = LoadCommunityAugmentsAsync();
             };
             _ = RunChampSelectAsync(viewModel, data, champSelectDemo);
 
@@ -185,7 +208,7 @@ public partial class App : Application
         try
         {
             _matchHistory = await client.GetMatchHistoryAsync(games: 30, withDetails: 15, _cts.Token);
-            Log.Write($"Read {_matchHistory.Count} Summoner's Rift games from the match history");
+            Log.Write($"Read {_matchHistory.Count} Summoner's Rift and League Classic games from the match history");
             _refreshStats?.Invoke();
         }
         catch (Exception ex) when (ex is HttpRequestException or System.Text.Json.JsonException or InvalidOperationException or TaskCanceledException)
@@ -328,6 +351,26 @@ public partial class App : Application
     {
         using var timer = new PeriodicTimer(ScanInterval);
         var ownWindow = new WindowInteropHelper(MainWindow).Handle;
+        picker.ScanRequested += async (_, _) =>
+        {
+            if (readerForGame() is not { } reader)
+            {
+                picker.OnRequestedScan([], "Augment data isn't loaded, so cards can't be read.");
+                return;
+            }
+            try
+            {
+                var scan = imagePath is null
+                    ? await Task.Run(() => reader.ScanScreenAsync(exclude: ScreenCapture.WindowArea(ownWindow)))
+                    : await Task.Run(() => reader.ScanFileAsync(imagePath));
+                picker.OnRequestedScan(scan.Offer.Select(d => d.Augment).ToList(), scan.Problem);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                Log.Error("Augment scan", ex);
+                picker.OnRequestedScan([], "Reading the screen failed. Type the cards instead.");
+            }
+        };
         try
         {
             while (await timer.WaitForNextTickAsync(_cts.Token))

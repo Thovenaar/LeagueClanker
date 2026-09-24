@@ -28,6 +28,9 @@ public sealed class AppSettings
     /// <summary>Nudge op.gg's most played items for your champion up the in-game build.</summary>
     public bool UsePopularItems { get; set; } = true;
 
+    /// <summary>Start augment scores from arammayhem.com's win rates and your champion's most taken cards.</summary>
+    public bool UseCommunityAugments { get; set; } = true;
+
     public static AppSettings Load()
     {
         try
@@ -81,6 +84,7 @@ public sealed class SettingsViewModel(AppSettings settings) : INotifyPropertyCha
     public bool CheckForUpdates { get => settings.CheckForUpdates; set => Update(settings.CheckForUpdates, value, v => settings.CheckForUpdates = v); }
     public bool Compact { get => settings.Compact; set => Update(settings.Compact, value, v => settings.Compact = v); }
     public bool UsePopularItems { get => settings.UsePopularItems; set => Update(settings.UsePopularItems, value, v => settings.UsePopularItems = v); }
+    public bool UseCommunityAugments { get => settings.UseCommunityAugments; set => Update(settings.UseCommunityAugments, value, v => settings.UseCommunityAugments = v); }
 
     private bool Update<T>(T current, T value, Action<T> store, [CallerMemberName] string? name = null)
     {
@@ -101,8 +105,11 @@ public sealed class SettingsViewModel(AppSettings settings) : INotifyPropertyCha
 
 public static class AppPaths
 {
+    /// <summary>LEAGUECLANKER_DATA overrides it, so the screenshot script never touches your own settings and games.</summary>
     public static string DataFolder { get; } =
-        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "LeagueClanker");
+        Environment.GetEnvironmentVariable("LEAGUECLANKER_DATA") is { Length: > 0 } custom
+            ? custom
+            : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "LeagueClanker");
 
     public static string LogFile { get; } = Path.Combine(DataFolder, "log.txt");
 

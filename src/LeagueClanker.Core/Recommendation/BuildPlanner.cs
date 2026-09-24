@@ -35,6 +35,15 @@ public sealed class BuildPlanner
     /// <summary>An item entering your next purchases needs at least this much situational bonus to justify a pivot.</summary>
     public const double MinReasonPoints = 0.5;
 
+    /// <summary>
+    /// Owning parts worth this share of an item's cost means you've started it: it goes first, and pivots don't drop it.
+    /// A Needlessly Large Rod starts Rabadon's Deathcap (34%); an Amplifying Tome starts nothing (11%).
+    /// </summary>
+    public const double StartedShare = 0.25;
+
+    /// <summary>How much an item must outscore the one ahead of it in your plan to move ahead.</summary>
+    public const double ReorderMargin = 0.5;
+
     private readonly HashSet<int> _declined = [];
     private List<ItemInfo> _plan = [];
     private HashSet<string> _planSituations = [];
@@ -53,6 +62,9 @@ public sealed class BuildPlanner
 
     /// <summary>Items the latest recommendation wants next that aren't in your next purchases.</summary>
     public IReadOnlyList<ItemInfo> LatestDifferences { get; private set; } = [];
+
+    /// <summary>Recipes, to tell which items you've started. Without it, parts you own don't change the order.</summary>
+    public ItemCatalog? Items { get; set; }
 
     public void Update(BuildRecommendation latest)
     {
@@ -119,8 +131,8 @@ public sealed class BuildPlanner
 
     private void Adopt(BuildRecommendation recommendation)
     {
-        Upcoming = recommendation.Ranked.Take(PlanLength).ToList();
-        _plan = Upcoming.Select(s => s.Item).ToList();
+        _plan = FinishStartedFirst(recommendation.Ranked.Take(PlanLength).Select(s => s.Item).ToList(), recommendation);
+        Upcoming = _plan.Select(i => recommendation.Find(i.Id)!).ToList();
         _planSituations = recommendation.Situations.Select(s => s.Label).ToHashSet();
         PendingPivot = null;
         CanSwitch = false;
@@ -144,14 +156,41 @@ public sealed class BuildPlanner
         // What you buy next only changes through pivots, but the order among those items follows the game:
         // a new augment can make your third item the one to buy first. Promoting a later item into your
         // next purchases is a pivot, so the next few and the rest are ordered separately.
-        var rank = latest.Ranked.Select((s, index) => (s.Item.Id, index)).ToDictionary(x => x.Id, x => x.index);
-        _plan = _plan.Take(NearTerm).OrderBy(i => rank[i.Id])
-            .Concat(_plan.Skip(NearTerm).OrderBy(i => rank[i.Id]))
-            .ToList();
+        var score = latest.Ranked.ToDictionary(s => s.Item.Id, s => s.Total);
+        _plan = [.. Reorder(_plan.Take(NearTerm).ToList(), score), .. Reorder(_plan.Skip(NearTerm).ToList(), score)];
 
+        _plan = FinishStartedFirst(_plan, latest);
         Upcoming = _plan.Select(i => latest.Find(i.Id)!).ToList();
         PendingPivot = DetectPivot(latest);
     }
+
+    /// <summary>
+    /// Sorts by score, but an item only moves ahead of another when it leads by <see cref="ReorderMargin"/>. Some scores
+    /// move with your stats (Rabadon's with your AP), and two close items would otherwise swap on every purchase.
+    /// </summary>
+    private static List<ItemInfo> Reorder(List<ItemInfo> items, IReadOnlyDictionary<int, double> score)
+    {
+        var sorted = new List<ItemInfo>();
+        foreach (var item in items)
+        {
+            var at = sorted.Count;
+            while (at > 0 && score[item.Id] >= score[sorted[at - 1].Id] + ReorderMargin)
+                at--;
+            sorted.Insert(at, item);
+        }
+        return sorted;
+    }
+
+    // Finish what you started: an item whose parts you already own a good share of beats a better item from scratch.
+    private List<ItemInfo> FinishStartedFirst(List<ItemInfo> plan, BuildRecommendation latest) =>
+        plan.Where(i => Started(i, latest)).MaxBy(i => Progress(i, latest)) is { } started
+            ? [started, .. plan.Where(i => i.Id != started.Id)]
+            : plan;
+
+    private double Progress(ItemInfo item, BuildRecommendation latest) =>
+        Items is null || item.TotalGold <= 0 ? 0 : 1 - (double)BuyAdvisor.RemainingCost(item, latest.Game.Me.Items, Items) / item.TotalGold;
+
+    private bool Started(ItemInfo item, BuildRecommendation latest) => Progress(item, latest) >= StartedShare;
 
     private Pivot? DetectPivot(BuildRecommendation latest)
     {
@@ -173,7 +212,7 @@ public sealed class BuildPlanner
 
         // Each new item pushes out the weakest of your next purchases that the latest ranking no longer has up front.
         var dropped = planNext
-            .Where(s => !latestIds.Contains(s.Item.Id))
+            .Where(s => !latestIds.Contains(s.Item.Id) && !Started(s.Item, latest))
             .OrderBy(s => s.Total)
             .Take(fresh.Count)
             .ToList();

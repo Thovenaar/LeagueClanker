@@ -353,18 +353,29 @@ public sealed class LeagueClientApi : IClientSource, IRunePageStore, IChampSelec
     /// Your recent Summoner's Rift games from the client's match history. The list only has your own row, so the most
     /// recent games' details are fetched one by one to find your lane opponents. Empty when the client doesn't answer.
     /// </summary>
+    private const int MatchHistoryPage = 20;
+
     public async Task<IReadOnlyList<History.PlayedGame>> GetMatchHistoryAsync(int games, int withDetails, CancellationToken ct)
     {
         using var summoner = await GetOrNullAsync<JsonDocument>("lol-summoner/v1/current-summoner", ct);
         var puuid = summoner?.RootElement.TryGetProperty("puuid", out var id) == true ? id.GetString() : null;
 
-        using var listResponse = await _http.GetAsync($"lol-match-history/v1/products/lol/current-summoner/matches?begIndex=0&endIndex={games - 1}", ct);
-        if (!listResponse.IsSuccessStatusCode)
-            return [];
-        var list = await listResponse.Content.ReadAsStringAsync(ct);
+        // The client returns at most 20 games per request, so ask page by page.
+        var pages = new List<string>();
+        for (var begin = 0; begin < games; begin += MatchHistoryPage)
+        {
+            var end = Math.Min(games, begin + MatchHistoryPage) - 1;
+            using var listResponse = await _http.GetAsync($"lol-match-history/v1/products/lol/current-summoner/matches?begIndex={begin}&endIndex={end}", ct);
+            if (!listResponse.IsSuccessStatusCode)
+                break;
+            var page = await listResponse.Content.ReadAsStringAsync(ct);
+            pages.Add(page);
+            if (History.MatchHistory.GameCount(page) < end - begin + 1)
+                break; // no older games
+        }
 
         var detailed = new Dictionary<long, History.PlayedGame>();
-        foreach (var gameId in History.MatchHistory.GamesWithoutOpponents(list).Take(withDetails))
+        foreach (var gameId in pages.SelectMany(History.MatchHistory.GamesWithoutOpponents).Take(withDetails))
         {
             using var detail = await _http.GetAsync($"lol-match-history/v1/games/{gameId}", ct);
             if (detail.IsSuccessStatusCode && History.MatchHistory.Parse(await detail.Content.ReadAsStringAsync(ct), puuid).FirstOrDefault() is { } game)
@@ -372,7 +383,7 @@ public sealed class LeagueClientApi : IClientSource, IRunePageStore, IChampSelec
         }
 
         // Details replace the list's rows where we have them; the rest keep champion and result without an opponent.
-        var fromList = History.MatchHistory.Parse(list, puuid);
+        var fromList = pages.SelectMany(p => History.MatchHistory.Parse(p, puuid)).ToList();
         return [.. detailed.Values, .. fromList.Where(g => !detailed.Values.Any(d => d.Played == g.Played))];
     }
 

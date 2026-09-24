@@ -125,10 +125,40 @@ public class BuildPlannerTests
         Assert.True(planner.CanSwitch);
     }
 
-    /// <summary>A recommendation with a fixed ranking and no situational reasons.</summary>
-    private static BuildRecommendation Ranking(GameAnalysis game, params int[] itemIds)
+    [Fact]
+    public void CloseScores_DontSwapTheOrderBackAndForth()
     {
-        var ranked = itemIds.Select((id, i) => new ScoredItem(TestData.Static.Items.Get(id)!, 10 - i, [])).ToList();
+        var game = GameAnalyzer.Analyze(TestData.Game([("Garen", [])], ApTeam), TestData.Static)!;
+        var planner = new BuildPlanner();
+        planner.Update(Scored(game, (TestData.Cloak, 10), (TestData.Veil, 9.8), (TestData.Cleaver, 9)));
+
+        // Veil edges ahead by 0.1, as Rabadon's does when your AP ticks up: not enough to change what you buy first.
+        planner.Update(Scored(game, (TestData.Veil, 10.1), (TestData.Cloak, 10), (TestData.Cleaver, 9)));
+        Assert.Equal(TestData.Cloak, planner.Upcoming[0].Item.Id);
+
+        planner.Update(Scored(game, (TestData.Veil, 10.6), (TestData.Cloak, 10), (TestData.Cleaver, 9)));
+        Assert.Equal(TestData.Veil, planner.Upcoming[0].Item.Id);
+    }
+
+    [Fact]
+    public void AStartedItem_IsFinishedFirst()
+    {
+        // Garen owns the 800g Wound Dagger, over a quarter of Wound Blade's 3,000g.
+        var game = GameAnalyzer.Analyze(TestData.Game([("Garen", [TestData.WoundComponent])], ApTeam), TestData.Static)!;
+        var planner = new BuildPlanner { Items = TestData.Static.Items };
+
+        planner.Update(Ranking(game, TestData.Cloak, TestData.Veil, TestData.Cleaver, TestData.Plate, TestData.WoundBlade, TestData.Heart));
+
+        Assert.Equal(TestData.WoundBlade, planner.Upcoming[0].Item.Id);
+    }
+
+    /// <summary>A recommendation with a fixed ranking and no situational reasons.</summary>
+    private static BuildRecommendation Ranking(GameAnalysis game, params int[] itemIds) =>
+        Scored(game, itemIds.Select((id, i) => (id, 10.0 - i)).ToArray());
+
+    private static BuildRecommendation Scored(GameAnalysis game, params (int Id, double Score)[] items)
+    {
+        var ranked = items.Select(x => new ScoredItem(TestData.Static.Items.Get(x.Id)!, x.Score, [])).OrderByDescending(s => s.Total).ToList();
         return new BuildRecommendation(game, ranked.Take(BuildPlanner.PlanLength).ToList(), null, [], []) { Ranked = ranked };
     }
 

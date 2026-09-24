@@ -83,7 +83,12 @@ public sealed class ChampionCatalog
     public ChampionInfo? Get(string id) => _byId.GetValueOrDefault(id);
 
     /// <summary>Looks up a champion by Riot's numeric id, as the League client reports it in champ select.</summary>
-    public ChampionInfo? GetByKey(int key) => _byKey.GetValueOrDefault(key);
+    public ChampionInfo? GetByKey(int key) => _byKey.GetValueOrDefault(NormalizeKey(key));
+
+    /// <summary>League Classic numbers its champions from 60000 (60021 is Miss Fortune, 21). Other modes use the plain key.</summary>
+    public const int LeagueClassicKeyOffset = 60000;
+
+    public static int NormalizeKey(int key) => key > LeagueClassicKeyOffset ? key - LeagueClassicKeyOffset : key;
 
     /// <summary>Finds a champion by name or id, ignoring case, spaces and punctuation ("kaisa" finds Kai'Sa).</summary>
     public ChampionInfo? Find(string name) => _byId.GetValueOrDefault(name) ?? _byNormalizedName.GetValueOrDefault(Normalize(name));

@@ -16,6 +16,11 @@ namespace LeagueClanker.App;
 
 public sealed record ItemRow(int Rank, string Name, int Gold, string IconUrl, IReadOnlyList<string> Reasons);
 
+public sealed record OwnedItemRow(string Name, string IconUrl);
+
+/// <param name="Direction">"Tankier", "More AP", "Vs tanks": which way this item takes your build.</param>
+public sealed record AlternativeRow(string Direction, string Name, int Gold, string IconUrl);
+
 public sealed record ChampionStatRow(string Name, string IconUrl, string Record, string WinRate);
 
 public sealed record PlayerRow(
@@ -44,6 +49,9 @@ public sealed class MainViewModel : INotifyPropertyChanged
     private GridLength _adShare = new(1, GridUnitType.Star);
     private GridLength _apShare = new(1, GridUnitType.Star);
     private IReadOnlyList<ItemRow> _items = [];
+    private IReadOnlyList<OwnedItemRow> _ownedItems = [];
+    private IReadOnlyList<AlternativeRow> _alternatives = [];
+    private string _buildHeader = "YOUR BUILD · MOST IMPORTANT FIRST";
     private ItemRow? _boots;
     private IReadOnlyList<string> _advice = [];
     private string _footer = "";
@@ -75,6 +83,14 @@ public sealed class MainViewModel : INotifyPropertyChanged
     public GridLength AdShare { get => _adShare; private set => Set(ref _adShare, value); }
     public GridLength ApShare { get => _apShare; private set => Set(ref _apShare, value); }
     public IReadOnlyList<ItemRow> Items { get => _items; private set => Set(ref _items, value); }
+
+    /// <summary>Your finished items and boots, in inventory order.</summary>
+    public IReadOnlyList<OwnedItemRow> OwnedItems { get => _ownedItems; private set => Set(ref _ownedItems, value); }
+
+    public string BuildHeader { get => _buildHeader; private set => Set(ref _buildHeader, value); }
+
+    /// <summary>Other ways to go than your plan: the best item per direction it doesn't cover.</summary>
+    public IReadOnlyList<AlternativeRow> Alternatives { get => _alternatives; private set => Set(ref _alternatives, value); }
     public ItemRow? Boots { get => _boots; private set => Set(ref _boots, value); }
     public IReadOnlyList<string> Advice { get => _advice; private set => Set(ref _advice, value); }
     public string Footer { get => _footer; set => Set(ref _footer, value); }
@@ -96,6 +112,9 @@ public sealed class MainViewModel : INotifyPropertyChanged
             if (e.PropertyName == nameof(SettingsViewModel.Compact))
                 Raise(nameof(ShowFullLive), nameof(ShowCompactLive));
         };
+
+        // Once you've taken a card from the offer, the build matters again. Typing cards you already have doesn't count.
+        Augments.OfferPicked += (_, _) => SelectTab(Tab.Build);
 
         // A card offer on screen needs your attention now, so bring its tab forward.
         Augments.OfferDetected += (_, _) =>
@@ -250,7 +269,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
             .Select(c => new ChampionStatRow(c.Champion!.Name, data.ChampionIconUrl(c.Champion.Id), c.Record.ToString(), $"{c.Record.WinRate:P0}"))
             .ToList();
         ChampionStats = champions;
-        StatsNote = stats.Games.Count == 0 ? "" : $"From your last {stats.Games.Count} Summoner's Rift games.";
+        StatsNote = stats.Games.Count == 0 ? "" : $"From your last {stats.Games.Count} Summoner's Rift games, League Classic included.";
         ChampSelect.SetStats(stats);
         Raise(nameof(ShowHistory));
     }
@@ -369,6 +388,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
             && (previous.Me.Archetype != rec.Game.Me.Archetype || !previous.PopularItems.SetEquals(rec.Game.PopularItems)))
             _planner.Reset();
 
+        _planner.Items = data.Items;
         _planner.Update(rec);
         Render();
     }
@@ -419,7 +439,19 @@ public sealed class MainViewModel : INotifyPropertyChanged
         DamageSummary = rec.DamageSummary;
         AdShare = new GridLength(rec.Game.Enemies.PhysicalShare, GridUnitType.Star);
         ApShare = new GridLength(rec.Game.Enemies.MagicShare, GridUnitType.Star);
-        Items = _planner.Upcoming.Select((item, i) => ToRow(item, i + 1, data)).ToList();
+        // Six slots: what you own fills some, boots take one, and the plan only lists what fits in the rest.
+        var finished = me.Items.Where(i => i.Kind is ItemKind.Legendary or ItemKind.Boots).ToList();
+        OwnedItems = finished.Select(i => new OwnedItemRow(i.Name, data.ItemIconUrl(i.Id))).ToList();
+        var bootsSlot = finished.Any(i => i.Kind == ItemKind.Boots) || rec.Boots is not null ? 1 : 0;
+        var slotsLeft = Math.Max(0, 6 - finished.Count(i => i.Kind == ItemKind.Legendary) - bootsSlot);
+        Items = _planner.Upcoming.Take(slotsLeft).Select((item, i) => ToRow(item, i + 1, data)).ToList();
+        var planned = _planner.Upcoming.Take(slotsLeft).Select(s => s.Item.Id).ToList();
+        Alternatives = ItemDirections.Alternatives(rec, planned)
+            .Select(a => new AlternativeRow(a.Direction, a.Item.Item.Name, a.Item.Item.TotalGold, data.ItemIconUrl(a.Item.Item.Id)))
+            .ToList();
+        BuildHeader = slotsLeft == 0 ? "YOUR BUILD IS FULL · SEE THE TIPS FOR SWAPS"
+            : finished.Count == 0 ? "YOUR BUILD · MOST IMPORTANT FIRST"
+            : $"STILL TO BUY · {slotsLeft} SLOT{(slotsLeft == 1 ? "" : "S")} LEFT";
         Raise(nameof(NextItem));
         Boots = rec.Boots is { } boots ? ToRow(boots, 0, data) : null;
         Advice = rec.Advice.Count > 0

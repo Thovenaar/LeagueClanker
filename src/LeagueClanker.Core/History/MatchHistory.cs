@@ -1,4 +1,5 @@
 using System.Text.Json.Nodes;
+using LeagueClanker.Core.StaticData;
 
 namespace LeagueClanker.Core.History;
 
@@ -9,7 +10,7 @@ namespace LeagueClanker.Core.History;
 /// </summary>
 public static class MatchHistory
 {
-    /// <summary>Summoner's Rift games from a list or detail response. Games in other modes are skipped.</summary>
+    /// <summary>Summoner's Rift games, League Classic included, from a list or detail response. Other modes are skipped.</summary>
     /// <param name="puuid">Your account id, to find your row among ten. With only one row, that row is you.</param>
     public static IReadOnlyList<PlayedGame> Parse(string json, string? puuid)
     {
@@ -18,6 +19,9 @@ public static class MatchHistory
         return games?.Select(g => ParseGame(g, puuid)).OfType<PlayedGame>().ToList() ?? [];
     }
 
+    /// <summary>All games in a list response, whatever the mode. Fewer than asked for means there are no older games.</summary>
+    public static int GameCount(string json) => (JsonNode.Parse(json)?["games"]?["games"] as JsonArray)?.Count ?? 0;
+
     /// <summary>Summoner's Rift game ids in a list response whose rows are incomplete, newest first, so their details can be fetched.</summary>
     public static IReadOnlyList<long> GamesWithoutOpponents(string json) =>
         (JsonNode.Parse(json)?["games"]?["games"] as JsonArray ?? [])
@@ -25,9 +29,10 @@ public static class MatchHistory
             .Select(g => g!["gameId"]!.GetValue<long>())
             .ToList();
 
-    // Normal, ranked and Swiftplay games. ARAM, Arena and the rotating modes have no lanes to compare.
+    // Normal, ranked, Swiftplay and League Classic ("JADE" on map 453) games. ARAM, Arena and the rotating modes
+    // have no lanes to compare.
     private static bool IsSummonersRift(JsonNode? game) =>
-        Text(game?["gameMode"])?.ToUpperInvariant() is "CLASSIC" or "SWIFTPLAY";
+        Text(game?["gameMode"])?.ToUpperInvariant() is "CLASSIC" or "SWIFTPLAY" or "JADE";
 
     private static PlayedGame? ParseGame(JsonNode? game, string? puuid)
     {
@@ -49,8 +54,8 @@ public static class MatchHistory
             : participants.FirstOrDefault(p => p?["teamId"]?.GetValue<int>() != team && PositionOf(p!) == position)?["championId"]?.GetValue<int>();
 
         var created = game["gameCreation"]?.GetValue<long>() ?? 0;
-        return new PlayedGame(DateTimeOffset.FromUnixTimeMilliseconds(created).LocalDateTime, me["championId"]!.GetValue<int>(),
-            me["stats"]!["win"]!.GetValue<bool>(), position, opponent);
+        return new PlayedGame(DateTimeOffset.FromUnixTimeMilliseconds(created).LocalDateTime, ChampionCatalog.NormalizeKey(me["championId"]!.GetValue<int>()),
+            me["stats"]!["win"]!.GetValue<bool>(), position, opponent is { } key ? ChampionCatalog.NormalizeKey(key) : null);
     }
 
     // Newer responses have "teamPosition"; older ones a lane and a role, where bottom lane's support is "DUO_SUPPORT".

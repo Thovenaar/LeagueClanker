@@ -357,6 +357,19 @@
 
             <!-- ===== Compact mode: one card with the next item, what to buy and the matchup ===== -->
             <StackPanel Margin="12,0,12,4" Visibility="{Binding ShowCompactLive, Converter={StaticResource BoolToVisibility}}">
+                <!-- An augment offer on screen matters more than the next item, so it goes first. -->
+                <Border Background="{StaticResource CardBrush}" CornerRadius="4" Padding="8,6" Margin="0,0,0,8"
+                        Visibility="{Binding Augments.OfferOnScreen, Converter={StaticResource BoolToVisibility}}">
+                    <StackPanel>
+                        <TextBlock Text="AUGMENT OFFER" Foreground="{StaticResource AccentBrush}" FontSize="10" FontWeight="SemiBold" />
+                        <TextBlock Text="{Binding Augments.AdviceText}" FontSize="12" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,3,0,0"
+                                   Visibility="{Binding Augments.AdviceText, Converter={StaticResource HasContent}}" />
+                        <TextBlock Text="{Binding Augments.RerollText}" FontSize="11" TextWrapping="Wrap" Margin="0,4,0,0"
+                                   Visibility="{Binding Augments.RerollText, Converter={StaticResource HasContent}}" />
+                        <TextBlock Text="Ranking the cards..." Foreground="{StaticResource MutedBrush}" FontSize="11" Margin="0,3,0,0"
+                                   Visibility="{Binding Augments.IsRanking, Converter={StaticResource BoolToVisibility}}" />
+                    </StackPanel>
+                </Border>
                 <DockPanel>
                     <Image DockPanel.Dock="Left" Source="{Binding NextItem.IconUrl, TargetNullValue={x:Null}}" Width="40" Height="40" Margin="0,0,10,0" />
                     <StackPanel VerticalAlignment="Center">
@@ -466,7 +479,24 @@
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
 
-                        <TextBlock Style="{StaticResource SectionHeader}" Text="YOUR BUILD · MOST IMPORTANT FIRST" />
+                        <StackPanel Visibility="{Binding OwnedItems, Converter={StaticResource HasContent}}">
+                            <TextBlock Style="{StaticResource SectionHeader}" Text="YOU HAVE" />
+                            <ItemsControl ItemsSource="{Binding OwnedItems}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <WrapPanel />
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate DataType="{x:Type local:OwnedItemRow}">
+                                        <Image Source="{Binding IconUrl}" Width="30" Height="30" Margin="0,0,4,4" ToolTip="{Binding Name}"
+                                               AutomationProperties.Name="{Binding Name}" />
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+
+                        <TextBlock Style="{StaticResource SectionHeader}" Text="{Binding BuildHeader}" />
                         <ItemsControl ItemsSource="{Binding Items}">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate DataType="{x:Type local:ItemRow}">
@@ -504,6 +534,25 @@
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
+
+                        <!-- Other ways to go: tankier, more AP, an answer to the enemy -->
+                        <StackPanel Visibility="{Binding Alternatives, Converter={StaticResource HasContent}}">
+                            <TextBlock Style="{StaticResource SectionHeader}" Text="OR GO ANOTHER WAY" />
+                            <ItemsControl ItemsSource="{Binding Alternatives}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate DataType="{x:Type local:AlternativeRow}">
+                                        <DockPanel Margin="0,0,0,4">
+                                            <Image DockPanel.Dock="Left" Source="{Binding IconUrl}" Width="22" Height="22" Margin="0,0,8,0" />
+                                            <TextBlock DockPanel.Dock="Right" Text="{Binding Gold, StringFormat={}{0}g}" Foreground="{StaticResource MutedBrush}" FontSize="11"
+                                                       VerticalAlignment="Center" />
+                                            <TextBlock FontSize="11" VerticalAlignment="Center" TextTrimming="CharacterEllipsis">
+                                                <Run Text="{Binding Direction, Mode=OneWay}" Foreground="{StaticResource AccentBrush}" /><Run Text=": " /><Run Text="{Binding Name, Mode=OneWay}" />
+                                            </TextBlock>
+                                        </DockPanel>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
 
                         <!-- Boots, only while you haven't bought tier 2 boots -->
                         <StackPanel DataContext="{Binding Boots}">
@@ -580,6 +629,12 @@
 
                         <!-- Search: Enter adds the top match to the offer -->
                         <Grid Margin="0,2,0,4">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <Button Grid.Column="1" Style="{StaticResource SmallButton}" Content="Read cards now" Margin="6,0,0,0" Click="OnScanNow"
+                                    IsEnabled="{Binding IsAvailable}" ToolTip="Read the offer on your screen right away" />
                             <TextBox x:Name="AugmentSearch" Style="{StaticResource SearchBox}" AutomationProperties.AutomationId="AugmentSearch"
                                      Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}" KeyDown="OnAugmentSearchKeyDown"
                                      IsEnabled="{Binding IsAvailable}" />
@@ -730,6 +785,9 @@
                     </CheckBox>
                     <CheckBox Style="{StaticResource SettingCheck}" IsChecked="{Binding UsePopularItems}">
                         <TextBlock Text="Favor op.gg's most played items for your champion (needs op.gg as the stats source)" TextWrapping="Wrap" />
+                    </CheckBox>
+                    <CheckBox Style="{StaticResource SettingCheck}" IsChecked="{Binding UseCommunityAugments}">
+                        <TextBlock Text="Start Mayhem augment scores from arammayhem.com's win rates and your champion's most taken cards" TextWrapping="Wrap" />
                     </CheckBox>
 
                     <TextBlock Style="{StaticResource SectionHeader}" Text="GENERAL" />

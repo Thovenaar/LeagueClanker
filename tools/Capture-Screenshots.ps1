@@ -29,6 +29,9 @@ $exe = Get-ChildItem "src/LeagueClanker.App/bin/Debug" -Recurse -Filter "LeagueC
     Sort-Object LastWriteTime -Descending | Select-Object -First 1
 if (-not $exe) { throw "LeagueClanker.App.exe not found; build the app first" }
 New-Item -ItemType Directory -Force $OutDir | Out-Null
+# A throwaway data folder: toggling compact mode or settings in a shot must not change your own settings.
+$env:LEAGUECLANKER_DATA = Join-Path ([System.IO.Path]::GetTempPath()) "LeagueClanker-screenshots"
+Remove-Item -Recurse -Force $env:LEAGUECLANKER_DATA -ErrorAction SilentlyContinue
 $OutDir = (Resolve-Path $OutDir).Path
 
 Add-Type -AssemblyName System.Drawing, UIAutomationClient, UIAutomationTypes

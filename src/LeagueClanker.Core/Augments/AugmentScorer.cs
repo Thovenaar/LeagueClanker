@@ -15,14 +15,17 @@ public sealed record AugmentContext(GameAnalysis Game)
     /// <summary>What the item rules detected about this game (enemy is AP, tanks, healing, ...).</summary>
     public IReadOnlyList<Situation> Situations { get; init; } = [];
 
+    /// <summary>Win rates and your champion's favorite cards from a stats site. Null scores from card effects alone.</summary>
+    public CommunityAugments? Community { get; init; }
+
     public PlayerProfile Me => Game.Me;
 }
 
 public sealed record ScoreReason(string Text, double Points);
 
 /// <summary>
-/// Scores augments without win rates: how well a card fits your champion, how it pairs with the cards and
-/// items you have, and what it answers in this game. All weights are in one place so they can be tuned.
+/// Scores augments: how well a card fits your champion, how it pairs with the cards and items you have, and what it
+/// answers in this game, on top of community win rates when those are loaded. All weights are in one place so they can be tuned.
 /// </summary>
 public sealed class AugmentScorer
 {
@@ -97,6 +100,17 @@ public sealed class AugmentScorer
         (AugmentTrigger.Dashes, AugmentEffect.Dash, 1.0),
         (AugmentTrigger.Stealth, AugmentEffect.Stealth, 1.0),
     ];
+
+    private static string DescribeGate(AugmentTrigger gate) => gate switch
+    {
+        AugmentTrigger.Spinning => "spinning abilities",
+        AugmentTrigger.Pets => "a pet or summon",
+        AugmentTrigger.Stealth => "stealth",
+        _ => "stacking abilities",
+    };
+
+    /// <summary>Conditions only some champions meet at all. When a card has one, it decides how well the card fits.</summary>
+    private const AugmentTrigger GateTriggers = AugmentTrigger.Pets | AugmentTrigger.Spinning | AugmentTrigger.Stealth | AugmentTrigger.Stacking;
 
     /// <summary>Triggers that are things you do (conditions), as opposed to stats the card scales with.</summary>
     private const AugmentTrigger ScalingTriggers =
@@ -175,7 +189,8 @@ public sealed class AugmentScorer
         private double Standalone(AugmentInfo augment, Dictionary<AugmentEffect, int> statCounts)
         {
             if (!_cards.TryGetValue(augment, out var card))
-                _cards[augment] = card = (scorer.ComputeFitParts(augment, ctx), scorer.ItemSynergy(augment, ctx, null) + Situational(augment, ctx, null));
+                _cards[augment] = card = (scorer.ComputeFitParts(augment, ctx),
+                    scorer.ItemSynergy(augment, ctx, null) + Situational(augment, ctx, null) + (ctx.Community?.Points(augment, null) ?? 0));
             return CombineFit(augment, card.Fit, statCounts) + card.ItemsAndSituations;
         }
 
@@ -225,7 +240,7 @@ public sealed class AugmentScorer
     {
         var fit = Fit(augment, ctx, statCounts, reasons);
         CountStats(augment, statCounts);
-        return fit + ItemSynergy(augment, ctx, reasons) + Situational(augment, ctx, reasons);
+        return fit + ItemSynergy(augment, ctx, reasons) + Situational(augment, ctx, reasons) + (ctx.Community?.Points(augment, reasons) ?? 0);
     }
 
     /// <summary>What a card gives, valued for your champion, before repeated stats are discounted.</summary>
@@ -284,6 +299,9 @@ public sealed class AugmentScorer
         {
             var me = ctx.Me;
             var top = parts.Effects.Where(e => e.Value >= 0.5).OrderByDescending(e => e.Value).Take(2).Select(e => e.Name).ToList();
+            var gate = Each(augment.Triggers & GateTriggers).FirstOrDefault(t => TriggerAffinity(t, ctx) >= 1.0);
+            if (gate != AugmentTrigger.None)
+                reasons.Add(new($"{me.Name} has {DescribeGate(gate)}", 0.5));
             if (parts.Factor < 0.35 && augment.Triggers != AugmentTrigger.None)
                 reasons.Add(new($"little use for {me.Name} ({DescribeWorstTrigger(augment.Triggers, ctx)})", -1));
             else if (top.Count > 0 && fit >= 0.8)
@@ -301,6 +319,11 @@ public sealed class AugmentScorer
         var conditions = Each(triggers & ~ScalingTriggers).Select(t => TriggerAffinity(t, ctx)).ToList();
         var scaling = Each(triggers & ScalingTriggers).Select(t => TriggerAffinity(t, ctx)).ToList();
         var condition = conditions.Count > 0 ? conditions.Average() : 1.0;
+
+        // A card built around spinning, pets, stealth or stacks lives or dies by that. Its other conditions (ability
+        // hits, the ultimate) describe how, and averaging them in watered down a Garen with Spin To Win.
+        if ((triggers & GateTriggers) != 0)
+            condition = Each(triggers & GateTriggers).Max(t => TriggerAffinity(t, ctx));
         var scale = scaling.Count > 0 ? scaling.Max() : 1.0;
         return condition * (0.5 + 0.5 * scale);
     }

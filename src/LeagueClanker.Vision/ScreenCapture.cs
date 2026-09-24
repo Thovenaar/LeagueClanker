@@ -42,6 +42,24 @@ public sealed class ScreenImage(byte[] pixels, int width, int height, PixelRect 
         return new ScreenImage(pixels, w, h, new PixelRect(Origin.X + x0, Origin.Y + y0, w, h));
     }
 
+    /// <summary>
+    /// Bright pixels become black and everything else white. The cards' light text on dark, glowing art reads far
+    /// better this way: on a 1440p offer, plain OCR found none of the three names and this version found all three.
+    /// </summary>
+    public ScreenImage HighContrast(int minBrightness = 170)
+    {
+        var pixels = new byte[Pixels.Length];
+        for (var i = 0; i < Pixels.Length; i += 4)
+        {
+            // BGRA
+            var brightness = (Pixels[i + 2] * 299 + Pixels[i + 1] * 587 + Pixels[i] * 114) / 1000;
+            var value = brightness > minBrightness ? (byte)0 : (byte)255;
+            pixels[i] = pixels[i + 1] = pixels[i + 2] = value;
+            pixels[i + 3] = 255;
+        }
+        return new ScreenImage(pixels, Width, Height, Origin);
+    }
+
     /// <summary>Halves both dimensions by averaging 2×2 blocks.</summary>
     public ScreenImage HalfSize()
     {

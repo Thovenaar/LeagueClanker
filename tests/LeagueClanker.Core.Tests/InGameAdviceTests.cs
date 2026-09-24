@@ -150,3 +150,27 @@ public class InGameAdviceTests
         into = into ?? [],
     };
 }
+
+public class ItemDirectionsTests
+{
+    [Fact]
+    public void Alternatives_OfferOneItemPerDirection()
+    {
+        var game = TestData.Game([("Garen", [])], [("Annie", []), ("Syndra", []), ("Lux", []), ("Brand", []), ("Zed", [])]);
+        var rec = new RecommendationEngine(TestData.Static).Recommend(GameAnalyzer.Analyze(game, TestData.Static)!);
+
+        var alternatives = ItemDirections.Alternatives(rec, rec.Ranked.Take(2).Select(s => s.Item.Id));
+
+        Assert.NotEmpty(alternatives);
+        Assert.Equal(alternatives.Count, alternatives.Select(a => a.Direction).Distinct().Count());
+        Assert.DoesNotContain(alternatives, a => rec.Ranked.Take(2).Any(s => s.Item.Id == a.Item.Item.Id));
+    }
+
+    [Fact]
+    public void Of_UsesTheSituationOrElseTheMainStats()
+    {
+        var heart = new ScoredItem(TestData.Static.Items.Get(TestData.Heart)!, 1, []);
+
+        Assert.Equal("Tankier", ItemDirections.Of(heart));
+    }
+}

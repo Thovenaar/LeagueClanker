@@ -29,7 +29,8 @@ dotnet run --project src/LeagueClanker.Cli -- --runes Jinx --position bottom
 
 ## Rules that aren't obvious from the code
 
-- **Riot policy.** Never show win rates for augments or Arena items. Never reveal what champ select hides: player names in ranked, enemy picks in blind pick, enemy summoner spells. No enemy timers.
+- **Riot policy.** Never reveal what champ select hides: player names in ranked, enemy picks in blind pick, enemy summoner spells. No enemy timers.
+- **Augment win rates.** Riot asks apps not to show augment win rates in game. The owner decided (2026-09-24) that this local app uses them anyway: arammayhem.com's Mayhem win rates, behind the *community augment stats* setting, on by default. Keep them behind that setting, and keep the README's *Is it allowed* section honest about it. Arena items still get no win rates.
 - **Unofficial sources.** op.gg's JSON API and the League client's local API are unofficial. Every call must fail soft: log it with `Log.Error`, then fall back to LeagueClanker's own rules. Say so in a sentence the user sees.
 - **Never overwrite user data.** Don't overwrite user data the user didn't select. Rune pages go to the current page only if it's editable. Item sets are read, merged and written back with the user's own sets untouched.
 - **User-facing text.** Plain sentences with concrete numbers: "Enemy team is 87% AP, so I suggest X, but Y is also ok." No em dashes, no hype.

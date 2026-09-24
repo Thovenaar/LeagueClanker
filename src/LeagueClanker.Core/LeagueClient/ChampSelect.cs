@@ -143,7 +143,7 @@ public sealed record ChampSelectState(
             HasPendingBan = myBans.Count > 0 && !myBans.Any(a => a.Completed),
             Bans = bans,
             Spells = (me?.Spell1Id ?? 0, me?.Spell2Id ?? 0),
-            Pickable = snapshot.PickableChampionIds.ToHashSet(),
+            Pickable = snapshot.PickableChampionIds.Select(ChampionCatalog.NormalizeKey).ToHashSet(),
             Mastery = snapshot.Mastery.GroupBy(m => m.ChampionId).ToDictionary(g => g.Key, g => g.Max(m => m.ChampionPoints)),
         };
     }

@@ -71,10 +71,27 @@ public sealed class AugmentScreenReader
             scale *= 2;
         }
 
-        using var bitmap = SoftwareBitmap.CreateCopyFromBuffer(area.Pixels.AsBuffer(), BitmapPixelFormat.Bgra8, area.Width, area.Height, BitmapAlphaMode.Ignore);
-        var result = await _ocr.RecognizeAsync(bitmap);
+        // Read the high-contrast version and the plain one, and keep whichever finds more cards. High contrast reads
+        // most offers; the plain image covers bright scenes where the background turns black too.
+        var problem = MissingLanguage is null ? null
+            : $"Windows can't read {MissingLanguage} text. Add the language in Windows settings (Time & language > Language & region) to read cards.";
+        var contrast = await ReadAsync(area.HighContrast(), scale);
+        var contrastOffer = AugmentTextMatcher.FindOffer(contrast, _catalog);
+        if (contrastOffer.Count == AugmentTextMatcher.OfferSize)
+            return new ScanResult(contrastOffer, contrast, problem);
+        var plain = await ReadAsync(area, scale);
+        var plainOffer = AugmentTextMatcher.FindOffer(plain, _catalog);
+        return plainOffer.Count > contrastOffer.Count
+            ? new ScanResult(plainOffer, plain, problem)
+            : new ScanResult(contrastOffer, contrast, problem);
+    }
 
-        var lines = result.Lines
+    private async Task<IReadOnlyList<TextLine>> ReadAsync(ScreenImage area, double scale)
+    {
+        using var bitmap = SoftwareBitmap.CreateCopyFromBuffer(area.Pixels.AsBuffer(), BitmapPixelFormat.Bgra8, area.Width, area.Height, BitmapAlphaMode.Ignore);
+        var result = await _ocr!.RecognizeAsync(bitmap);
+
+        return result.Lines
             .Where(l => l.Words.Count > 0)
             .Select(l =>
             {
@@ -85,10 +102,6 @@ public sealed class AugmentScreenReader
                 return new TextLine(l.Text, left * scale, top * scale, (right - left) * scale, (bottom - top) * scale);
             })
             .ToList();
-
-        var problem = MissingLanguage is null ? null
-            : $"Windows can't read {MissingLanguage} text. Add the language in Windows settings (Time & language > Language & region) to read cards.";
-        return new ScanResult(AugmentTextMatcher.FindOffer(lines, _catalog), lines, problem);
     }
 
     private static async Task<ScreenImage> LoadAsync(string path)

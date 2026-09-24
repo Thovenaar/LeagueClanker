@@ -51,6 +51,10 @@ public static class BuyAdvisor
         return new BuyAdvice($"{budget:N0} gold: buy {Join(buy.Select(i => i.Name))} ({best.Cost:N0}g) {goal}.", buy, best.Cost);
     }
 
+    /// <summary>What the shop still charges for the item, counting the parts you own.</summary>
+    public static int RemainingCost(ItemInfo item, IReadOnlyList<ItemInfo> owned, ItemCatalog items) =>
+        Resolve(item, owned.Select(i => i.Id).ToList(), items).Cost;
+
     private const int MaxChoices = 5000;
 
     // Every way to buy some of the item's missing parts: nothing, a whole part, or a mix of its parts' parts. Recipes are

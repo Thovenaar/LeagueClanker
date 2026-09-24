@@ -23,8 +23,8 @@ using LeagueClanker.Vision;
 //                                             list Mayhem (or Arena) augments with their tags, and names in that language
 //   LeagueClanker.Cli --champions             list healers, shielders, crowd control and true damage, from the hand-kept
 //                                             lists and the ability tooltips
-//   LeagueClanker.Cli --mayhem <game.json> --offer "A;B;C" [--picked "X;Y"] [--rerolled "A"] [--golden "B"]
-//                                             rank an augment offer and say which cards to reroll
+//   LeagueClanker.Cli --mayhem <game.json> --offer "A;B;C" [--picked "X;Y"] [--rerolled "A"] [--golden "B"] [--no-community]
+//                                             rank an augment offer and say which cards to reroll, with arammayhem.com's win rates
 //   LeagueClanker.Cli --scan <image.png | screen> [--verbose] [--locale de_DE]
 //                                             read an augment offer from a screenshot or the game, in the client's language
 //   LeagueClanker.Cli --runes <champion> [--position support] [--style tank] [--mode aram] [--enemies "A;B"] [--source rules]
@@ -202,11 +202,18 @@ if (args is ["--mayhem", var gamePath, ..])
     AugmentInfo Resolve(string name) => augments.Find(name) ?? throw new ArgumentException($"Unknown augment '{name}'. Run --augments for the list.");
 
     var offer = NamesAfter("--offer").Select(Resolve).ToList();
+    CommunityAugments? community = null;
+    if (!args.Contains("--no-community"))
+    {
+        community = await new CommunityAugmentClient().LoadAsync(rec.Game.Me.Champion.Name, cts.Token);
+        Console.WriteLine($"{community.Count} cards with win rates from {CommunityAugments.Source}. --no-community leaves them out.");
+    }
     var ctx = new AugmentContext(rec.Game)
     {
         Picked = NamesAfter("--picked").Select(Resolve).ToList(),
         PlannedItems = rec.Items.Select(i => i.Item).ToList(),
         Situations = rec.Situations,
+        Community = community,
     };
 
     var rerolls = new RerollState

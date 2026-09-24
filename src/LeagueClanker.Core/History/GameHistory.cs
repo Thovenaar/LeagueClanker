@@ -141,12 +141,12 @@ public sealed class PersonalStats(IReadOnlyList<PlayedGame> games)
         Games.GroupBy(g => g.ChampionKey).Select(g => (g.Key, Count(g))).OrderByDescending(c => c.Item2.Games).ThenByDescending(c => c.Item2.WinRate).ToList();
 
     /// <summary>
-    /// Summoner's Rift recaps and match history together, without counting a game twice: the same champion starting within ten minutes.
+    /// Summoner's Rift recaps (League Classic included) and match history together, without counting a game twice: the same champion starting within ten minutes.
     /// A recap is written when a game ends, so its start is its end minus its length.
     /// </summary>
     public static PersonalStats Combine(IEnumerable<GameRecap> recaps, IEnumerable<PlayedGame> history, ChampionCatalog champions)
     {
-        var fromRecaps = recaps.Where(r => r.Win is not null && r.Mode == GameMode.SummonersRift)
+        var fromRecaps = recaps.Where(r => r.Win is not null && r.Mode is GameMode.SummonersRift or GameMode.LeagueClassic)
             .Select(r => new PlayedGame(r.Played.AddSeconds(-r.DurationSeconds), r.ChampionKey, r.Win!.Value, r.Position,
                 r.LaneOpponent is { } id ? champions.Get(id)?.Key : null))
             .ToList();
