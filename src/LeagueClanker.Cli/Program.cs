@@ -19,11 +19,14 @@ using LeagueClanker.Vision;
 //   LeagueClanker.Cli <folder | a.json b.json> [--decline]
 //                                             replay snapshots through the pivot planner, accepting pivots (or declining)
 //   LeagueClanker.Cli --items [map]           list the item catalog with detected traits (map 453 = League Classic)
-//   LeagueClanker.Cli --augments [arena]      list Mayhem (or Arena) augments with their tags
+//   LeagueClanker.Cli --augments [arena] [--locale de_DE]
+//                                             list Mayhem (or Arena) augments with their tags, and names in that language
+//   LeagueClanker.Cli --champions             list healers, shielders, crowd control and true damage, from the hand-kept
+//                                             lists and the ability tooltips
 //   LeagueClanker.Cli --mayhem <game.json> --offer "A;B;C" [--picked "X;Y"] [--rerolled "A"] [--golden "B"]
 //                                             rank an augment offer and say which cards to reroll
-//   LeagueClanker.Cli --scan <image.png | screen> [--verbose]
-//                                             read an augment offer from a screenshot or the game
+//   LeagueClanker.Cli --scan <image.png | screen> [--verbose] [--locale de_DE]
+//                                             read an augment offer from a screenshot or the game, in the client's language
 //   LeagueClanker.Cli --runes <champion> [--position support] [--style tank] [--mode aram] [--enemies "A;B"] [--source rules]
 //                                             recommend a rune page (from op.gg unless --source rules)
 //   LeagueClanker.Cli --champselect [--style tank] [--source rules] [--apply]
@@ -48,19 +51,42 @@ if (args is ["--items", ..])
     // --items [map]: 11 Summoner's Rift (default), 12 Howling Abyss, 453 League Classic.
     var map = args.Length > 1 ? int.Parse(args[1]) : GameModes.SummonersRiftMap;
     foreach (var item in data.Items.LegendariesOn(map).Concat(data.Items.BootsOn(map)))
-        Console.WriteLine($"{item.Id,5} {item.Name,-30} {item.TotalGold,5}g  {item.Traits,-40} {string.Join(", ", item.Stats.Select(s => $"{s.Key} {s.Value}"))}");
+        Console.WriteLine($"{item.Id,5} {item.Name,-30} {item.TotalGold,5}g  {item.Traits,-40} {string.Join(", ", item.Stats.Select(s => $"{s.Key} {s.Value}"))}"
+                          + string.Concat(item.Scaling.Select(s => $" | {s.Passive}: {s.Stat} {(s.Source == ScalingSource.Stacked ? $"+{s.Amount}" : $"{s.Amount:P1} of {s.Source}")}")));
+    return;
+}
+
+if (args is ["--champions", ..])
+{
+    var byId = data.Abilities.ToDictionary(a => a.ChampionId);
+    Console.WriteLine($"{byId.Count} champions with ability data. * = added by the abilities, not the hand-kept lists.\n");
+    foreach (var trait in new[] { ChampionTraits.Healer, ChampionTraits.Shielder, ChampionTraits.HeavyCrowdControl, ChampionTraits.TrueDamage })
+    {
+        var champions = data.Champions.All.Where(c => c.Has(trait)).OrderBy(c => c.Name).ToList();
+        Console.WriteLine($"{trait} ({champions.Count}):");
+        Console.WriteLine("  " + string.Join(", ", champions.Select(c => ChampionKnowledge.TraitsOf(c.Id).HasFlag(trait) ? c.Name : c.Name + "*")) + "\n");
+    }
+    Console.WriteLine("Per champion, the abilities that heal (H), shield (S), crowd control (C) and deal true damage (T):");
+    foreach (var a in data.Abilities.OrderBy(a => a.ChampionId))
+        Console.WriteLine($"  {a.ChampionId,-14} H {a.Healing,-5} S {a.Shielding,-5} C {a.HardCrowdControl,-5} T {a.TrueDamage}");
     return;
 }
 
 if (args is ["--augments", ..])
 {
     var set = args.Contains("arena") ? AugmentSet.Arena : AugmentSet.Mayhem;
-    var augments = await new AugmentDataClient().LoadAsync(set, data.Items, cts.Token);
+    var augmentData = new AugmentDataClient();
+    var augments = await augmentData.LoadAsync(set, data.Items, cts.Token);
+    if (Option("--locale") is { } locale)
+    {
+        augments = augments.WithLocalNames(await augmentData.LoadLocalNamesAsync(locale, cts.Token));
+        Console.WriteLine($"{augments.All.Count(a => a.LocalNames.Count > 0)} of {augments.All.Count} have a {locale} name. {AugmentTranslations.Attribution}");
+    }
     Console.WriteLine($"{augments.All.Count} {set} augments ({augments.Offerable.Count()} offerable). {AugmentDataClient.Attribution}\n");
     foreach (var a in augments.All)
     {
         var flags = string.Join(" ", new[] { a.IsDisabled ? "DISABLED" : "", a.IsQuest ? "quest" : "", a.HasDrawback ? "drawback" : "", a.IsRandom ? "random" : "" }.Where(f => f != ""));
-        Console.WriteLine($"{a.Tier.ToString()[0]} {a.Name,-28} gives [{a.Effects}] needs [{a.Triggers}]" +
+        Console.WriteLine($"{a.Tier.ToString()[0]} {a.Name,-28}{(a.LocalNames.Count > 0 ? $" ({string.Join(" / ", a.LocalNames)})" : "")} gives [{a.Effects}] needs [{a.Triggers}]" +
             (a.MentionedItems.Count > 0 ? $" items [{string.Join(", ", a.MentionedItems.Select(i => i.Name))}]" : "") + (flags != "" ? $" {flags}" : ""));
     }
     return;
@@ -216,8 +242,12 @@ if (args is ["--mayhem", var gamePath, ..])
 
 if (args is ["--scan", var source, ..])
 {
-    var augments = await new AugmentDataClient().LoadMayhemAsync(data.Items, cts.Token);
-    var reader = new AugmentScreenReader(augments);
+    var augmentData = new AugmentDataClient();
+    var augments = await augmentData.LoadMayhemAsync(data.Items, cts.Token);
+    var locale = Option("--locale");
+    if (locale is not null)
+        augments = augments.WithLocalNames(await augmentData.LoadLocalNamesAsync(locale, cts.Token));
+    var reader = new AugmentScreenReader(augments, locale);
     Console.WriteLine($"OCR language: {reader.OcrLanguage}");
 
     var started = DateTime.UtcNow;
@@ -458,4 +488,4 @@ static void PrintTeam(string title, IEnumerable<PlayerProfile> players)
 }
 
 static string Reasons(ScoredItem item) =>
-    string.Join("  ", item.Reasons.Select(r => $"[{r.Situation.Label} +{r.Points:0.0}]"));
+    string.Join("  ", item.Reasons.Select(r => $"[{r.Situation.Label} +{r.Points:0.0}]").Concat(item.Effects.Select(e => $"[{e}]")));

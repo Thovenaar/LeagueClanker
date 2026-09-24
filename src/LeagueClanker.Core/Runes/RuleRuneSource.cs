@@ -1,4 +1,5 @@
 using LeagueClanker.Core.Analysis;
+using LeagueClanker.Core.StaticData;
 
 namespace LeagueClanker.Core.Runes;
 
@@ -94,7 +95,7 @@ public sealed class RuleRuneSource(RuneCatalog catalog) : IRuneSource
             reasons.Add($"Enemy has {tanks.Count} tanks ({string.Join(", ", tanks)}), so Cut Down instead of Coup de Grace.");
         }
 
-        var crowdControl = enemies.Where(e => ChampionKnowledge.HeavyCrowdControl.Contains(e.Champion.Id)).Select(e => e.Champion.Name).ToList();
+        var crowdControl = enemies.Where(e => e.Champion.Has(ChampionTraits.HeavyCrowdControl)).Select(e => e.Champion.Name).ToList();
         if (crowdControl.Count >= CrowdControlForTenacity && request.Playstyle != Archetype.Tank && shards[2] != StatShards.Tenacity)
         {
             shards[2] = StatShards.Tenacity;

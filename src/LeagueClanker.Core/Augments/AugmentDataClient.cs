@@ -27,9 +27,23 @@ public sealed class AugmentDataClient(HttpClient? http = null, string? cacheDire
         return AugmentCatalog.ParseWikiModule(source, items);
     }
 
-    private async Task<string> GetSourceAsync(AugmentSet set, CancellationToken ct)
+    /// <summary>
+    /// Card names in the client's language ("de_DE"), keyed by English name. Empty for English, so nothing changes there.
+    /// </summary>
+    public async Task<IReadOnlyDictionary<string, IReadOnlyList<string>>> LoadLocalNamesAsync(string locale, CancellationToken ct = default)
     {
-        var (url, file) = set == AugmentSet.Arena ? (ArenaModuleUrl, "arena.lua") : (MayhemModuleUrl, "mayhem.lua");
+        if (AugmentTranslations.IsEnglish(locale))
+            return new Dictionary<string, IReadOnlyList<string>>();
+        var english = await GetCachedAsync(AugmentTranslations.Url("en_US"), "cherry-augments.default.json", ct);
+        var local = await GetCachedAsync(AugmentTranslations.Url(locale), $"cherry-augments.{AugmentTranslations.Folder(locale)}.json", ct);
+        return AugmentTranslations.Join(english, local);
+    }
+
+    private Task<string> GetSourceAsync(AugmentSet set, CancellationToken ct) =>
+        set == AugmentSet.Arena ? GetCachedAsync(ArenaModuleUrl, "arena.lua", ct) : GetCachedAsync(MayhemModuleUrl, "mayhem.lua", ct);
+
+    private async Task<string> GetCachedAsync(string url, string file, CancellationToken ct)
+    {
         var path = Path.Combine(_cacheDirectory, file);
         var cached = File.Exists(path);
         if (cached && DateTime.UtcNow - File.GetLastWriteTimeUtc(path) < MaxAge)

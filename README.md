@@ -128,7 +128,7 @@ During champ select, `--champselect` does the same for your pick and adds your l
 dotnet run --project src/LeagueClanker.Cli -- --matchup - --position top --enemies "Darius;Amumu;Caitlyn"
 ```
 
-`--augments` lists the Mayhem augments with the tags the parser gave them, and `--augments arena` the Arena ones. `--scan` reads an offer from a screenshot, or from the running game with `--scan screen`. Add `--verbose` to see every line of text it recognized:
+`--augments` lists the Mayhem augments with the tags the parser gave them, and `--augments arena` the Arena ones. Add `--locale de_DE` to see each card's name in that language. `--scan` reads an offer from a screenshot, or from the running game with `--scan screen`. Add `--verbose` to see every line of text it recognized, and `--locale` to read a client in another language:
 
 ```bash
 dotnet run --project src/LeagueClanker.Cli -- --scan samples/mayhem/offer-mock.png --verbose
@@ -138,6 +138,12 @@ dotnet run --project src/LeagueClanker.Cli -- --scan samples/mayhem/offer-mock.p
 
 ```bash
 dotnet run --project src/LeagueClanker.Cli -- --history samples/history/games.json
+```
+
+`--champions` lists the healers, shielders, crowd control and true damage champions, marking the ones the ability tooltips added to the hand-kept lists, and shows per champion which abilities heal, shield, crowd control or deal true damage. `--items` also shows the passives it could read, like Rabadon's Deathcap's 30% AP:
+
+```bash
+dotnet run --project src/LeagueClanker.Cli -- --champions
 ```
 
 To turn one of your own games into a sample, save the API response while in a match:
@@ -164,7 +170,7 @@ During a game the app reads Riot's official Live Client Data API on localhost, a
 
 In champ select it reads the League client's local API, the same one Porofessor, Blitz and Mobalytics use to import runes. The only things it changes are what *Apply* writes: your rune page, your summoner spells and an item set for the shop. With *Apply automatically* turned on in the settings, that happens when you lock in. Riot doesn't document that API, but it has tolerated rune importers for years.
 
-It also reads your own match history from that API, for your record per champion. It only uses what the client shows you: picks as they lock in, your own role, mastery, champions and past games. It doesn't try to reveal what champ select hides, like player names in ranked or enemy picks in blind pick. That's what gets tools banned, while counters and matchup stats are what every approved app shows.
+It also reads your own match history from that API, for your record per champion, and the client's language, to read augment cards in it. It only uses what the client shows you: picks as they lock in, your own role, mastery, champions and past games. It doesn't try to reveal what champ select hides, like player names in ranked or enemy picks in blind pick. That's what gets tools banned, while counters and matchup stats are what every approved app shows.
 
 Riot's third-party policy allows apps that highlight decisions with multiple choices rather than dictate them. That's why every suggestion comes with an alternative and a reason.
 
@@ -176,9 +182,11 @@ Everything that matters lives in `src/LeagueClanker.Core`.
 
 `StaticData/` parses Data Dragon. Item stats come from the description's `<stats>` block, because the structured `stats` field leaves out lethality, penetration and ability haste. Item effects like anti-heal ("Wounds"), stasis, spell shields and armor shred are regex matches on the description text. New items on a new patch get picked up without code changes, as long as Riot keeps the wording.
 
+`ItemScaling.cs` reads passives whose stats depend on yours: Rabadon's Deathcap's "Increases your total Ability Power by 30%", Riftmaker's and Overlord's Bloodmail's share of bonus health as AP or AD, Warmog's bonus health and Jak'Sho's bonus resists. It also reads stats that build up during the game, like Rod of Ages (10 times 10 health, 30 mana and 3 AP) and Yun Tal's 25% crit, and counts those fully stacked. The item advisor values these with your current stats, so Rabadon's climbs as your AP grows, and the build card says what they add ("Magical Opus: +95 AP"). Enemy stat estimates include the passives of items they own.
+
 `Analysis/` turns each player into a profile. It estimates their archetype (mage, marksman, bruiser and so on), their AP/AD split, their threat from item gold and K/D, and how tanky, healing, shielding or CC-heavy they are. The AP/AD split starts from the champion and moves with what they buy, so an AP Kai'Sa counts as AP once she has the items.
 
-Every player gets a full stat block in `StatBlock.cs`: AD, AP, attack speed, crit, lethality, % penetration, ability haste (cooldown reduction in League Classic), life steal, omnivamp, spell vamp, armor, MR, health, move speed and range. Riot's API only exposes real stats for you, so yours come straight from the game, runes and buffs included. Percentage stats are the exception, because their units vary between game versions, so those still come from items. Everyone else's stats are base stats at their level, using League's growth curve, plus item stats. The Players tab shows all ten. Tankiness works the same way. Early on a tank champion is assumed to go tank. After about two items' worth of gold only what they bought counts, so an Ornn who built Liandry's and Sorcerer's Shoes stops counting as a tank. `samples/tanks-no-defense.json` shows that case. `ChampionKnowledge.cs` holds the hand-kept lists Data Dragon doesn't have: healers, shielders, true damage and heavy crowd control.
+Every player gets a full stat block in `StatBlock.cs`: AD, AP, attack speed, crit, lethality, % penetration, ability haste (cooldown reduction in League Classic), life steal, omnivamp, spell vamp, armor, MR, health, move speed and range. Riot's API only exposes real stats for you, so yours come straight from the game, runes and buffs included. Percentage stats are the exception, because their units vary between game versions, so those still come from items. Everyone else's stats are base stats at their level, using League's growth curve, plus item stats. The Players tab shows all ten. Tankiness works the same way. Early on a tank champion is assumed to go tank. After about two items' worth of gold only what they bought counts, so an Ornn who built Liandry's and Sorcerer's Shoes stops counting as a tank. `samples/tanks-no-defense.json` shows that case. `ChampionKnowledge.cs` holds hand-kept lists of healers, shielders, true damage and heavy crowd control. `ChampionAbilities.cs` adds to them from the ability tooltips in Data Dragon's championFull.json, which mark healing, shields, true damage and statuses like stuns. It adds a champion when at least 2 abilities heal, 2 shield, 3 have hard crowd control (stuns, knock-ups, roots, suppression, charms, fears, taunts, sleeps, pulls) or 1 deals true damage to champions. The bar is high because the hand-kept lists already cover most champions, but new champions get picked up without a code change.
 
 `Recommendation/` scores every legendary item for you. The base score is what your archetype values in its stats, minus anything past a cap you've already hit: crit stops at 100% and attack speed at 2.5 per second. Each rule that fires adds a bonus to items that answer it. Ranking is greedy with diminishing returns. Once one MR item answers "enemy is AP", the next MR item gets half the bonus, and items you already own count the same way. Without this, one strong situation fills all six slots with the same kind of item.
 
@@ -211,7 +219,7 @@ op.gg's ranked data is read for all ranks. That's about four times the games of 
 - **Team comp.** Once your team has picks (teammates count with their hover), it warns about gaps. It checks for no tank or bruiser in three or more picks, a team that's 80% or more one damage type, and no heavy crowd control in four or more picks. Before you lock in, it lists up to five champions in your role that fill the biggest gap, with a frontline first, then the other damage type, then crowd control. Champions you play come first. It also sums up the enemy picks so far: their AP share, tanks and crowd control.
 - **Notes.** Under your lane opponent there's a box for your own notes, like "Darius: don't trade at level 2". It saves as you type, in `%LOCALAPPDATA%\LeagueClanker\notes.json`. The note shows up again the next time you face that champion, in champ select and under the matchup line in game.
 
-`DraftAdvisor.cs` holds these thresholds. The damage split and crowd control come from champion classes and the hand-kept lists in `ChampionKnowledge.cs`, so they're estimates before anyone buys items.
+`DraftAdvisor.cs` holds these thresholds. The damage split and crowd control come from champion classes, the hand-kept lists in `ChampionKnowledge.cs` and the ability tooltips, so they're estimates before anyone buys items.
 
 ### Champ select: playstyle and runes
 
@@ -302,7 +310,9 @@ What changes in League Classic:
 
 ### ARAM: Mayhem and Arena augments
 
-The app reads the offer off your screen. In Mayhem, once you reach a pick level (3, 7, 11 or 15) without having taken that many cards, it screenshots the League window every 2 seconds and runs Windows' built-in text recognition on it. That takes about 130 ms. It only looks at the middle of the screen, which skips chat and the HUD, and it blacks out its own window so it never reads its own suggestions. `AugmentTextMatcher` matches the text against the card names by edit distance. That way OCR slips like "CRITICA1" and names that wrap over two lines still count, and a stray card name of another tier elsewhere on screen is ignored. When cards show up, the app switches to the Augments tab with a chime. A reroll changes the offer, and the ranking follows.
+The app reads the offer off your screen. In Mayhem, once you reach a pick level (3, 7, 11 or 15) without having taken that many cards, it screenshots the League window every 2 seconds and runs Windows' built-in text recognition on it. That takes about 130 ms. It only looks at the middle of the screen, which skips chat and the HUD, and it blacks out its own window so it never reads its own suggestions. `AugmentTextMatcher` matches the text against the card names by edit distance. That way OCR slips like "CRITICA1" and names that wrap over two lines still count, and a stray card name of another tier elsewhere on screen is ignored.
+
+The League client can run in another language. When it does, the app asks the client for its language and downloads the card names in it from Community Dragon (`AugmentTranslations`), joined to the English names on each card's id. That covers 223 of 225 Mayhem cards and 253 of 257 Arena cards. Text recognition then runs in that language, which Windows can only do when the language is installed (Settings, Time & language, Language & region). Without it, the Augments tab says so and reads in English, which still catches names that stay the same. You can also type a card's name in your language. When cards show up, the app switches to the Augments tab with a chime. A reroll changes the offer, and the ranking follows.
 
 Arena offers augments between rounds, and the game doesn't report rounds. So in Arena the app keeps watching the screen until you have four cards. Arena's card list comes from the wiki's Arena module. Its simulation has no rule against two Silver offers in a row, because that rule is Mayhem's.
 
@@ -313,7 +323,7 @@ You can always type cards instead: type part of a name and mark each match as *O
 `Augments/` ranks the three cards in an augment offer by the best final set of four they lead to, without win rates:
 
 1. `AugmentDataClient` downloads the wiki's augment data (225 Mayhem cards, 257 Arena cards) and caches it for a day. Riot's own data has neither.
-2. `AugmentTagger` tags each card with what it gives (attack speed, true damage, shields, ...) and what it needs or scales with (attacking, crits, pets, AP ratio, ...), from the description text. A short override list fixes cards the patterns misread.
+2. `AugmentTagger` tags each card with what it gives (attack speed, true damage, shields, ...) and what it needs or scales with (attacking, crits, pets, AP ratio, ...), from the description text. A hand-kept list fixes cards the patterns misread and tags cards the wiki describes by what they do rather than by stats. Only random and economy cards (transmutes, Pandora's Box, rerolls, gold) stay untagged: 17 in Arena and 6 in Mayhem.
 3. `AugmentScorer` values a card by its fit with your champion, its pairings with the cards you picked (a card that pays off on attacks wants attack speed), your items (on-hit items, "Upgrade Infinity Edge"), and the game situation from the item rules.
 4. `AugmentAdvisor` simulates your remaining picks 1,500 times per option with Mayhem's rules: picks at levels 3, 7, 11 and 15, one tier per offer, the first two offers never both Silver, one reroll per card. It ranks each option by the average value of the final set. That's how a weaker card that sets up combos can beat a stronger card that leads nowhere.
 
@@ -375,20 +385,19 @@ To add a rule, implement `IBuildRule`, return a `Situation` with a label, a sent
 ## Known gaps
 
 - Enemy stats are estimates. Runes, stat shards and stacking passives (Malphite, Cho'Gath, Sion) don't show up in the API.
-- Only stats and keyword traits count. Rabadon's Deathcap's AP multiplier, for example, is invisible to the scorer. The core-item bonus papers over some of this.
+- Only stats, keyword traits and the passives `ItemScaling` can read count. Stacks without a number in the description (Heartsteel's health, Mejai's Glory) and mana-based passives (Archangel's Staff, Manamune) are invisible to the scorer. The core-item bonus papers over some of this.
 - "Buy now" plans toward your next item only. It doesn't pick up a cheap part of a later item when your gold doesn't fit the next one.
 - Your own archetype comes from Riot's class tags plus a short override list. Off-meta picks like AP Shaco get the wrong item pool. A manual archetype picker in the window would fix it.
 - Riot's policy rules out showing win rates for augments and Arena items, so the augment advisor reasons from card effects only.
 - In Arena the whole lobby counts as enemies, because the API doesn't show your duo partner. Rules that count enemies (tanks, healers) fire more easily with 15 of them.
-- Arena augments are tagged by the same patterns as Mayhem's. About 1 in 7 gets no tags yet, which makes it rank on its tier alone.
 - Swiftplay slot writing has been tested against a simulated client only, like the rest of what *Apply* writes.
 - Augment tags come from description text. Expect some cards to be tagged wrong until they've been reviewed with `--augments`.
-- Card names are matched in English, so screen reading needs the League client in English.
+- Screen reading in other languages has been tested with typed and simulated text only, not on a real non-English client. Reading the client's language needs the League client running.
 - Screen reading has only been tested on a mock screenshot, not on real games yet.
 - The core-item lists and weights are my best guess for patch 16.18. Real win-rate data per matchup would beat them.
 - Writing rune pages, summoner spells and item sets has been tested against a simulated client, not yet against a real one. The client's local API and op.gg's JSON API are both undocumented and can change.
 - Enemy roles are guessed until the game starts. Flex picks (a mid Gragas, a top Seraphine) can land in the wrong role, and so can the lane opponent.
-- The team comp check reads champion classes and a hand-kept crowd control list. Champions with crowd control that isn't on the list count as having none.
+- The team comp check reads champion classes, a hand-kept crowd control list and the ability tooltips. A champion with one strong stun that isn't on the list counts as having little crowd control, because the tooltips need 3 abilities with it.
 - The rule pages and keystone lists are hand-made for patch 16.19. New keystones need adding to `KeystoneFit` before op.gg pages with them are used.
 - Rune pages assume today's runes. League Classic's old runes and masteries aren't supported.
 - League Classic's mode string is unverified until someone saves a snapshot from a real game (see *Running it from source*). The classic-item check covers the likely cases.
@@ -403,6 +412,8 @@ To add a rule, implement `IBuildRule`, return a `Situation` with a label, a sent
 Augment data comes from the League of Legends Wiki under CC BY-SA 3.0: [Mayhem](https://wiki.leagueoflegends.com/en-us/Module:MayhemAugmentData/data) and [Arena](https://wiki.leagueoflegends.com/en-us/Module:ArenaAugmentData/data).
 
 Rune pages, summoner spells, skill orders, starting and core items, role play rates and matchups come from [op.gg](https://www.op.gg). LeagueClanker isn't affiliated with op.gg.
+
+Augment names in other languages come from [Community Dragon](https://www.communitydragon.org). LeagueClanker isn't affiliated with Community Dragon.
 
 
 LeagueClanker isn't endorsed by Riot Games and doesn't reflect the views or opinions of Riot Games or anyone officially involved in producing or managing Riot Games properties. Riot Games, and all associated properties are trademarks or registered trademarks of Riot Games, Inc.

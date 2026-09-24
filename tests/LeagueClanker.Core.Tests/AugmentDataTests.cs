@@ -59,6 +59,17 @@ public class AugmentDataTests
     }
 
     [Fact]
+    public void Tag_ReadsArenaSpellCardsAndHandKeptCards()
+    {
+        var castle = AugmentTagger.Tag("Castle", new() { ["description"] = "Replaces Flee with {{ai|Castle|Castle}}.", ["tier"] = "Silver" }, null);
+        var punch = AugmentTagger.Tag("Mystic Punch", new() { ["description"] = "Basic attacks on-hit reduce the remaining cooldowns of your abilities by 1.25 seconds.", ["tier"] = "Prismatic" }, null);
+
+        Assert.True(castle.Effects.HasFlag(AugmentEffect.SummonerSpell));
+        Assert.True(punch.Effects.HasFlag(AugmentEffect.AbilityHaste));
+        Assert.True(punch.Triggers.HasFlag(AugmentTrigger.Attacks));
+    }
+
+    [Fact]
     public void TagText_IgnoresTheTargetsHealthAndLowHealthThresholds()
     {
         var (bomber, _) = AugmentTagger.TagText("Upon death, you explode to deal true damage equal to 20% of the target's maximum health.");

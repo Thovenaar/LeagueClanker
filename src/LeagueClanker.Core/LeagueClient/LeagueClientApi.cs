@@ -82,6 +82,11 @@ public sealed class GameflowQueue
     public int MapId { get; init; }
 }
 
+public sealed class RegionLocale
+{
+    public string? Locale { get; init; }
+}
+
 public sealed class Lobby
 {
     public LobbyMember? LocalMember { get; init; }
@@ -400,6 +405,10 @@ public sealed class LeagueClientApi : IClientSource, IRunePageStore, IChampSelec
         using var response = await _http.PutAsJsonAsync("lol-perks/v1/currentpage", id, Json.Options, ct);
         await EnsureSuccessAsync(response, ct);
     }
+
+    /// <summary>The client's language, like "de_DE". Null when the client doesn't say.</summary>
+    public async Task<string?> GetLocaleAsync(CancellationToken ct) =>
+        (await GetOrNullAsync<RegionLocale>("riotclient/region-locale", ct))?.Locale;
 
     // 404 means "not in that state right now" (no champ select, no lobby); a closed client means null too.
     private async Task<T?> GetOrNullAsync<T>(string path, CancellationToken ct) where T : class

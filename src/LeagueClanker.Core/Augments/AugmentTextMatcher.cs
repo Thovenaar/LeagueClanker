@@ -21,19 +21,23 @@ public static class AugmentTextMatcher
 
     public static IReadOnlyList<DetectedAugment> FindOffer(IReadOnlyList<TextLine> lines, AugmentCatalog catalog)
     {
-        var augments = catalog.Offerable.Select(a => (Augment: a, Key: AugmentCatalog.Key(a.Name))).Where(a => a.Key.Length > 0).ToList();
+        // English names always, plus the client's language when it isn't English.
+        var augments = catalog.Offerable
+            .SelectMany(a => a.LocalNames.Prepend(a.Name).Select(name => (Augment: a, Name: name, Key: AugmentCatalog.Key(name))))
+            .Where(a => a.Key.Length > 0)
+            .ToList();
         var matches = new Dictionary<AugmentInfo, DetectedAugment>();
 
         foreach (var (text, x) in Candidates(lines))
         {
             var key = AugmentCatalog.Key(text);
-            if (key.Length < 3)
-                continue;
+            if (key.Length < 2 || (key.Length < 3 && key.All(char.IsAscii)))
+                continue; // Chinese and Korean names can be two characters
 
             // Each piece of text names at most one card: the closest one.
             var best = augments
-                .Select(a => (a.Augment, Score: Similarity(a.Key, key)))
-                .Where(m => m.Score >= (m.Augment.Name.Length <= ShortName ? 1.0 : MinSimilarity))
+                .Select(a => (a.Augment, a.Name, Score: Similarity(a.Key, key)))
+                .Where(m => m.Score >= (m.Name.Length <= ShortName ? 1.0 : MinSimilarity))
                 .OrderByDescending(m => m.Score)
                 .ThenByDescending(m => m.Augment.Name.Length)
                 .FirstOrDefault();

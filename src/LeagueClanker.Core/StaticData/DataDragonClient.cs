@@ -12,6 +12,9 @@ public sealed record StaticGameData(string Version, ItemCatalog Items, ChampionC
 
     public SummonerSpellCatalog Spells { get; init; } = SummonerSpellCatalog.Empty;
 
+    /// <summary>What each champion's abilities do. Empty when championFull.json couldn't be loaded; the hand-kept lists still work.</summary>
+    public IReadOnlyList<AbilityProfile> Abilities { get; init; } = [];
+
     public string SpellIconUrl(int spellId) =>
         Spells.Get(spellId) is { } spell ? $"https://ddragon.leagueoflegends.com/cdn/{Version}/img/spell/{spell.Image}" : "";
 
@@ -32,8 +35,10 @@ public sealed class DataDragonClient(HttpClient? http = null, string? cacheDirec
         var version = await GetLatestVersionAsync(ct);
         var itemJson = await GetCachedAsync(version, "item.json", ct);
         var championJson = await GetCachedAsync(version, "champion.json", ct);
-        return new StaticGameData(version, ItemCatalog.Parse(itemJson), ChampionCatalog.Parse(championJson))
+        var abilities = await LoadOptionalAsync(version, "championFull.json", ChampionAbilities.Parse, [], ct);
+        return new StaticGameData(version, ItemCatalog.Parse(itemJson), ChampionCatalog.Parse(championJson).WithAbilities(abilities))
         {
+            Abilities = abilities,
             Runes = await LoadOptionalAsync(version, "runesReforged.json", RuneCatalog.Parse, RuneCatalog.Empty, ct),
             Spells = await LoadOptionalAsync(version, "summoner.json", SummonerSpellCatalog.Parse, SummonerSpellCatalog.Empty, ct),
         };

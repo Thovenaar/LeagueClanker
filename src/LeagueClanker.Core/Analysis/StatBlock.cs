@@ -13,6 +13,11 @@ public sealed record StatBlock
     public double BonusAttackDamage { get; init; }
     public double AbilityPower { get; init; }
 
+    /// <summary>Health, armor and magic resist from items (and runes, for the active player), for passives that scale with them.</summary>
+    public double BonusHealth { get; init; }
+    public double BonusArmor { get; init; }
+    public double BonusMagicResist { get; init; }
+
     /// <summary>Attacks per second.</summary>
     public double AttackSpeed { get; init; }
 
@@ -62,7 +67,7 @@ public static class StatEstimator
 
         var classic = mode.UsesClassicItems();
         var bonusAttackSpeed = champion.BonusAttackSpeedAt(level, classic) + Sum(Stat.AttackSpeed);
-        return new StatBlock
+        var stats = new StatBlock
         {
             Health = champion.HealthAt(level, classic) + Sum(Stat.Health),
             Armor = champion.ArmorAt(level, classic) + (classic ? ClassicBonusArmor : 0) + Sum(Stat.Armor),
@@ -85,8 +90,50 @@ public static class StatEstimator
             Tenacity = Math.Min(100, Sum(Stat.Tenacity)),
             MoveSpeed = (champion.MoveSpeed + Sum(Stat.MoveSpeed)) * (1 + Sum(Stat.MoveSpeedPercent) / 100),
             AttackRange = champion.AttackRange,
+            BonusHealth = Sum(Stat.Health),
+            BonusArmor = Sum(Stat.Armor),
+            BonusMagicResist = Sum(Stat.MagicResist),
         };
+        return WithPassives(stats, items);
     }
+
+    /// <summary>
+    /// Adds what item passives give on top of the item stats: stacks first, then health and resists, then stats converted
+    /// from health, and multipliers of total AP last, so Rabadon's also multiplies Riftmaker's AP.
+    /// </summary>
+    private static StatBlock WithPassives(StatBlock stats, IReadOnlyList<ItemInfo> items)
+    {
+        var scaling = items.SelectMany(i => i.Scaling.Select(s => (Item: i, Scaling: s))).ToList();
+        if (scaling.Count == 0)
+            return stats;
+
+        foreach (var order in new[] { ScalingSource.Stacked, ScalingSource.BonusArmor, ScalingSource.BonusMagicResist, ScalingSource.BonusHealth, ScalingSource.TotalAbilityPower })
+            foreach (var (_, s) in scaling.Where(x => x.Scaling.Source == order).OrderBy(x => x.Scaling.Stat == Stat.Health ? 0 : 1))
+            {
+                // The item's own stats are in the totals already, so value the passive on the totals alone.
+                var value = s.Source switch
+                {
+                    ScalingSource.Stacked => s.Amount,
+                    ScalingSource.TotalAbilityPower => s.Amount * stats.AbilityPower,
+                    ScalingSource.BonusHealth => s.Amount * stats.BonusHealth,
+                    ScalingSource.BonusArmor => s.Amount * stats.BonusArmor,
+                    _ => s.Amount * stats.BonusMagicResist,
+                };
+                stats = stats.Add(s.Stat, value);
+            }
+        return stats;
+    }
+
+    private static StatBlock Add(this StatBlock stats, string stat, double value) => stat switch
+    {
+        Stat.Health => stats with { Health = stats.Health + value, BonusHealth = stats.BonusHealth + value },
+        Stat.Armor => stats with { Armor = stats.Armor + value, BonusArmor = stats.BonusArmor + value },
+        Stat.MagicResist => stats with { MagicResist = stats.MagicResist + value, BonusMagicResist = stats.BonusMagicResist + value },
+        Stat.AttackDamage => stats with { AttackDamage = stats.AttackDamage + value, BonusAttackDamage = stats.BonusAttackDamage + value },
+        Stat.AbilityPower => stats with { AbilityPower = stats.AbilityPower + value },
+        Stat.CritChance => stats with { CritChance = Math.Min(CritCap, stats.CritChance + value) },
+        _ => stats,
+    };
 
     /// <summary>Overlays the active player's real stats on the estimate. Zeroed stats (loading screen) are ignored.</summary>
     public static StatBlock WithRealStats(this StatBlock estimate, LiveChampionStats? real)
@@ -99,6 +146,10 @@ public static class StatEstimator
             Health = real.MaxHealth,
             Armor = real.Armor,
             MagicResist = real.MagicResist,
+            // The real totals include runes and passives; the base part is the same as in the estimate.
+            BonusHealth = Math.Max(0, real.MaxHealth - (estimate.Health - estimate.BonusHealth)),
+            BonusArmor = Math.Max(0, real.Armor - (estimate.Armor - estimate.BonusArmor)),
+            BonusMagicResist = Math.Max(0, real.MagicResist - (estimate.MagicResist - estimate.BonusMagicResist)),
             AttackDamage = real.AttackDamage,
             AbilityPower = real.AbilityPower,
             AttackSpeed = real.AttackSpeed,

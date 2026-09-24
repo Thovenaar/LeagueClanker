@@ -16,6 +16,9 @@ public sealed record ScoredItem(ItemInfo Item, double BaseScore, IReadOnlyList<I
         Contributions.Where(c => c.Points >= MinReasonPoints).OrderByDescending(c => c.Points);
 
     public double PointsFor(Situation situation) => Contributions.FirstOrDefault(c => c.Situation == situation)?.Points ?? 0;
+
+    /// <summary>What the item's scaling passives add for you: "Magical Opus: +95 AP".</summary>
+    public IReadOnlyList<string> Effects { get; init; } = [];
 }
 
 /// <summary>"Enemy team is 80% AP, so I suggest X, but Y is also ok."</summary>
@@ -127,7 +130,10 @@ public sealed class RecommendationEngine(StaticGameData data, IReadOnlyList<IBui
     }
 
     private static ScoredItem Score(ItemInfo item, ArchetypeProfile profile, StatBlock mine, IReadOnlyList<Situation> situations, Dictionary<Situation, double> weights) =>
-        new(item, profile.BaseScore(item, mine), situations.Select(s => new ItemContribution(s, s.Score(item) * weights[s])).ToList());
+        new(item, profile.BaseScore(item, mine), situations.Select(s => new ItemContribution(s, s.Score(item) * weights[s])).ToList())
+        {
+            Effects = item.Scaling.Where(s => s.Value(item, mine) >= 1 && profile.StatWeights.GetValueOrDefault(s.Stat) > 0).Select(s => s.Note(item, mine)).ToList(),
+        };
 
     /// <param name="pool">Candidates in recommendation order: ranked legendaries, then boots.</param>
     private Advice? BuildAdvice(Situation situation, IReadOnlyList<ScoredItem> pool)

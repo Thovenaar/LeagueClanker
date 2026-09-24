@@ -22,7 +22,7 @@ public sealed record ArchetypeProfile(
 
     /// <param name="mine">Your current stats. Stats past their cap are worth nothing to you.</param>
     public double BaseScore(ItemInfo item, StatBlock? mine = null) =>
-        item.Stats.Sum(s => StatWeights.GetValueOrDefault(s.Key) * StatScale.Normalize(s.Key, Useful(s.Key, s.Value, mine)))
+        item.StatsFor(mine).Sum(s => StatWeights.GetValueOrDefault(s.Key) * StatScale.Normalize(s.Key, Useful(s.Key, s.Value, mine)))
         + ((item.IsClassic ? ClassicCoreItems : CoreItems).Contains(item.Name) ? CoreItemBonus : 0);
 
     // Crit stops at 100%. Attack speed stops at 2.5 per second; bonus attack speed scales base attack speed.

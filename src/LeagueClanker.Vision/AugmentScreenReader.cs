@@ -21,15 +21,27 @@ public sealed class AugmentScreenReader
     private readonly AugmentCatalog _catalog;
     private readonly OcrEngine? _ocr;
 
-    public AugmentScreenReader(AugmentCatalog catalog)
+    /// <param name="locale">The League client's language, like "de_DE". Cards are read in that language when Windows can.</param>
+    public AugmentScreenReader(AugmentCatalog catalog, string? locale = null)
     {
         _catalog = catalog;
-        // Augment names come from the English wiki data, so read with English when it's installed.
         var english = new Language("en-US");
-        _ocr = OcrEngine.IsLanguageSupported(english) ? OcrEngine.TryCreateFromLanguage(english) : OcrEngine.TryCreateFromUserProfileLanguages();
+        var tag = locale?.Replace('_', '-');
+        var wanted = AugmentTranslations.IsEnglish(locale) || !Language.IsWellFormed(tag) ? english : new Language(tag);
+        if (OcrEngine.IsLanguageSupported(wanted))
+            _ocr = OcrEngine.TryCreateFromLanguage(wanted);
+        else
+        {
+            // English still reads names that stay the same in other languages ("ADAPt", "Goliath").
+            MissingLanguage = wanted.DisplayName;
+            _ocr = OcrEngine.IsLanguageSupported(english) ? OcrEngine.TryCreateFromLanguage(english) : OcrEngine.TryCreateFromUserProfileLanguages();
+        }
     }
 
     public string OcrLanguage => _ocr?.RecognizerLanguage.DisplayName ?? "none";
+
+    /// <summary>The client's language when Windows has no text recognition for it, like "German (Germany)".</summary>
+    public string? MissingLanguage { get; }
 
     /// <summary>Scans the League window. <paramref name="exclude"/> is blanked first (our own window).</summary>
     public async Task<ScanResult> ScanScreenAsync(PixelRect? exclude = null)
@@ -74,7 +86,9 @@ public sealed class AugmentScreenReader
             })
             .ToList();
 
-        return new ScanResult(AugmentTextMatcher.FindOffer(lines, _catalog), lines);
+        var problem = MissingLanguage is null ? null
+            : $"Windows can't read {MissingLanguage} text. Add the language in Windows settings (Time & language > Language & region) to read cards.";
+        return new ScanResult(AugmentTextMatcher.FindOffer(lines, _catalog), lines, problem);
     }
 
     private static async Task<ScreenImage> LoadAsync(string path)

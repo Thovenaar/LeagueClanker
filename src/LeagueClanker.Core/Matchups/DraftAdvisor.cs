@@ -145,7 +145,7 @@ public sealed class DraftAdvisor(IMatchupData data, ChampionCatalog champions)
                 gap = Gap.Physical;
         }
 
-        if (team.Count >= 4 && !profiles.Any(p => ChampionKnowledge.HeavyCrowdControl.Contains(p.Champion.Id)))
+        if (team.Count >= 4 && !profiles.Any(p => p.Champion.Has(ChampionTraits.HeavyCrowdControl)))
         {
             warnings.Add("Little crowd control: nobody to lock enemies down.");
             if (gap == Gap.None)
@@ -164,7 +164,7 @@ public sealed class DraftAdvisor(IMatchupData data, ChampionCatalog champions)
                 Gap.Frontline => archetype.IsFrontline(),
                 Gap.Magic => GameAnalyzer.EstimateMagicShare(c, archetype, []) >= 0.6,
                 Gap.Physical => GameAnalyzer.EstimateMagicShare(c, archetype, []) <= 0.4,
-                Gap.CrowdControl => ChampionKnowledge.HeavyCrowdControl.Contains(c.Id),
+                Gap.CrowdControl => c.Has(ChampionTraits.HeavyCrowdControl),
                 _ => false,
             };
         }
@@ -205,7 +205,7 @@ public sealed class DraftAdvisor(IMatchupData data, ChampionCatalog champions)
         var tanks = profiles.Count(p => p.Archetype == Archetype.Tank);
         if (tanks > 0)
             parts.Add(tanks == 1 ? "1 tank" : $"{tanks} tanks");
-        var crowdControl = profiles.Count(p => ChampionKnowledge.HeavyCrowdControl.Contains(p.Champion.Id));
+        var crowdControl = profiles.Count(p => p.Champion.Has(ChampionTraits.HeavyCrowdControl));
         if (crowdControl >= 2)
             parts.Add("heavy crowd control");
         return $"Enemy so far: {string.Join(", ", parts)}.";

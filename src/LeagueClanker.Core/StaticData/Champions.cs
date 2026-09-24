@@ -14,6 +14,11 @@ public sealed record ChampionInfo(
     string Id, string Name, IReadOnlyList<string> Tags, int Attack, int Defense, int Magic,
     ChampionStats? BaseStats = null, string Resource = "Mana", int Key = 0)
 {
+    /// <summary>From the hand-kept lists, plus what the ability tooltips show once <see cref="ChampionCatalog.WithAbilities"/> ran.</summary>
+    public ChampionTraits Traits { get; init; } = Analysis.ChampionKnowledge.TraitsOf(Id);
+
+    public bool Has(ChampionTraits trait) => (Traits & trait) == trait;
+
     public bool UsesMana => Resource.Equals("Mana", StringComparison.OrdinalIgnoreCase);
 
     public string PrimaryTag => Tags.Count > 0 ? Tags[0] : "";
@@ -129,6 +134,13 @@ public sealed class ChampionCatalog
                 int.TryParse(c.GetStringOrEmpty("key"), out var key) ? key : 0);
         });
         return new ChampionCatalog(champions);
+    }
+
+    /// <summary>Adds the traits each champion's abilities show to the hand-kept ones.</summary>
+    public ChampionCatalog WithAbilities(IEnumerable<AbilityProfile> abilities)
+    {
+        var byId = abilities.ToDictionary(a => a.ChampionId, StringComparer.OrdinalIgnoreCase);
+        return new ChampionCatalog(All.Select(c => byId.TryGetValue(c.Id, out var a) ? c with { Traits = c.Traits | a.Traits } : c));
     }
 
     private static string Normalize(string name) => new(name.Where(char.IsLetterOrDigit).Select(char.ToLowerInvariant).ToArray());

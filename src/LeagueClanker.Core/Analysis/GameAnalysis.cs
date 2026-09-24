@@ -72,18 +72,18 @@ public sealed class PlayerProfile
     // Tank champions that skipped defense are as squishy as a mage. Bruisers aren't, their base stats are too high.
     public bool IsSquishy => Tankiness < 0.2 && DefenseFromItems < 50 && (Archetype.IsSquishy() || Archetype == Archetype.Tank);
     public bool HasAntiHeal => Items.Any(i => i.Has(ItemTraits.AntiHeal));
-    public bool DealsTrueDamage => ChampionKnowledge.TrueDamage.Contains(Champion.Id);
+    public bool DealsTrueDamage => Champion.Has(ChampionTraits.TrueDamage);
 
     public double HealingScore =>
-        (ChampionKnowledge.Healers.Contains(Champion.Id) ? 1 : 0)
+        (Champion.Has(ChampionTraits.Healer) ? 1 : 0)
         + 0.4 * Legendaries.Count(i => i.Has(ItemTraits.Sustain));
 
     public double ShieldScore =>
-        (ChampionKnowledge.Shielders.Contains(Champion.Id) ? 1 : 0)
+        (Champion.Has(ChampionTraits.Shielder) ? 1 : 0)
         + 0.4 * Legendaries.Count(i => i.Has(ItemTraits.GrantsShield) || i.Stat(Stat.HealShieldPower) > 0);
 
     public double CrowdControlScore =>
-        ChampionKnowledge.HeavyCrowdControl.Contains(Champion.Id) ? 1.0
+        Champion.Has(ChampionTraits.HeavyCrowdControl) ? 1.0
         : Archetype switch { Archetype.Tank => 0.8, Archetype.Enchanter => 0.5, _ => 0.25 };
 
     public override string ToString() => Name;

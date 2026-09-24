@@ -97,6 +97,9 @@ public sealed record AugmentInfo
     public required string Name { get; init; }
     public required AugmentTier Tier { get; init; }
 
+    /// <summary>The name in the League client's language, when that isn't English. Screen reading matches these too.</summary>
+    public IReadOnlyList<string> LocalNames { get; init; } = [];
+
     /// <summary>Plain-text description, wiki markup removed.</summary>
     public required string Description { get; init; }
 
@@ -137,7 +140,12 @@ public sealed class AugmentCatalog
     public AugmentCatalog(IEnumerable<AugmentInfo> augments)
     {
         All = augments.OrderBy(a => a.Tier).ThenBy(a => a.Name).ToList();
-        _byKey = All.GroupBy(a => Key(a.Name)).ToDictionary(g => g.Key, g => g.First());
+        // English names first, so a local name that happens to be another card's English name doesn't take it over.
+        _byKey = All.Select(a => (Key: Key(a.Name), Augment: a))
+            .Concat(All.SelectMany(a => a.LocalNames.Select(n => (Key: Key(n), Augment: a))))
+            .Where(n => n.Key.Length > 0)
+            .GroupBy(n => n.Key)
+            .ToDictionary(g => g.Key, g => g.First().Augment);
     }
 
     public IReadOnlyList<AugmentInfo> All { get; }
@@ -147,7 +155,17 @@ public sealed class AugmentCatalog
 
     public IReadOnlyList<AugmentInfo> OfferableOfTier(AugmentTier tier) => Offerable.Where(a => a.Tier == tier).ToList();
 
-    /// <summary>Case, spacing and punctuation don't matter, so OCR'd or typed names still match.</summary>
+    /// <summary>Adds each card's name in another language, keyed by its English name (see <see cref="AugmentTranslations"/>).</summary>
+    public AugmentCatalog WithLocalNames(IReadOnlyDictionary<string, IReadOnlyList<string>> byEnglishName) =>
+        new(All.Select(a => a with
+        {
+            // The wiki writes "Quest: Sneakerhead" where the client may say "Sneakerhead".
+            LocalNames = byEnglishName.GetValueOrDefault(Key(a.Name))
+                         ?? byEnglishName.GetValueOrDefault(Key(a.Name.StartsWith("Quest:", StringComparison.OrdinalIgnoreCase) ? a.Name[6..] : a.Name))
+                         ?? [],
+        }));
+
+    /// <summary>Case, spacing and punctuation don't matter, so OCR'd or typed names still match. Local names work too.</summary>
     public AugmentInfo? Find(string name) => _byKey.GetValueOrDefault(Key(name));
 
     /// <summary>Parses the wiki's Module:MayhemAugmentData/data Lua source and tags every augment.</summary>

@@ -76,6 +76,20 @@ public sealed record ItemInfo
     public IReadOnlySet<string> Passives { get; init; } = new HashSet<string>();
     public IReadOnlyList<int> BuildsFrom { get; init; } = [];
 
+    /// <summary>Passives whose stats depend on yours or build up during the game, like Rabadon's Deathcap's.</summary>
+    public IReadOnlyList<ItemScaling> Scaling { get; init; } = [];
+
+    /// <summary>The item's stats plus what its passives add for you right now.</summary>
+    public IReadOnlyDictionary<string, double> StatsFor(Analysis.StatBlock? mine)
+    {
+        if (Scaling.Count == 0)
+            return Stats;
+        var stats = new Dictionary<string, double>(Stats, StringComparer.OrdinalIgnoreCase);
+        foreach (var s in Scaling)
+            stats[s.Stat] = stats.GetValueOrDefault(s.Stat) + s.Value(this, mine);
+        return stats;
+    }
+
     /// <summary>Data Dragon map ids the item can be bought on (11 = Summoner's Rift, 12 = Howling Abyss).</summary>
     public IReadOnlySet<int> Maps { get; init; } = new HashSet<int> { GameModes.SummonersRiftMap };
 
@@ -205,6 +219,7 @@ public sealed partial class ItemCatalog
             Traits = DetectTraits(description),
             Tags = tags,
             Passives = ParsePassives(description),
+            Scaling = ItemScalingParser.Parse(description),
             BuildsFrom = from,
             Maps = ParseMaps(json),
         };

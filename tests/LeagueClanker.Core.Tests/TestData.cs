@@ -97,7 +97,7 @@ internal static class TestData
         Items = items.Select((id, slot) => new LiveItem { ItemID = id, Slot = slot }).ToList(),
     };
 
-    private static string Stats(params (string A, string B)[] lines)
+    internal static string Stats(params (string A, string B)[] lines)
     {
         // ("Armor", "60") → "60 Armor"; ("35%", "Armor Penetration") → "35% Armor Penetration"
         var parts = lines.Select(l => char.IsDigit(l.A[0])
@@ -106,7 +106,7 @@ internal static class TestData
         return $"<mainText><stats>{string.Join("<br>", parts)}</stats><br><br>";
     }
 
-    private static object Item(string name, int gold, string description, string[]? tags = null, string[]? from = null, string[]? into = null, string[]? maps = null) => new
+    internal static object Item(string name, int gold, string description, string[]? tags = null, string[]? from = null, string[]? into = null, string[]? maps = null) => new
     {
         name,
         description = description + "</mainText>",

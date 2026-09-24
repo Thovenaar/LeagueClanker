@@ -64,11 +64,28 @@ public partial class App : Application
             viewModel.Status = "Loading item data...";
             var data = await new DataDragonClient().LoadAsync(_cts.Token);
             viewModel.Footer = demoPath is null ? $"v{AppVersion} · Patch {data.Version}" : $"v{AppVersion} · Patch {data.Version} · demo: {Path.GetFileName(demoPath)}";
+            var catalogs = new Dictionary<AugmentSet, AugmentCatalog>();
             var readers = new Dictionary<AugmentSet, AugmentScreenReader>();
             foreach (var set in Enum.GetValues<AugmentSet>())
                 if (await LoadAugmentsAsync(viewModel.Augments, set, data) is { } augments)
+                {
+                    catalogs[set] = augments;
                     readers[set] = new AugmentScreenReader(augments);
+                }
             _ = RunScannerAsync(viewModel.Augments, () => readers.GetValueOrDefault(viewModel.Augments.CurrentSet), scanImage);
+
+            // Once the League client says it runs in another language, read the cards in that language.
+            var readerLocale = "en_US";
+            _useClientLocale = async locale =>
+            {
+                if (locale == readerLocale || catalogs.Count == 0)
+                    return;
+                readerLocale = locale;
+                var names = await new AugmentDataClient().LoadLocalNamesAsync(locale, _cts.Token);
+                foreach (var (set, catalog) in catalogs)
+                    readers[set] = new AugmentScreenReader(catalog.WithLocalNames(names), locale);
+                Log.Write($"Reading augment cards in {locale} ({names.Count} translated names)");
+            };
 
             var advisor = new BuildAdvisor(source, data);
             viewModel.Augments.PickedChanged += (_, picked) => advisor.Augments = picked;
@@ -146,6 +163,20 @@ public partial class App : Application
     }
 
     private Action? _refreshStats;
+    private Func<string, Task>? _useClientLocale;
+
+    private async Task UseClientLocaleAsync(LeagueClientApi client)
+    {
+        try
+        {
+            if (await client.GetLocaleAsync(_cts.Token) is { Length: > 0 } locale && _useClientLocale is { } use)
+                await use(locale);
+        }
+        catch (Exception ex) when (ex is HttpRequestException or System.Text.Json.JsonException or IOException or TaskCanceledException)
+        {
+            Log.Error("Loading augment names in the client's language", ex);
+        }
+    }
     private bool _historyStale = true;
 
     // Up to 30 games, with details for the 15 newest to find lane opponents. Slow on purpose: it's a one-off per session.
@@ -241,6 +272,7 @@ public partial class App : Application
                     {
                         _historyStale = false;
                         _ = LoadMatchHistoryAsync(client);
+                        _ = UseClientLocaleAsync(client);
                     }
                     if (snapshot is null && LeagueClientApi.FindLockfile() is var found && found != lockfile)
                     {
@@ -307,7 +339,7 @@ public partial class App : Application
                     var scan = imagePath is null
                         ? await Task.Run(() => reader.ScanScreenAsync(exclude: ScreenCapture.WindowArea(ownWindow)))
                         : await Task.Run(() => reader.ScanFileAsync(imagePath));
-                    picker.OnScan(scan.Offer.Select(d => d.Augment).ToList());
+                    picker.OnScan(scan.Offer.Select(d => d.Augment).ToList(), scan.Problem);
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException)
                 {

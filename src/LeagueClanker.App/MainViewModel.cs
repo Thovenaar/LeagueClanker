@@ -508,7 +508,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
     }
 
     private static ItemRow ToRow(ScoredItem item, int rank, StaticGameData data) =>
-        new(rank, item.Item.Name, item.Item.TotalGold, data.ItemIconUrl(item.Item.Id), item.Reasons.Select(r => r.Situation.Label).ToList());
+        new(rank, item.Item.Name, item.Item.TotalGold, data.ItemIconUrl(item.Item.Id), [.. item.Reasons.Select(r => r.Situation.Label), .. item.Effects]);
 
     private static PlayerRow ToRow(PlayerProfile p, bool isMe, StaticGameData data)
     {

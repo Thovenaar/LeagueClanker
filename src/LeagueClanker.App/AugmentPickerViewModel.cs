@@ -50,6 +50,7 @@ public sealed class AugmentPickerViewModel : INotifyPropertyChanged
 
     private string _searchText = "";
     private string _status = "Loading augment data...";
+    private string? _scanProblem;
     private IReadOnlyList<AugmentRow> _suggestions = [];
     private IReadOnlyList<AugmentRow> _offerRows = [];
     private IReadOnlyList<AugmentRow> _pickedRows = [];
@@ -224,8 +225,14 @@ public sealed class AugmentPickerViewModel : INotifyPropertyChanged
     /// Result of reading the screen. A new set of cards replaces the offer (a reroll changes one card).
     /// The same cards again are ignored, so a name you corrected by hand stays corrected.
     /// </summary>
-    public void OnScan(IReadOnlyList<AugmentInfo> detected)
+    public void OnScan(IReadOnlyList<AugmentInfo> detected, string? problem = null)
     {
+        if (problem != _scanProblem)
+        {
+            _scanProblem = problem;
+            if (_offer.Count == 0)
+                UpdateStatus(null);
+        }
         if (detected.Count >= 2)
         {
             _scansWithoutOffer = 0;
@@ -405,7 +412,7 @@ public sealed class AugmentPickerViewModel : INotifyPropertyChanged
     {
         Status = error ?? (_catalog is null ? "Augment data isn't available."
             : _picked.Count >= MaxPicked ? "You have all four augments."
-            : _offer.Count == 0 && WantsScan ? "Watching your screen for the augment offer. You can also type the cards."
+            : _offer.Count == 0 && WantsScan ? $"Watching your screen for the augment offer. You can also type the cards.{(_scanProblem is null ? "" : " " + _scanProblem)}"
             : _offer.Count == 0 ? "Type the cards you're offered. Add cards you already have as picked."
             : _offer.Count < OfferSize ? $"Add the other {OfferSize - _offer.Count} offered card{(OfferSize - _offer.Count == 1 ? "" : "s")}, or look at the ranking so far."
             : RerollsPerCard > 1 ? "You have 2 rerolls per card this time (Stats on Stats on Stats!)."

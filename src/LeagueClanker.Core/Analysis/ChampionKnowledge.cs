@@ -1,8 +1,11 @@
+using LeagueClanker.Core.StaticData;
+
 namespace LeagueClanker.Core.Analysis;
 
 /// <summary>
 /// Hand-curated champion traits Data Dragon does not expose. Keys are Data Dragon ids.
-/// Missing or new champions still work: they fall back to Riot's class tags and item-based detection.
+/// Healers, shielders, crowd control and true damage also come from ability tooltips (<see cref="ChampionAbilities"/>),
+/// which catches new champions. Others still work without them: they fall back to Riot's class tags and item-based detection.
 /// </summary>
 public static class ChampionKnowledge
 {
@@ -92,6 +95,13 @@ public static class ChampionKnowledge
             ["Udyr"] = 0.5, ["Varus"] = 0.25, ["Volibear"] = 0.5, ["Warwick"] = 0.5, ["Zac"] = 0.9,
             ["Ezreal"] = 0.25,
         };
+
+    /// <summary>The traits the lists above give a champion.</summary>
+    public static ChampionTraits TraitsOf(string id) =>
+        (Healers.Contains(id) ? ChampionTraits.Healer : 0)
+        | (Shielders.Contains(id) ? ChampionTraits.Shielder : 0)
+        | (HeavyCrowdControl.Contains(id) ? ChampionTraits.HeavyCrowdControl : 0)
+        | (TrueDamage.Contains(id) ? ChampionTraits.TrueDamage : 0);
 
     private static HashSet<string> Set(params string[] ids) => new(ids, StringComparer.OrdinalIgnoreCase);
 }
