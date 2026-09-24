@@ -11,7 +11,7 @@ using LeagueClanker.Vision;
 //   LeagueClanker.Cli <game.json>             analyze a saved allgamedata snapshot once
 //   LeagueClanker.Cli <folder | a.json b.json> [--decline]
 //                                             replay snapshots through the pivot planner, accepting pivots (or declining)
-//   LeagueClanker.Cli --items                 list the item catalog with detected traits (for tuning rules)
+//   LeagueClanker.Cli --items [map]           list the item catalog with detected traits (map 453 = League Classic)
 //   LeagueClanker.Cli --augments              list Mayhem augments with their tags
 //   LeagueClanker.Cli --mayhem <game.json> --offer "A;B;C" [--picked "X;Y"] [--rerolled "A"] [--golden "B"]
 //                                             rank an augment offer and say which cards to reroll
@@ -26,9 +26,11 @@ Console.WriteLine("Loading Data Dragon...");
 var data = await new DataDragonClient().LoadAsync(cts.Token);
 Console.WriteLine($"Patch {data.Version}: {data.Items.Legendaries.Count} legendary items, {data.Items.Boots.Count} boots.\n");
 
-if (args is ["--items"])
+if (args is ["--items", ..])
 {
-    foreach (var item in data.Items.Legendaries.Concat(data.Items.Boots))
+    // --items [map]: 11 Summoner's Rift (default), 12 Howling Abyss, 453 League Classic.
+    var map = args.Length > 1 ? int.Parse(args[1]) : GameModes.SummonersRiftMap;
+    foreach (var item in data.Items.LegendariesOn(map).Concat(data.Items.BootsOn(map)))
         Console.WriteLine($"{item.Id,5} {item.Name,-30} {item.TotalGold,5}g  {item.Traits,-40} {string.Join(", ", item.Stats.Select(s => $"{s.Key} {s.Value}"))}");
     return;
 }
@@ -194,7 +196,7 @@ static void Print(BuildRecommendation? rec)
     }
 
     var me = rec.Game.Me;
-    Console.WriteLine($"=== {me.Name} ({me.Archetype.DisplayName()}) @ {TimeSpan.FromSeconds(rec.Game.GameTimeSeconds):mm\\:ss} ===");
+    Console.WriteLine($"=== {me.Name} ({me.Archetype.DisplayName()}) @ {TimeSpan.FromSeconds(rec.Game.GameTimeSeconds):mm\\:ss}, {rec.Game.Mode.DisplayName()} ===");
     Console.WriteLine(rec.DamageSummary);
     PrintTeam("Your team", [me, .. rec.Game.Allies.Players]);
     PrintTeam("Enemies", rec.Game.Enemies.Players);

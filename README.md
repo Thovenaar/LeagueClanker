@@ -18,6 +18,10 @@ In ARAM: Mayhem an Augments tab ranks the cards you're offered:
 
 <img src="docs/screenshots/augments.png" alt="Augments tab" width="400">
 
+In League Classic it recommends from the old item shop, with the old stats:
+
+<img src="docs/screenshots/classic.png" alt="League Classic build" width="400">
+
 The screenshots come from the demo snapshots in `samples/`, not a live game.
 
 ## Download
@@ -46,6 +50,8 @@ dotnet run --project src/LeagueClanker.App -- --demo samples/ap-heavy.json
 dotnet run --project src/LeagueClanker.App -- --demo samples/mayhem/jinx-level7.json --scan-image samples/mayhem/offer-mock.png
 ```
 
+`samples/classic/ashe-vs-tanks.json` is a League Classic game: Ashe against three tanks, with the classic items.
+
 Point it at a folder to replay snapshots in order, one every 10 seconds. `samples/pivot-demo` is a Garen game where the enemy team switches from AD to AP items, which triggers a pivot suggestion:
 
 ```bash
@@ -58,7 +64,7 @@ The CLI prints the same output as text, which is faster when tuning rules:
 dotnet run --project src/LeagueClanker.Cli -- samples/three-tanks.json
 ```
 
-Run it with no arguments to watch the live game, or with `--items` to list every item and the traits the parser detected. Give it a folder to replay snapshots through the pivot planner. It accepts every pivot, or declines them with `--decline`:
+Run it with no arguments to watch the live game, or with `--items` to list every item and the traits the parser detected. `--items 12` lists the Howling Abyss items and `--items 453` the League Classic ones. Give it a folder to replay snapshots through the pivot planner. It accepts every pivot, or declines them with `--decline`:
 
 ```bash
 dotnet run --project src/LeagueClanker.Cli -- samples/pivot-demo --decline
@@ -110,7 +116,7 @@ Everything that matters lives in `src/LeagueClanker.Core`.
 
 `Analysis/` turns each player into a profile. It estimates their archetype (mage, marksman, bruiser and so on), their AP/AD split, their threat from item gold and K/D, and how tanky, healing, shielding or CC-heavy they are. The AP/AD split starts from the champion and moves with what they buy, so an AP Kai'Sa counts as AP once she has the items.
 
-Every player gets a full stat block in `StatBlock.cs`: AD, AP, attack speed, crit, lethality, % penetration, ability haste, life steal, omnivamp, armor, MR, health, move speed and range. Riot's API only exposes real stats for you, so yours come straight from the game, runes and buffs included. Percentage stats are the exception, because their units vary between game versions, so those still come from items. Everyone else's stats are base stats at their level, using League's growth curve, plus item stats. The Players tab shows all ten. Tankiness works the same way. Early on a tank champion is assumed to go tank. After about two items' worth of gold only what they bought counts, so an Ornn who built Liandry's and Sorcerer's Shoes stops counting as a tank. `samples/tanks-no-defense.json` shows that case. `ChampionKnowledge.cs` holds the hand-kept lists Data Dragon doesn't have: healers, shielders, true damage and heavy crowd control.
+Every player gets a full stat block in `StatBlock.cs`: AD, AP, attack speed, crit, lethality, % penetration, ability haste (cooldown reduction in League Classic), life steal, omnivamp, spell vamp, armor, MR, health, move speed and range. Riot's API only exposes real stats for you, so yours come straight from the game, runes and buffs included. Percentage stats are the exception, because their units vary between game versions, so those still come from items. Everyone else's stats are base stats at their level, using League's growth curve, plus item stats. The Players tab shows all ten. Tankiness works the same way. Early on a tank champion is assumed to go tank. After about two items' worth of gold only what they bought counts, so an Ornn who built Liandry's and Sorcerer's Shoes stops counting as a tank. `samples/tanks-no-defense.json` shows that case. `ChampionKnowledge.cs` holds the hand-kept lists Data Dragon doesn't have: healers, shielders, true damage and heavy crowd control.
 
 `Recommendation/` scores every legendary item for you. The base score is what your archetype values in its stats, minus anything past a cap you've already hit: crit stops at 100% and attack speed at 2.5 per second. Each rule that fires adds a bonus to items that answer it. Ranking is greedy with diminishing returns. Once one MR item answers "enemy is AP", the next MR item gets half the bonus, and items you already own count the same way. Without this, one strong situation fills all six slots with the same kind of item.
 
@@ -127,7 +133,26 @@ Your next three purchases keep the order of the latest ranking, so a new augment
 
 ### Game modes
 
-The advisor reads `gameMode` and the map number from the live game. Summoner's Rift uses map 11 items. ARAM and ARAM: Mayhem (`KIWI`) use Howling Abyss items. Arena isn't supported.
+The advisor reads `gameMode` and the map number from the live game. Summoner's Rift uses map 11 items. ARAM and ARAM: Mayhem (`KIWI`) use Howling Abyss items. League Classic uses its own shop, see below. Arena isn't supported.
+
+### League Classic
+
+League Classic is Summoner's Rift with the item shop, stats and champions of around 2014. Riot's data sells its items on map 453, as copies of the old items with ids from 770000 to 779999. The advisor treats a game as League Classic when:
+
+- the map is 453, or the mode is `JADE` (the codename in the item texts), or
+- the game reports itself as Summoner's Rift, but someone holds a classic item. Everyone starts with one, like Doran's Blade, so this kicks in within the first minute.
+
+Nobody has sent a real League Classic snapshot yet, so the second check is there in case Riot reports it as a normal Summoner's Rift game. That's also how `samples/classic/ashe-vs-tanks.json` reports it.
+
+What changes in League Classic:
+
+- **The shop.** Only classic items are recommended. Old items are cheaper, so any item that builds into nothing and costs 1,100 gold or more counts as finished. Doran's items don't. Boots build from the classic Boots of Speed.
+- **Stats in passives.** Classic items keep some stats in their unique passives, like The Black Cleaver's "Wicked Edge: 10 Lethality", Ionian Boots' "15% Cooldown Reduction", the boots' move speed, and Last Whisper's "ignore 35% of your opponent's Armor". The parser reads those, but skips conditional ones like Mejai's "At 20 stacks, grants 15% Cooldown Reduction". Flat regeneration ("10 Mana Regen per 5 seconds") counts as 100% base regeneration.
+- **Old stats.** Cooldown reduction takes the place of ability haste and stops counting at 40%. Spell vamp counts as sustain, and AP champions value it.
+- **Stat growth.** Champions gain the same amount every level, instead of today's curve that saves more for later levels, and everyone gets 4 extra armor. That changes everyone's numbers on the Players tab and every rule built on them.
+- **Staples.** Each archetype has its own classic core items: Last Whisper and Phantom Dancer for marksmen, Deathfire Grasp for AP assassins, Sunfire Cape and Randuin's Omen for tanks, Shurelya's Reverie for enchanters.
+- **Jungle items.** Spirit of the Ancient Golem and the other jungle items only show up when you have Smite.
+- **Old item wording.** Zhonya's "Invulnerable and Untargetable" counts as stasis and Quicksilver's "Removes all debuffs" as a cleanse. Randuin's attack speed slow, Madred's %max health damage and Abyssal Scepter's magic resist aura are recognized too.
 
 ### ARAM: Mayhem augments
 
@@ -208,6 +233,10 @@ To add a rule, implement `IBuildRule`, return a `Situation` with a label, a sent
 - Card names are matched in English, so screen reading needs the League client in English.
 - Screen reading has only been tested on a mock screenshot, not on real games yet.
 - The core-item lists and weights are my best guess for patch 16.18. Real win-rate data per matchup would beat them.
+- League Classic's mode string is unverified until someone saves a snapshot from a real game (see *Running it from source*). The classic-item check covers the likely cases.
+- In League Classic, champion knowledge (roles, healers, crowd control) and base stats describe today's champions, not the old kits.
+- Runes and masteries aren't read in any mode, so they're missing from everyone's stats but yours.
+- The limited "Classic ARAM" variant, with classic items on Howling Abyss, gets the normal ARAM items.
 
 ## Legal
 

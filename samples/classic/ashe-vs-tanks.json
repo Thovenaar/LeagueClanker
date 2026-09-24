@@ -1,0 +1,623 @@
+{
+  "activePlayer": {
+    "riotId": "You#EUW",
+    "riotIdGameName": "You",
+    "riotIdTagLine": "EUW",
+    "summonerName": "You#EUW",
+    "level": 12,
+    "currentGold": 1300.0
+  },
+  "allPlayers": [
+    {
+      "championName": "Ashe",
+      "rawChampionName": "game_character_displayname_Ashe",
+      "riotId": "You#EUW",
+      "riotIdGameName": "You",
+      "riotIdTagLine": "EUW",
+      "summonerName": "You#EUW",
+      "team": "ORDER",
+      "position": "BOTTOM",
+      "level": 12,
+      "isBot": false,
+      "isDead": false,
+      "items": [
+        {
+          "itemID": 771055,
+          "displayName": "Doran's Blade",
+          "count": 1,
+          "slot": 0,
+          "canUse": false,
+          "consumable": false,
+          "price": 0
+        },
+        {
+          "itemID": 773006,
+          "displayName": "Berserker's Greaves",
+          "count": 1,
+          "slot": 1,
+          "canUse": false,
+          "consumable": false,
+          "price": 0
+        },
+        {
+          "itemID": 773031,
+          "displayName": "Infinity Edge",
+          "count": 1,
+          "slot": 2,
+          "canUse": false,
+          "consumable": false,
+          "price": 0
+        },
+        {
+          "itemID": 771037,
+          "displayName": "Pickaxe",
+          "count": 1,
+          "slot": 3,
+          "canUse": false,
+          "consumable": false,
+          "price": 0
+        }
+      ],
+      "scores": {
+        "kills": 5,
+        "deaths": 2,
+        "assists": 4,
+        "creepScore": 150,
+        "wardScore": 6.0
+      },
+      "summonerSpells": {
+        "summonerSpellOne": {
+          "displayName": "Flash",
+          "rawDescription": "GeneratedTip_SummonerSpell_SummonerFlash_Description",
+          "rawDisplayName": "GeneratedTip_SummonerSpell_SummonerFlash_DisplayName"
+        },
+        "summonerSpellTwo": {
+          "displayName": "Heal",
+          "rawDescription": "GeneratedTip_SummonerSpell_SummonerHeal_Description",
+          "rawDisplayName": "GeneratedTip_SummonerSpell_SummonerHeal_DisplayName"
+        }
+      }
+    },
+    {
+      "championName": "Garen",
+      "rawChampionName": "game_character_displayname_Garen",
+      "riotId": "Ally1#EUW",
+      "riotIdGameName": "Ally1",
+      "riotIdTagLine": "EUW",
+      "summonerName": "Ally1#EUW",
+      "team": "ORDER",
+      "position": "TOP",
+      "level": 12,
+      "isBot": false,
+      "isDead": false,
+      "items": [
+        {
+          "itemID": 773111,
+          "displayName": "Mercury's Treads",
+          "count": 1,
+          "slot": 0,
+          "canUse": false,
+          "consumable": false,
+          "price": 0
+        },
+        {
+          "itemID": 773068,
+          "displayName": "Sunfire Cape",
+          "count": 1,
+          "slot": 1,
+          "canUse": false,
+          "consumable": false,
+          "price": 0
+        },
+        {
+          "itemID": 771028,
+          "displayName": "Ruby Crystal",
+          "count": 1,
+          "slot": 2,
+          "canUse": false,
+          "consumable": false,
+          "price": 0
+        }
+      ],
+      "scores": {
+        "kills": 2,
+        "deaths": 3,
+        "assists": 3,
+        "creepScore": 140,
+        "wardScore": 6.0
+      },
+      "summonerSpells": {
+        "summonerSpellOne": {
+          "displayName": "Flash",
+          "rawDescription": "GeneratedTip_SummonerSpell_SummonerFlash_Description",
+          "rawDisplayName": "GeneratedTip_SummonerSpell_SummonerFlash_DisplayName"
+        },
+        "summonerSpellTwo": {
+          "displayName": "Teleport",
+          "rawDescription": "GeneratedTip_SummonerSpell_SummonerTeleport_Description",
+          "rawDisplayName": "GeneratedTip_SummonerSpell_SummonerTeleport_DisplayName"
+        }
+      }
+    },
+    {
+      "championName": "Master Yi",
+      "rawChampionName": "game_character_displayname_MasterYi",
+      "riotId": "Ally2#EUW",
+      "riotIdGameName": "Ally2",
+      "riotIdTagLine": "EUW",
+      "summonerName": "Ally2#EUW",
+      "team": "ORDER",
+      "position": "JUNGLE",
+      "level": 12,
+      "isBot": false,
+      "isDead": false,
+      "items": [
+        {
+          "itemID": 773154,
+          "displayName": "Wriggle's Lantern",
+          "count": 1,
+          "slot": 0,
+          "canUse": false,
+          "consumable": false,
+          "price": 0
+        },
+        {
+          "itemID": 773006,
+          "displayName": "Berserker's Greaves",
+          "count": 1,
+          "slot": 1,
+          "canUse": false,
+          "consumable": false,
+          "price": 0
+        },
+        {
+          "itemID": 771037,
+          "displayName": "Pickaxe",
+          "count": 1,
+          "slot": 2,
+          "canUse": false,
+          "consumable": false,
+          "price": 0
+        }
+      ],
+      "scores": {
+        "kills": 4,
+        "deaths": 3,
+        "assists": 2,
+        "creepScore": 90,
+        "wardScore": 6.0
+      },
+      "summonerSpells": {
+        "summonerSpellOne": {
+          "displayName": "Flash",
+          "rawDescription": "GeneratedTip_SummonerSpell_SummonerFlash_Description",
+          "rawDisplayName": "GeneratedTip_SummonerSpell_SummonerFlash_DisplayName"
+        },
+        "summonerSpellTwo": {
+          "displayName": "Smite",
+          "rawDescription": "GeneratedTip_SummonerSpell_SummonerSmite_Description",
+          "rawDisplayName": "GeneratedTip_SummonerSpell_SummonerSmite_DisplayName"
+        }
+      }
+    },
+    {
+      "championName": "Annie",
+      "rawChampionName": "game_character_displayname_Annie",
+      "riotId": "Ally3#EUW",
+      "riotIdGameName": "Ally3",
+      "riotIdTagLine": "EUW",
+      "summonerName": "Ally3#EUW",
+      "team": "ORDER",
+      "position": "MIDDLE",
+      "level": 12,
+      "isBot": false,
+      "isDead": false,
+      "items": [
+        {
+          "itemID": 773020,
+          "displayName": "Sorcerer's Shoes",
+          "count": 1,
+          "slot": 0,
+          "canUse": false,
+          "consumable": false,
+          "price": 0
+        },
+        {
+          "itemID": 773027,
+          "displayName": "Rod of Ages",
+          "count": 1,
+          "slot": 1,
+          "canUse": false,
+          "consumable": false,
+          "price": 0
+        },
+        {
+          "itemID": 771052,
+          "displayName": "Amplifying Tome",
+          "count": 1,
+          "slot": 2,
+          "canUse": false,
+          "consumable": false,
+          "price": 0
+        }
+      ],
+      "scores": {
+        "kills": 3,
+        "deaths": 2,
+        "assists": 5,
+        "creepScore": 160,
+        "wardScore": 6.0
+      },
+      "summonerSpells": {
+        "summonerSpellOne": {
+          "displayName": "Flash",
+          "rawDescription": "GeneratedTip_SummonerSpell_SummonerFlash_Description",
+          "rawDisplayName": "GeneratedTip_SummonerSpell_SummonerFlash_DisplayName"
+        },
+        "summonerSpellTwo": {
+          "displayName": "Ignite",
+          "rawDescription": "GeneratedTip_SummonerSpell_SummonerIgnite_Description",
+          "rawDisplayName": "GeneratedTip_SummonerSpell_SummonerIgnite_DisplayName"
+        }
+      }
+    },
+    {
+      "championName": "Janna",
+      "rawChampionName": "game_character_displayname_Janna",
+      "riotId": "Ally4#EUW",
+      "riotIdGameName": "Ally4",
+      "riotIdTagLine": "EUW",
+      "summonerName": "Ally4#EUW",
+      "team": "ORDER",
+      "position": "UTILITY",
+      "level": 10,
+      "isBot": false,
+      "isDead": false,
+      "items": [
+        {
+          "itemID": 773158,
+          "displayName": "Ionian Boots of Lucidity",
+          "count": 1,
+          "slot": 0,
+          "canUse": false,
+          "consumable": false,
+          "price": 0
+        },
+        {
+          "itemID": 773069,
+          "displayName": "Shurelya's Reverie",
+          "count": 1,
+          "slot": 1,
+          "canUse": false,
+          "consumable": false,
+          "price": 0
+        }
+      ],
+      "scores": {
+        "kills": 0,
+        "deaths": 2,
+        "assists": 9,
+        "creepScore": 20,
+        "wardScore": 6.0
+      },
+      "summonerSpells": {
+        "summonerSpellOne": {
+          "displayName": "Flash",
+          "rawDescription": "GeneratedTip_SummonerSpell_SummonerFlash_Description",
+          "rawDisplayName": "GeneratedTip_SummonerSpell_SummonerFlash_DisplayName"
+        },
+        "summonerSpellTwo": {
+          "displayName": "Exhaust",
+          "rawDescription": "GeneratedTip_SummonerSpell_SummonerExhaust_Description",
+          "rawDisplayName": "GeneratedTip_SummonerSpell_SummonerExhaust_DisplayName"
+        }
+      }
+    },
+    {
+      "championName": "Malphite",
+      "rawChampionName": "game_character_displayname_Malphite",
+      "riotId": "Enemy1#EUW",
+      "riotIdGameName": "Enemy1",
+      "riotIdTagLine": "EUW",
+      "summonerName": "Enemy1#EUW",
+      "team": "CHAOS",
+      "position": "TOP",
+      "level": 12,
+      "isBot": false,
+      "isDead": false,
+      "items": [
+        {
+          "itemID": 773047,
+          "displayName": "Ninja Tabi",
+          "count": 1,
+          "slot": 0,
+          "canUse": false,
+          "consumable": false,
+          "price": 0
+        },
+        {
+          "itemID": 773068,
+          "displayName": "Sunfire Cape",
+          "count": 1,
+          "slot": 1,
+          "canUse": false,
+          "consumable": false,
+          "price": 0
+        },
+        {
+          "itemID": 773143,
+          "displayName": "Randuin's Omen",
+          "count": 1,
+          "slot": 2,
+          "canUse": false,
+          "consumable": false,
+          "price": 0
+        }
+      ],
+      "scores": {
+        "kills": 2,
+        "deaths": 2,
+        "assists": 6,
+        "creepScore": 150,
+        "wardScore": 6.0
+      },
+      "summonerSpells": {
+        "summonerSpellOne": {
+          "displayName": "Flash",
+          "rawDescription": "GeneratedTip_SummonerSpell_SummonerFlash_Description",
+          "rawDisplayName": "GeneratedTip_SummonerSpell_SummonerFlash_DisplayName"
+        },
+        "summonerSpellTwo": {
+          "displayName": "Teleport",
+          "rawDescription": "GeneratedTip_SummonerSpell_SummonerTeleport_Description",
+          "rawDisplayName": "GeneratedTip_SummonerSpell_SummonerTeleport_DisplayName"
+        }
+      }
+    },
+    {
+      "championName": "Amumu",
+      "rawChampionName": "game_character_displayname_Amumu",
+      "riotId": "Enemy2#EUW",
+      "riotIdGameName": "Enemy2",
+      "riotIdTagLine": "EUW",
+      "summonerName": "Enemy2#EUW",
+      "team": "CHAOS",
+      "position": "JUNGLE",
+      "level": 12,
+      "isBot": false,
+      "isDead": false,
+      "items": [
+        {
+          "itemID": 773111,
+          "displayName": "Mercury's Treads",
+          "count": 1,
+          "slot": 0,
+          "canUse": false,
+          "consumable": false,
+          "price": 0
+        },
+        {
+          "itemID": 773207,
+          "displayName": "Spirit of the Ancient Golem",
+          "count": 1,
+          "slot": 1,
+          "canUse": false,
+          "consumable": false,
+          "price": 0
+        },
+        {
+          "itemID": 773075,
+          "displayName": "Thornmail",
+          "count": 1,
+          "slot": 2,
+          "canUse": false,
+          "consumable": false,
+          "price": 0
+        }
+      ],
+      "scores": {
+        "kills": 1,
+        "deaths": 3,
+        "assists": 8,
+        "creepScore": 80,
+        "wardScore": 6.0
+      },
+      "summonerSpells": {
+        "summonerSpellOne": {
+          "displayName": "Flash",
+          "rawDescription": "GeneratedTip_SummonerSpell_SummonerFlash_Description",
+          "rawDisplayName": "GeneratedTip_SummonerSpell_SummonerFlash_DisplayName"
+        },
+        "summonerSpellTwo": {
+          "displayName": "Smite",
+          "rawDescription": "GeneratedTip_SummonerSpell_SummonerSmite_Description",
+          "rawDisplayName": "GeneratedTip_SummonerSpell_SummonerSmite_DisplayName"
+        }
+      }
+    },
+    {
+      "championName": "Alistar",
+      "rawChampionName": "game_character_displayname_Alistar",
+      "riotId": "Enemy3#EUW",
+      "riotIdGameName": "Enemy3",
+      "riotIdTagLine": "EUW",
+      "summonerName": "Enemy3#EUW",
+      "team": "CHAOS",
+      "position": "UTILITY",
+      "level": 10,
+      "isBot": false,
+      "isDead": false,
+      "items": [
+        {
+          "itemID": 773117,
+          "displayName": "Boots of Mobility",
+          "count": 1,
+          "slot": 0,
+          "canUse": false,
+          "consumable": false,
+          "price": 0
+        },
+        {
+          "itemID": 773190,
+          "displayName": "Locket of the Iron Solari",
+          "count": 1,
+          "slot": 1,
+          "canUse": false,
+          "consumable": false,
+          "price": 0
+        }
+      ],
+      "scores": {
+        "kills": 0,
+        "deaths": 4,
+        "assists": 7,
+        "creepScore": 25,
+        "wardScore": 6.0
+      },
+      "summonerSpells": {
+        "summonerSpellOne": {
+          "displayName": "Flash",
+          "rawDescription": "GeneratedTip_SummonerSpell_SummonerFlash_Description",
+          "rawDisplayName": "GeneratedTip_SummonerSpell_SummonerFlash_DisplayName"
+        },
+        "summonerSpellTwo": {
+          "displayName": "Exhaust",
+          "rawDescription": "GeneratedTip_SummonerSpell_SummonerExhaust_Description",
+          "rawDisplayName": "GeneratedTip_SummonerSpell_SummonerExhaust_DisplayName"
+        }
+      }
+    },
+    {
+      "championName": "Twisted Fate",
+      "rawChampionName": "game_character_displayname_TwistedFate",
+      "riotId": "Enemy4#EUW",
+      "riotIdGameName": "Enemy4",
+      "riotIdTagLine": "EUW",
+      "summonerName": "Enemy4#EUW",
+      "team": "CHAOS",
+      "position": "MIDDLE",
+      "level": 12,
+      "isBot": false,
+      "isDead": false,
+      "items": [
+        {
+          "itemID": 773020,
+          "displayName": "Sorcerer's Shoes",
+          "count": 1,
+          "slot": 0,
+          "canUse": false,
+          "consumable": false,
+          "price": 0
+        },
+        {
+          "itemID": 773100,
+          "displayName": "Lich Bane",
+          "count": 1,
+          "slot": 1,
+          "canUse": false,
+          "consumable": false,
+          "price": 0
+        },
+        {
+          "itemID": 771052,
+          "displayName": "Amplifying Tome",
+          "count": 1,
+          "slot": 2,
+          "canUse": false,
+          "consumable": false,
+          "price": 0
+        }
+      ],
+      "scores": {
+        "kills": 4,
+        "deaths": 3,
+        "assists": 3,
+        "creepScore": 170,
+        "wardScore": 6.0
+      },
+      "summonerSpells": {
+        "summonerSpellOne": {
+          "displayName": "Flash",
+          "rawDescription": "GeneratedTip_SummonerSpell_SummonerFlash_Description",
+          "rawDisplayName": "GeneratedTip_SummonerSpell_SummonerFlash_DisplayName"
+        },
+        "summonerSpellTwo": {
+          "displayName": "Ignite",
+          "rawDescription": "GeneratedTip_SummonerSpell_SummonerIgnite_Description",
+          "rawDisplayName": "GeneratedTip_SummonerSpell_SummonerIgnite_DisplayName"
+        }
+      }
+    },
+    {
+      "championName": "Sivir",
+      "rawChampionName": "game_character_displayname_Sivir",
+      "riotId": "Enemy5#EUW",
+      "riotIdGameName": "Enemy5",
+      "riotIdTagLine": "EUW",
+      "summonerName": "Enemy5#EUW",
+      "team": "CHAOS",
+      "position": "BOTTOM",
+      "level": 11,
+      "isBot": false,
+      "isDead": false,
+      "items": [
+        {
+          "itemID": 773006,
+          "displayName": "Berserker's Greaves",
+          "count": 1,
+          "slot": 0,
+          "canUse": false,
+          "consumable": false,
+          "price": 0
+        },
+        {
+          "itemID": 773072,
+          "displayName": "The Bloodthirster",
+          "count": 1,
+          "slot": 1,
+          "canUse": false,
+          "consumable": false,
+          "price": 0
+        },
+        {
+          "itemID": 771036,
+          "displayName": "Long Sword",
+          "count": 1,
+          "slot": 2,
+          "canUse": false,
+          "consumable": false,
+          "price": 0
+        }
+      ],
+      "scores": {
+        "kills": 3,
+        "deaths": 2,
+        "assists": 4,
+        "creepScore": 145,
+        "wardScore": 6.0
+      },
+      "summonerSpells": {
+        "summonerSpellOne": {
+          "displayName": "Flash",
+          "rawDescription": "GeneratedTip_SummonerSpell_SummonerFlash_Description",
+          "rawDisplayName": "GeneratedTip_SummonerSpell_SummonerFlash_DisplayName"
+        },
+        "summonerSpellTwo": {
+          "displayName": "Heal",
+          "rawDescription": "GeneratedTip_SummonerSpell_SummonerHeal_Description",
+          "rawDisplayName": "GeneratedTip_SummonerSpell_SummonerHeal_DisplayName"
+        }
+      }
+    }
+  ],
+  "events": {
+    "Events": []
+  },
+  "gameData": {
+    "gameMode": "CLASSIC",
+    "gameTime": 1320.0,
+    "mapName": "Map11",
+    "mapNumber": 11,
+    "mapTerrain": "Default"
+  }
+}

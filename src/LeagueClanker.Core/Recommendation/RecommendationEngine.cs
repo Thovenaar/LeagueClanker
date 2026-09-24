@@ -55,7 +55,6 @@ public sealed record BuildRecommendation(
 /// </summary>
 public sealed class RecommendationEngine(StaticGameData data, IReadOnlyList<IBuildRule>? rules = null)
 {
-    private const int BasicBootsId = 1001;
     private const double RepeatDecay = 0.5;
     private const double OwnedDecay = 0.6;
 
@@ -95,8 +94,12 @@ public sealed class RecommendationEngine(StaticGameData data, IReadOnlyList<IBui
 
         var mine = AugmentRules.WithAugmentStats(game.Me.Stats, game.Augments);
         var map = game.Mode.MapId();
-        var candidates = data.Items.LegendariesOn(map).Where(Available).Where(i => profile.BaseScore(i, mine) >= profile.MinFit).ToList();
-        var boots = owned.Any(i => i.IsBoots && i.Id != BasicBootsId)
+        var candidates = data.Items.LegendariesOn(map)
+            .Where(Available)
+            .Where(i => !i.IsJungleItem || game.Me.HasSmite)
+            .Where(i => profile.BaseScore(i, mine) >= profile.MinFit)
+            .ToList();
+        var boots = owned.Any(i => i.IsBoots && !ItemCatalog.BasicBootsIds.Contains(i.Id))
             ? []
             : data.Items.BootsOn(map).Select(i => Score(i, profile, mine, situations, weights)).OrderByDescending(s => s.Total).ToList();
 

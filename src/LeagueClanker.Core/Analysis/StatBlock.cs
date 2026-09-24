@@ -22,8 +22,13 @@ public sealed record StatBlock
     public double MagicPen { get; init; }
     public double MagicPenPercent { get; init; }
     public double AbilityHaste { get; init; }
+
+    /// <summary>League Classic's cooldown reduction, capped at 40%.</summary>
+    public double CooldownReduction { get; init; }
+
     public double LifeSteal { get; init; }
     public double Omnivamp { get; init; }
+    public double SpellVamp { get; init; }
     public double HealShieldPower { get; init; }
     public double Tenacity { get; init; }
     public double MoveSpeed { get; init; }
@@ -41,22 +46,28 @@ public sealed record StatBlock
 public static class StatEstimator
 {
     private const double CritCap = 100;
+    public const double CooldownReductionCap = 40;
+
+    // League Classic gives every champion 4 extra armor.
+    private const double ClassicBonusArmor = 4;
 
     /// <summary>
     /// Base stats at their level plus item stats. Runes, stat shards and stacking passives aren't visible
     /// through the API, so real values run a little higher, mostly for tanks and scaling champions.
     /// </summary>
-    public static StatBlock Estimate(ChampionStats champion, int level, IReadOnlyList<ItemInfo> items)
+    /// <param name="mode">League Classic grows stats linearly and adds 4 armor.</param>
+    public static StatBlock Estimate(ChampionStats champion, int level, IReadOnlyList<ItemInfo> items, GameMode mode = GameMode.SummonersRift)
     {
         double Sum(string stat) => items.Sum(i => i.Stat(stat));
 
-        var bonusAttackSpeed = champion.BonusAttackSpeedAt(level) + Sum(Stat.AttackSpeed);
+        var classic = mode == GameMode.LeagueClassic;
+        var bonusAttackSpeed = champion.BonusAttackSpeedAt(level, classic) + Sum(Stat.AttackSpeed);
         return new StatBlock
         {
-            Health = champion.HealthAt(level) + Sum(Stat.Health),
-            Armor = champion.ArmorAt(level) + Sum(Stat.Armor),
-            MagicResist = champion.MagicResistAt(level) + Sum(Stat.MagicResist),
-            AttackDamage = champion.AttackDamageAt(level) + Sum(Stat.AttackDamage),
+            Health = champion.HealthAt(level, classic) + Sum(Stat.Health),
+            Armor = champion.ArmorAt(level, classic) + (classic ? ClassicBonusArmor : 0) + Sum(Stat.Armor),
+            MagicResist = champion.MagicResistAt(level, classic) + Sum(Stat.MagicResist),
+            AttackDamage = champion.AttackDamageAt(level, classic) + Sum(Stat.AttackDamage),
             BonusAttackDamage = Sum(Stat.AttackDamage),
             AbilityPower = Sum(Stat.AbilityPower),
             AttackSpeed = champion.AttackSpeed * (1 + bonusAttackSpeed / 100),
@@ -66,8 +77,10 @@ public static class StatEstimator
             MagicPen = Sum(Stat.MagicPen),
             MagicPenPercent = Math.Min(100, Sum(Stat.MagicPenPercent)),
             AbilityHaste = Sum(Stat.AbilityHaste),
+            CooldownReduction = Math.Min(CooldownReductionCap, Sum(Stat.CooldownReduction)),
             LifeSteal = Sum(Stat.LifeSteal),
             Omnivamp = Sum(Stat.Omnivamp),
+            SpellVamp = Sum(Stat.SpellVamp),
             HealShieldPower = Sum(Stat.HealShieldPower),
             Tenacity = Math.Min(100, Sum(Stat.Tenacity)),
             MoveSpeed = (champion.MoveSpeed + Sum(Stat.MoveSpeed)) * (1 + Sum(Stat.MoveSpeedPercent) / 100),

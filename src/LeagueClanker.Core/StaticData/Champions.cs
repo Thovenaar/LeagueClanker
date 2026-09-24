@@ -41,17 +41,18 @@ public sealed record ChampionStats
     public double MoveSpeed { get; init; } = 335;
     public double AttackRange { get; init; } = 175;
 
-    public double HealthAt(int level) => Health + HealthPerLevel * Growth(level);
-    public double ArmorAt(int level) => Armor + ArmorPerLevel * Growth(level);
-    public double MagicResistAt(int level) => MagicResist + MagicResistPerLevel * Growth(level);
-    public double AttackDamageAt(int level) => AttackDamage + AttackDamagePerLevel * Growth(level);
-    public double BonusAttackSpeedAt(int level) => AttackSpeedPerLevel * Growth(level);
+    /// <param name="linear">League Classic grows stats by the same amount every level, like the game did before 2015.</param>
+    public double HealthAt(int level, bool linear = false) => Health + HealthPerLevel * Growth(level, linear);
+    public double ArmorAt(int level, bool linear = false) => Armor + ArmorPerLevel * Growth(level, linear);
+    public double MagicResistAt(int level, bool linear = false) => MagicResist + MagicResistPerLevel * Growth(level, linear);
+    public double AttackDamageAt(int level, bool linear = false) => AttackDamage + AttackDamagePerLevel * Growth(level, linear);
+    public double BonusAttackSpeedAt(int level, bool linear = false) => AttackSpeedPerLevel * Growth(level, linear);
 
     /// <summary>How many levels' worth of per-level growth a champion has. League's curve gives later levels slightly more.</summary>
-    public static double Growth(int level)
+    public static double Growth(int level, bool linear = false)
     {
         var levelsGained = Math.Clamp(level, 1, 18) - 1;
-        return levelsGained * (0.7025 + 0.0175 * levelsGained);
+        return linear ? levelsGained : levelsGained * (0.7025 + 0.0175 * levelsGained);
     }
 }
 

@@ -19,6 +19,9 @@ public sealed class PlayerProfile
 
     public LiveScores Scores { get; init; } = new();
 
+    /// <summary>Junglers take Smite. League Classic has jungle items that only make sense then.</summary>
+    public bool HasSmite { get; init; }
+
     public string Name => Champion.Name;
 
     /// <summary>How much this champion contributes to the team's damage. Tanks and enchanters deal less than carries.</summary>
@@ -128,17 +131,29 @@ public static class GameAnalyzer
         if (me is null)
             return null;
 
-        var allies = data.AllPlayers.Where(p => p != me && p.Team == me.Team).Select(p => Profile(p, staticData)).ToList();
-        var enemies = data.AllPlayers.Where(p => p.Team != me.Team).Select(p => Profile(p, staticData)).ToList();
-        var myProfile = Profile(me, staticData, active.ChampionStats);
+        var mode = DetectMode(data);
+        var allies = data.AllPlayers.Where(p => p != me && p.Team == me.Team).Select(p => Profile(p, staticData, mode: mode)).ToList();
+        var enemies = data.AllPlayers.Where(p => p.Team != me.Team).Select(p => Profile(p, staticData, mode: mode)).ToList();
+        var myProfile = Profile(me, staticData, active.ChampionStats, mode);
         return new GameAnalysis(myProfile, new TeamProfile(allies), new TeamProfile(enemies), data.GameData?.GameTime ?? 0)
         {
-            Mode = GameModes.Detect(data.GameData?.GameMode, data.GameData?.MapNumber ?? 0),
+            Mode = mode,
             Augments = augments ?? [],
         };
     }
 
-    public static PlayerProfile Profile(LivePlayer player, StaticGameData staticData, LiveChampionStats? realStats = null)
+    /// <summary>
+    /// The mode the game reports. League Classic's mode string is unconfirmed, so a Summoner's Rift or unknown game where
+    /// anyone holds a Classic item (77xxxx id, including the starting Doran's items) counts as League Classic too.
+    /// </summary>
+    public static GameMode DetectMode(AllGameData data)
+    {
+        var mode = GameModes.Detect(data.GameData?.GameMode, data.GameData?.MapNumber ?? 0);
+        var holdsClassicItems = data.AllPlayers.Any(p => p.Items.Any(i => ItemCatalog.IsClassicId(i.ItemID)));
+        return mode is GameMode.SummonersRift or GameMode.Unsupported && holdsClassicItems ? GameMode.LeagueClassic : mode;
+    }
+
+    public static PlayerProfile Profile(LivePlayer player, StaticGameData staticData, LiveChampionStats? realStats = null, GameMode mode = GameMode.SummonersRift)
     {
         var champion = staticData.Champions.Resolve(player);
         var archetype = ArchetypeClassifier.Classify(champion);
@@ -156,8 +171,9 @@ public static class GameAnalyzer
             MagicShare = EstimateMagicShare(champion, archetype, items),
             Threat = EstimateThreat(items, player.Scores),
             Scores = player.Scores,
+            HasSmite = player.HasSmite,
             Level = Math.Max(1, player.Level),
-            Stats = StatEstimator.Estimate(champion.Stats, Math.Max(1, player.Level), items).WithRealStats(realStats),
+            Stats = StatEstimator.Estimate(champion.Stats, Math.Max(1, player.Level), items, mode).WithRealStats(realStats),
         };
     }
 

@@ -58,6 +58,26 @@ public sealed class LivePlayer
     public bool IsDead { get; init; }
     public List<LiveItem> Items { get; init; } = [];
     public LiveScores Scores { get; init; } = new();
+    public LiveSummonerSpells? SummonerSpells { get; init; }
+
+    public bool HasSmite => SummonerSpells?.Names.Any(n => n.Contains("Smite", StringComparison.OrdinalIgnoreCase)) == true;
+}
+
+public sealed class LiveSummonerSpells
+{
+    public LiveSummonerSpell? SummonerSpellOne { get; init; }
+    public LiveSummonerSpell? SummonerSpellTwo { get; init; }
+
+    public IEnumerable<string> Names =>
+        new[] { SummonerSpellOne, SummonerSpellTwo }.OfType<LiveSummonerSpell>().SelectMany(s => new[] { s.DisplayName, s.RawDisplayName }).OfType<string>();
+}
+
+public sealed class LiveSummonerSpell
+{
+    public string? DisplayName { get; init; }
+
+    /// <summary>e.g. "GeneratedTip_SummonerSpell_SummonerSmite_DisplayName", the same in every client language.</summary>
+    public string? RawDisplayName { get; init; }
 }
 
 public sealed class LiveItem
@@ -81,7 +101,7 @@ public sealed class LiveGameInfo
     /// <summary>"CLASSIC", "ARAM", "KIWI" (ARAM: Mayhem), "CHERRY" (Arena), ...</summary>
     public string? GameMode { get; init; }
 
-    /// <summary>11 = Summoner's Rift, 12 = Howling Abyss.</summary>
+    /// <summary>11 = Summoner's Rift, 12 = Howling Abyss, 453 = League Classic (probably).</summary>
     public int MapNumber { get; init; }
 
     public double GameTime { get; init; }

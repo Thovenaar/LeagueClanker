@@ -32,6 +32,10 @@ public static class Stat
     public const string HealthRegen = "%Base Health Regen";
     public const string HealShieldPower = "%Heal and Shield Power";
     public const string Tenacity = "%Tenacity";
+
+    // League Classic stats. Cooldown reduction stacks additively up to 40%; spell vamp heals from ability damage.
+    public const string CooldownReduction = "%Cooldown Reduction";
+    public const string SpellVamp = "%Spell Vamp";
 }
 
 /// <summary>Special effects detected from item passives/actives. These drive the situational rules.</summary>
@@ -77,6 +81,12 @@ public sealed record ItemInfo
 
     public bool IsBoots => Tags.Contains("Boots");
 
+    /// <summary>League Classic's version of the item, sold on map 453.</summary>
+    public bool IsClassic => ItemCatalog.IsClassicId(Id);
+
+    /// <summary>Classic jungle items (Spirit of the ..., Wriggle's Lantern). Only worth it with Smite.</summary>
+    public bool IsJungleItem => Tags.Contains("Jungle") || Passives.Contains("Butcher");
+
     public double Stat(string name) => Stats.TryGetValue(name, out var value) ? value : 0;
 
     public bool Has(ItemTraits trait) => (Traits & trait) != 0;
@@ -88,9 +98,23 @@ public sealed partial class ItemCatalog
 {
     private const int LegendaryMinGold = 2200;
 
+    // Classic items are cheaper: Sword of the Occult costs 1200, and Doran's items (400-475) are the only cheaper finished items.
+    private const int ClassicLegendaryMinGold = 1100;
+
     // Items with 6-digit ids are copies for other modes (Arena, ARAM variants, Mayhem specials) with changed stats or prices.
     // The standard versions are available on those maps too, so only standard ids are recommended.
+    // The exception is League Classic, whose shop is its own set of 77xxxx items.
     private const int MaxStandardItemId = 9999;
+    private const int ClassicMinId = 770000;
+    private const int ClassicMaxId = 779999;
+
+    // Boots of Speed, and League Classic's copy of it.
+    public static readonly IReadOnlySet<int> BasicBootsIds = new HashSet<int> { 1001, 771001 };
+
+    // Flat regeneration (Classic's "per 5 seconds") in percent of base regeneration. Base regeneration is about 10 per 5 seconds.
+    private const double FlatRegenToPercent = 10;
+
+    public static bool IsClassicId(int id) => id is >= ClassicMinId and <= ClassicMaxId;
 
     private readonly Dictionary<int, ItemInfo> _byId;
 
@@ -111,8 +135,9 @@ public sealed partial class ItemCatalog
 
     public IReadOnlyList<ItemInfo> BootsOn(int map) => OfKind(ItemKind.Boots, map);
 
+    // Classic items are also flagged for Howling Abyss (for a Classic ARAM variant), so the id range decides, not just the map.
     private IReadOnlyList<ItemInfo> OfKind(ItemKind kind, int map) =>
-        _byId.Values.Where(i => i.Kind == kind && i.Maps.Contains(map)).OrderBy(i => i.Id).ToList();
+        _byId.Values.Where(i => i.Kind == kind && i.Maps.Contains(map) && i.IsClassic == (map == GameModes.LeagueClassicMap)).OrderBy(i => i.Id).ToList();
 
     public ItemInfo? Get(int id) => _byId.GetValueOrDefault(id);
 
@@ -148,11 +173,17 @@ public sealed partial class ItemCatalog
             Stats = ParseStats(description),
             Traits = DetectTraits(description),
             Tags = tags,
-            Passives = PassiveRegex().Matches(description).Select(m => m.Groups[1].Value.Trim()).ToHashSet(StringComparer.OrdinalIgnoreCase),
+            Passives = ParsePassives(description),
             BuildsFrom = from,
             Maps = ParseMaps(json),
         };
     }
+
+    // Classic items name their unique passives as "<jadeUnique>Name:</jadeUnique>". "Active" and "Passive:" aren't names.
+    private static HashSet<string> ParsePassives(string description) =>
+        PassiveRegex().Matches(description).Select(m => m.Groups[1].Value.Trim())
+            .Concat(ClassicUniqueRegex().Matches(description).Select(m => m.Groups[1].Value.Trim()).Where(name => name != "Passive"))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
     private static HashSet<int> ParseMaps(JsonElement json) =>
         json.TryGetProperty("maps", out var maps)
@@ -167,37 +198,75 @@ public sealed partial class ItemCatalog
         var restricted = json.TryGetProperty("requiredChampion", out _) || json.TryGetProperty("requiredAlly", out _);
 
         var soldSomewhere = json.TryGetProperty("maps", out var maps) && maps.EnumerateObject().Any(m => m.Value.GetBoolean());
-        if (!purchasable || !inStore || restricted || !soldSomewhere || id > MaxStandardItemId)
+        if (!purchasable || !inStore || restricted || !soldSomewhere || (id > MaxStandardItemId && !IsClassicId(id)))
             return ItemKind.Other;
         if (tags.Contains("Consumable") || tags.Contains("Trinket"))
             return ItemKind.Other;
 
-        // Tier 2 boots build out of basic Boots (1001). Tier 3 upgrades build out of tier 2.
+        // Tier 2 boots build out of basic Boots. Tier 3 upgrades build out of tier 2.
         if (tags.Contains("Boots"))
-            return from.Contains(1001) ? ItemKind.Boots : ItemKind.Other;
+            return from.Any(BasicBootsIds.Contains) ? ItemKind.Boots : ItemKind.Other;
 
         if (json.GetStringArray("into").Any())
             return ItemKind.Component;
 
-        return gold.GetProperty("total").GetInt32() >= LegendaryMinGold ? ItemKind.Legendary : ItemKind.Other;
+        var minGold = IsClassicId(id) ? ClassicLegendaryMinGold : LegendaryMinGold;
+        return gold.GetProperty("total").GetInt32() >= minGold ? ItemKind.Legendary : ItemKind.Other;
     }
 
     internal static Dictionary<string, double> ParseStats(string description)
     {
         var stats = new Dictionary<string, double>(StringComparer.OrdinalIgnoreCase);
-        var block = StatsBlockRegex().Match(description);
-        if (!block.Success)
-            return stats;
+        void Add(string name, double value) => stats[name] = stats.GetValueOrDefault(name) + value;
 
-        foreach (Match m in StatLineRegex().Matches(block.Groups[1].Value))
+        var block = StatsBlockRegex().Match(description);
+        if (block.Success)
         {
-            var raw = m.Groups[1].Value;
-            var isPercent = raw.EndsWith('%');
-            var value = double.Parse(raw.TrimEnd('%'), CultureInfo.InvariantCulture);
-            var name = (isPercent ? "%" : "") + m.Groups[2].Value.Trim();
-            stats[name] = stats.GetValueOrDefault(name) + value;
+            foreach (Match m in StatLineRegex().Matches(block.Groups[1].Value))
+            {
+                var raw = m.Groups[1].Value;
+                var isPercent = raw.EndsWith('%');
+                var value = double.Parse(raw.TrimEnd('%'), CultureInfo.InvariantCulture);
+                var name = (isPercent ? "%" : "") + m.Groups[2].Value.Trim();
+                switch (name)
+                {
+                    case "Mana Regen per 5 seconds": Add(Stat.ManaRegen, value * FlatRegenToPercent); break;
+                    case "Health Regen per 5 seconds": Add(Stat.HealthRegen, value * FlatRegenToPercent); break;
+                    default: Add(name, value); break;
+                }
+            }
         }
+
+        if (description.Contains("<jadeUnique>", StringComparison.Ordinal))
+            AddClassicPassiveStats(description, Add);
         return stats;
+    }
+
+    /// <summary>
+    /// Classic items keep some stats in their unique passives: "Wicked Edge: 10 Lethality", "Light Step: 15% Cooldown Reduction",
+    /// boots' "Enhanced Movement: 45 Move Speed", and the "ignore 35% of Armor/Magic Resist" of Last Whisper and Void Staff.
+    /// Only passives that are nothing but a stat count, so "At 20 stacks, grants 15% Cooldown Reduction" doesn't.
+    /// </summary>
+    private static void AddClassicPassiveStats(string description, Action<string, double> add)
+    {
+        foreach (Match m in ClassicUniqueTextRegex().Matches(description))
+        {
+            var text = WhitespaceRegex().Replace(TagRegex().Replace(m.Groups[1].Value, " "), " ").Trim();
+            var stat = ClassicPassiveStatRegex().Match(text);
+            if (stat.Success)
+            {
+                var value = double.Parse(stat.Groups[1].Value, CultureInfo.InvariantCulture);
+                var name = (stat.Groups[2].Value == "%" ? "%" : "") + stat.Groups[3].Value;
+                add(name, value);
+                continue;
+            }
+
+            var ignore = ClassicIgnoreResistRegex().Match(text);
+            if (ignore.Success)
+                add(ignore.Groups[2].Value == "Armor" ? Stat.ArmorPenPercent : Stat.MagicPenPercent, double.Parse(ignore.Groups[1].Value, CultureInfo.InvariantCulture));
+            else if (TenacityPassiveRegex().Match(text) is { Success: true } tenacity)
+                add(Stat.Tenacity, double.Parse(tenacity.Groups[1].Value, CultureInfo.InvariantCulture));
+        }
     }
 
     internal static ItemTraits DetectTraits(string description)
@@ -208,13 +277,15 @@ public sealed partial class ItemCatalog
         if (Regex.IsMatch(text, @"\bWounds\b")) traits |= ItemTraits.AntiHeal;
         if (Regex.IsMatch(text, @"Shield Reaver|reduces? (the )?Shields", RegexOptions.IgnoreCase)) traits |= ItemTraits.AntiShield;
         if (Regex.IsMatch(text, @"less damage from Critical Strikes", RegexOptions.IgnoreCase)) traits |= ItemTraits.CritReduction;
-        if (Regex.IsMatch(text, @"Reduce the Attack Speed", RegexOptions.IgnoreCase)) traits |= ItemTraits.AttackSpeedSlow;
-        if (Regex.IsMatch(text, @"\bStasis\b")) traits |= ItemTraits.Stasis;
+        // Classic wording: Randuin's "reduces the attacker's Attack Speed", Zhonya's "Invulnerable and Untargetable",
+        // Quicksilver's "Removes all debuffs", Madred's "4% of the target's maximum Health", Abyssal's "Reduces the Magic Resist of".
+        if (Regex.IsMatch(text, @"Reduces? the Attack Speed|reduces the attacker.s Attack Speed", RegexOptions.IgnoreCase)) traits |= ItemTraits.AttackSpeedSlow;
+        if (Regex.IsMatch(text, @"\bStasis\b|Invulnerable and Untargetable", RegexOptions.IgnoreCase)) traits |= ItemTraits.Stasis;
         if (Regex.IsMatch(text, @"Spell Shield", RegexOptions.IgnoreCase)) traits |= ItemTraits.SpellShield;
-        if (Regex.IsMatch(text, @"removes? all crowd control", RegexOptions.IgnoreCase)) traits |= ItemTraits.Cleanse;
-        if (Regex.IsMatch(text, @"max Health (magic |physical |true )?damage|based on their (bonus|max(imum)?) Health", RegexOptions.IgnoreCase)) traits |= ItemTraits.MaxHealthDamage;
-        if (Regex.IsMatch(text, @"reduces (the target.s |their )?(Armor|Magic Resist) by", RegexOptions.IgnoreCase)) traits |= ItemTraits.ResistShred;
-        if (Regex.IsMatch(text, @"Omnivamp|Life Steal|Heal and Shield Power", RegexOptions.IgnoreCase)) traits |= ItemTraits.Sustain;
+        if (Regex.IsMatch(text, @"removes? all (crowd control|debuffs|Stuns)", RegexOptions.IgnoreCase)) traits |= ItemTraits.Cleanse;
+        if (Regex.IsMatch(text, @"max Health (magic |physical |true )?damage|based on their (bonus|max(imum)?) Health|% of (the )?target(.s| champion.s) (current |max(imum)? )Health", RegexOptions.IgnoreCase)) traits |= ItemTraits.MaxHealthDamage;
+        if (Regex.IsMatch(text, @"reduces (the target.s |their )?(Armor|Magic Resist) by|reduces the (Armor|Magic Resist) of|removes? \d+ (Armor|Magic Resist) from", RegexOptions.IgnoreCase)) traits |= ItemTraits.ResistShred;
+        if (Regex.IsMatch(text, @"Omnivamp|Life Steal|Heal and Shield Power|Spell Vamp", RegexOptions.IgnoreCase)) traits |= ItemTraits.Sustain;
 
         var grantsShield = description.Contains("<shield>", StringComparison.OrdinalIgnoreCase)
             || Regex.IsMatch(text, @"grants? (a |an )?(\w+ )?Shield\b", RegexOptions.IgnoreCase);
@@ -232,6 +303,22 @@ public sealed partial class ItemCatalog
 
     [GeneratedRegex(@"<passive>([^<]+)</passive>")]
     private static partial Regex PassiveRegex();
+
+    [GeneratedRegex(@"<jadeUnique>([^<]+?):\s*</jadeUnique>")]
+    private static partial Regex ClassicUniqueRegex();
+
+    // The text of one classic unique passive, up to the next line break.
+    [GeneratedRegex(@"</jadeUnique>(.*?)(?=<br>|</mainText>|$)", RegexOptions.Singleline)]
+    private static partial Regex ClassicUniqueTextRegex();
+
+    [GeneratedRegex(@"^(\d+)(%?) (Lethality|Magic Penetration|Cooldown Reduction|Spell Vamp|Move Speed)\b(?! for)")]
+    private static partial Regex ClassicPassiveStatRegex();
+
+    [GeneratedRegex(@"ignores? (\d+)% of (?:your opponent's|the target's) (Armor|Magic Resist)")]
+    private static partial Regex ClassicIgnoreResistRegex();
+
+    [GeneratedRegex(@"^Reduces the duration of Stuns.* by (\d+)%")]
+    private static partial Regex TenacityPassiveRegex();
 
     [GeneratedRegex(@"<[^>]+>")]
     private static partial Regex TagRegex();
