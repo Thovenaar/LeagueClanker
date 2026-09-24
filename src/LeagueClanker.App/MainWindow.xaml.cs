@@ -68,6 +68,8 @@ public partial class MainWindow : Window
 
     private void OnToggleSettings(object sender, RoutedEventArgs e) => ViewModel.ToggleSettings();
 
+    private void OnToggleCompact(object sender, RoutedEventArgs e) => ViewModel.ToggleCompact();
+
     private void OnSaveSnapshot(object sender, RoutedEventArgs e) => ViewModel.SaveSnapshot();
 
     private void OnOpenLog(object sender, RoutedEventArgs e) => Shell.Open(AppPaths.LogFile);

@@ -218,7 +218,7 @@ if (paths.Count == 1)
             .Select(n => augments.Find(n) ?? throw new ArgumentException($"Unknown augment '{n}'. Run --augments for the list."))
             .ToList();
     }
-    Print(await RecommendAsync(paths[0], picked));
+    Print(await RecommendAsync(paths[0], picked), (await new FileGameDataSource(paths[0]).TryGetAsync(cts.Token))?.ActivePlayer?.CurrentGold, data.Items);
     return;
 }
 
@@ -257,7 +257,7 @@ try
         if (update.State == AdvisorState.WaitingForGame)
             Console.WriteLine("Waiting for a game... (start one, Practice Tool works too)");
         else
-            Print(update.Recommendation);
+            Print(update.Recommendation, update.Gold, data.Items);
     }
 }
 catch (OperationCanceledException)
@@ -374,7 +374,7 @@ void PrintRunes(RuneRequest request, RuneRecommendation rec)
     Console.WriteLine();
 }
 
-static void Print(BuildRecommendation? rec)
+static void Print(BuildRecommendation? rec, double? gold = null, ItemCatalog? items = null)
 {
     if (rec is null)
     {
@@ -395,6 +395,14 @@ static void Print(BuildRecommendation? rec)
 
     if (rec.Boots is { } boots)
         Console.WriteLine($"  Boots: {boots.Item.Name,-28} {boots.Item.TotalGold,5}g  {Reasons(boots)}");
+
+    if (gold is { } g && items is not null)
+    {
+        if (BuyAdvisor.Advise(rec.Items.FirstOrDefault()?.Item, me.Items, g, items) is { } buy)
+            Console.WriteLine($"\nBuy now: {buy.Text}");
+        foreach (var tip in LateGameAdvisor.Advise(rec, g, items))
+            Console.WriteLine($"Tip: {tip}");
+    }
 
     Console.WriteLine("\nWhy:");
     if (rec.Advice.Count == 0)

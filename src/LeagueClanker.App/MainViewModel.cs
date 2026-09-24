@@ -4,7 +4,9 @@ using System.Runtime.CompilerServices;
 using System.Windows;
 using LeagueClanker.Core;
 using LeagueClanker.Core.Analysis;
+using LeagueClanker.Core.ItemSets;
 using LeagueClanker.Core.Matchups;
+using LeagueClanker.Core.Opgg;
 using LeagueClanker.Core.Recommendation;
 using LeagueClanker.Core.Runes;
 using LeagueClanker.Core.StaticData;
@@ -88,6 +90,8 @@ public sealed class MainViewModel : INotifyPropertyChanged
         {
             if (e.PropertyName is nameof(SettingsViewModel.ApplySpells) or nameof(SettingsViewModel.ApplyItemSet))
                 ChampSelect.RefreshApplyLabel();
+            if (e.PropertyName == nameof(SettingsViewModel.Compact))
+                Raise(nameof(ShowFullLive), nameof(ShowCompactLive));
         };
 
         // A card offer on screen needs your attention now, so bring its tab forward.
@@ -189,6 +193,39 @@ public sealed class MainViewModel : INotifyPropertyChanged
     /// <summary>Your note on the lane opponent, from champ select or an earlier game.</summary>
     public string MatchupNote { get => _matchupNote; private set => Set(ref _matchupNote, value); }
 
+    private double _gold;
+    private OpggChampion? _opggChampion;
+    private string? _liveChampionKey;
+    private string _buyText = "";
+    private IReadOnlyList<string> _tips = [];
+    private string _startText = "";
+
+    /// <summary>Raised when a game starts or your champion or role changes, so the app can fetch op.gg data for it.</summary>
+    public event EventHandler<GameAnalysis>? LiveChampionChanged;
+
+    /// <summary>"1,300 gold: buy Caulfield's Warhammer (1,050g) toward Black Cleaver (1,950g left)."</summary>
+    public string BuyText { get => _buyText; private set => Set(ref _buyText, value); }
+
+    /// <summary>Full-build tips: swaps, elixirs, control wards.</summary>
+    public IReadOnlyList<string> Tips { get => _tips; private set => Set(ref _tips, value); }
+
+    /// <summary>"Start with Doran's Blade and 2 Health Potions." Only in the first two minutes.</summary>
+    public string StartText { get => _startText; private set => Set(ref _startText, value); }
+
+    public ItemRow? NextItem => Items.FirstOrDefault();
+
+    public bool ShowFullLive => IsLive && !Settings.Compact;
+    public bool ShowCompactLive => IsLive && Settings.Compact;
+
+    public void ToggleCompact() => Settings.Compact = !Settings.Compact;
+
+    /// <summary>op.gg's data for your champion in this game (starting items). Set by the app, null without it.</summary>
+    public void SetOpggChampion(OpggChampion? champion)
+    {
+        _opggChampion = champion;
+        RenderBuy();
+    }
+
     /// <summary>You picked another playstyle in game. The build follows on the next poll.</summary>
     public void ChangePlaystyle(Archetype playstyle)
     {
@@ -225,9 +262,18 @@ public sealed class MainViewModel : INotifyPropertyChanged
             _planner.Reset();
             Augments.Reset();
             _lastPivotSummary = null;
+            _liveChampionKey = null;
+            _opggChampion = null;
             IsLive = false;
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(ShowChampSelect)));
+            Raise(nameof(ShowChampSelect), nameof(ShowFullLive), nameof(ShowCompactLive));
             Status = ChampSelect.IsActive ? "Champ select" : WaitingStatus;
+            return;
+        }
+
+        _gold = update.Gold;
+        if (ReferenceEquals(rec, _planner.Latest))
+        {
+            RenderBuy(); // only the gold changed
             return;
         }
 
@@ -236,7 +282,9 @@ public sealed class MainViewModel : INotifyPropertyChanged
             UsePlaystyle(rec.Game.Me.Champion.Id, null);
 
         // A new playstyle is your decision, not the game's: take its build right away instead of suggesting a pivot.
-        if (_planner.Latest?.Game.Me is { } previous && previous.Champion.Id == rec.Game.Me.Champion.Id && previous.Archetype != rec.Game.Me.Archetype)
+        // The same goes for op.gg's popular items arriving just after the game starts, or being switched on or off.
+        if (_planner.Latest?.Game is { } previous && previous.Me.Champion.Id == rec.Game.Me.Champion.Id
+            && (previous.Me.Archetype != rec.Game.Me.Archetype || !previous.PopularItems.SetEquals(rec.Game.PopularItems)))
             _planner.Reset();
 
         _planner.Update(rec);
@@ -268,16 +316,25 @@ public sealed class MainViewModel : INotifyPropertyChanged
 
         var me = rec.Game.Me;
         IsLive = true;
-        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(ShowChampSelect)));
+        Raise(nameof(ShowChampSelect), nameof(ShowFullLive), nameof(ShowCompactLive));
         Status = $"Live · {TimeSpan.FromSeconds(rec.Game.GameTimeSeconds):mm\\:ss} · {rec.Game.Mode.DisplayName()}";
         ChampionLine = me.Name;
         PlaystyleLabel = $"{me.Archetype.DisplayName()} ▾";
         LivePlaystyles = Playstyles.All.Select(a => new PlaystyleOption(a, a.DisplayName(), a == me.Archetype)).ToList();
         _ = ShowMatchupAsync(rec.Game);
+
+        var championKey = $"{me.Champion.Id}|{me.Position}|{rec.Game.Mode}";
+        if (championKey != _liveChampionKey)
+        {
+            _liveChampionKey = championKey;
+            _opggChampion = null;
+            LiveChampionChanged?.Invoke(this, rec.Game);
+        }
         DamageSummary = rec.DamageSummary;
         AdShare = new GridLength(rec.Game.Enemies.PhysicalShare, GridUnitType.Star);
         ApShare = new GridLength(rec.Game.Enemies.MagicShare, GridUnitType.Star);
         Items = _planner.Upcoming.Select((item, i) => ToRow(item, i + 1, data)).ToList();
+        Raise(nameof(NextItem));
         Boots = rec.Boots is { } boots ? ToRow(boots, 0, data) : null;
         Advice = rec.Advice.Count > 0
             ? rec.Advice.Select(a => a.Text).ToList()
@@ -302,6 +359,32 @@ public sealed class MainViewModel : INotifyPropertyChanged
             Augments.SetGame(rec, _planner.Upcoming.Select(i => i.Item).ToList());
         else if (_tab == Tab.Augments)
             SelectTab(Tab.Build);
+
+        RenderBuy();
+    }
+
+    // What to buy follows your gold; the tips follow the build and the clock.
+    private void RenderBuy()
+    {
+        if (_planner.Latest is not { } rec || _data is not { } data)
+            return;
+
+        var me = rec.Game.Me;
+        BuyText = BuyAdvisor.Advise(_planner.Upcoming.FirstOrDefault()?.Item, me.Items, _gold, data.Items)?.Text ?? "";
+        Tips = LateGameAdvisor.Advise(rec, _gold, data.Items);
+
+        var starting = rec.Game.Mode == GameMode.SummonersRift && rec.Game.GameTimeSeconds < 120 && me.Items.Count == 0;
+        StartText = starting
+            ? "Start with " + string.Join(" and ", ItemSetBuilder.StartingItems(me, _opggChampion, rec.Game.Mode)
+                .Select(e => data.Items.Get(e.Id) is { } item ? (e.Count > 1 ? $"{e.Count} {item.Name}s" : item.Name) : null)
+                .OfType<string>()) + "."
+            : "";
+    }
+
+    private void Raise(params string[] names)
+    {
+        foreach (var name in names)
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
     }
 
     // The lane matchup only changes when champions or roles do, so it's looked up once per combination.

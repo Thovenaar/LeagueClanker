@@ -102,6 +102,8 @@
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,0,6,0">
                     <Button Style="{StaticResource ChromeButton}" Content="&#x2913;" ToolTip="Save a snapshot of what the app sees (for bug reports)"
                             Click="OnSaveSnapshot" AutomationProperties.Name="Save snapshot" />
+                    <Button Style="{StaticResource ChromeButton}" Content="&#x25AD;" ToolTip="Compact mode: just the next item, what to buy and the matchup"
+                            Click="OnToggleCompact" AutomationProperties.Name="Compact mode" />
                     <Button Style="{StaticResource ChromeButton}" Content="&#x2699;" ToolTip="Settings" Click="OnToggleSettings" AutomationProperties.Name="Settings" />
                     <Button Style="{StaticResource ChromeButton}" Content="📌" ToolTip="Toggle always on top" Click="OnPinClick" />
                     <Button Style="{StaticResource ChromeButton}" Content="✕" ToolTip="Close" Click="OnCloseClick" />
@@ -296,8 +298,27 @@
                 </StackPanel>
             </ScrollViewer>
 
+            <!-- ===== Compact mode: one card with the next item, what to buy and the matchup ===== -->
+            <StackPanel Margin="12,0,12,4" Visibility="{Binding ShowCompactLive, Converter={StaticResource BoolToVisibility}}">
+                <DockPanel>
+                    <Image DockPanel.Dock="Left" Source="{Binding NextItem.IconUrl, TargetNullValue={x:Null}}" Width="40" Height="40" Margin="0,0,10,0" />
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Foreground="{StaticResource MutedBrush}" FontSize="10">
+                            <Run Text="{Binding ChampionLine, Mode=OneWay}" /><Run Text=" &#x00B7; next item" />
+                        </TextBlock>
+                        <TextBlock Text="{Binding NextItem.Name}" FontSize="15" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                    </StackPanel>
+                </DockPanel>
+                <TextBlock Text="{Binding StartText}" FontSize="11" TextWrapping="Wrap" Margin="0,6,0,0" Foreground="{StaticResource AccentBrush}"
+                           Visibility="{Binding StartText, Converter={StaticResource HasContent}}" />
+                <TextBlock Text="{Binding BuyText}" FontSize="11" TextWrapping="Wrap" Margin="0,6,0,0"
+                           Visibility="{Binding BuyText, Converter={StaticResource HasContent}}" />
+                <TextBlock Text="{Binding MatchupLine}" Foreground="{StaticResource MutedBrush}" FontSize="11" TextTrimming="CharacterEllipsis" Margin="0,4,0,0"
+                           Visibility="{Binding MatchupLine, Converter={StaticResource HasContent}}" />
+            </StackPanel>
+
             <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="12,0,12,0"
-                          Visibility="{Binding IsLive, Converter={StaticResource BoolToVisibility}}">
+                          Visibility="{Binding ShowFullLive, Converter={StaticResource BoolToVisibility}}">
                 <StackPanel>
                     <DockPanel Margin="0,2,0,8">
                         <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Bottom">
@@ -361,6 +382,32 @@
                             <Button DockPanel.Dock="Right" Style="{StaticResource LinkButton}" Content="Switch anyway" Click="OnSwitchToLatest" VerticalAlignment="Center" />
                             <TextBlock Text="{Binding SwitchHint}" Foreground="{StaticResource MutedBrush}" FontSize="11" TextWrapping="Wrap" Margin="0,0,8,0" />
                         </DockPanel>
+
+                        <!-- Start of the game, and what your gold buys right now -->
+                        <Border Background="{StaticResource CardBrush}" CornerRadius="6" Padding="10,7" Margin="0,12,0,0"
+                                Visibility="{Binding StartText, Converter={StaticResource HasContent}}">
+                            <StackPanel>
+                                <TextBlock Text="START OF THE GAME" Foreground="{StaticResource AccentBrush}" FontSize="10" FontWeight="Bold" />
+                                <TextBlock Text="{Binding StartText}" FontSize="12" TextWrapping="Wrap" Margin="0,2,0,0" />
+                            </StackPanel>
+                        </Border>
+                        <Border Background="{StaticResource CardBrush}" CornerRadius="6" Padding="10,7" Margin="0,8,0,0"
+                                Visibility="{Binding BuyText, Converter={StaticResource HasContent}}">
+                            <StackPanel>
+                                <TextBlock Text="BUY NOW" Foreground="{StaticResource AccentBrush}" FontSize="10" FontWeight="Bold" />
+                                <TextBlock Text="{Binding BuyText}" FontSize="12" TextWrapping="Wrap" Margin="0,2,0,0" />
+                            </StackPanel>
+                        </Border>
+                        <ItemsControl ItemsSource="{Binding Tips}" Margin="0,6,0,0">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <DockPanel Margin="0,0,0,3">
+                                        <TextBlock DockPanel.Dock="Left" Text="&#x2022;" Foreground="{StaticResource AccentBrush}" Margin="0,0,6,0" />
+                                        <TextBlock Text="{Binding}" FontSize="11" TextWrapping="Wrap" />
+                                    </DockPanel>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
 
                         <TextBlock Style="{StaticResource SectionHeader}" Text="YOUR BUILD · MOST IMPORTANT FIRST" />
                         <ItemsControl ItemsSource="{Binding Items}">
@@ -618,6 +665,14 @@
                     </CheckBox>
                     <CheckBox Style="{StaticResource SettingCheck}" IsChecked="{Binding AutoApply}">
                         <TextBlock Text="Apply automatically when you lock in" TextWrapping="Wrap" />
+                    </CheckBox>
+
+                    <TextBlock Style="{StaticResource SectionHeader}" Text="IN GAME" />
+                    <CheckBox Style="{StaticResource SettingCheck}" IsChecked="{Binding Compact}">
+                        <TextBlock Text="Compact mode: only the next item, what to buy and the matchup" TextWrapping="Wrap" />
+                    </CheckBox>
+                    <CheckBox Style="{StaticResource SettingCheck}" IsChecked="{Binding UsePopularItems}">
+                        <TextBlock Text="Favor op.gg's most played items for your champion (needs op.gg as the stats source)" TextWrapping="Wrap" />
                     </CheckBox>
 
                     <TextBlock Style="{StaticResource SectionHeader}" Text="GENERAL" />

@@ -25,6 +25,9 @@ public sealed class PlayerProfile
     /// <summary>Their role, when the game reports it (matchmade Summoner's Rift games).</summary>
     public Position Position { get; init; }
 
+    /// <summary>Every item id in their inventory, potions and wards included. <see cref="Items"/> leaves those out.</summary>
+    public IReadOnlyList<int> AllItemIds { get; init; } = [];
+
     public string Name => Champion.Name;
 
     /// <summary>How much this champion contributes to the team's damage. Tanks and enchanters deal less than carries.</summary>
@@ -117,6 +120,9 @@ public sealed record GameAnalysis(PlayerProfile Me, TeamProfile Allies, TeamProf
     /// <summary>ARAM: Mayhem augments you picked. They shape the item advice like any other game fact.</summary>
     public IReadOnlyList<AugmentInfo> Augments { get; init; } = [];
 
+    /// <summary>Items players of your champion buy most on op.gg. <see cref="PopularItemsRule"/> nudges them up. Empty to ignore.</summary>
+    public IReadOnlySet<int> PopularItems { get; init; } = new HashSet<int>();
+
     /// <summary>My team including me.</summary>
     public TeamProfile MyTeam => new([Me, .. Allies.Players]);
 }
@@ -125,7 +131,8 @@ public static class GameAnalyzer
 {
     /// <summary>Returns null when the active player can't be found (e.g. spectating).</summary>
     /// <param name="playstyle">How you chose to play your champion (AP Ezreal, tank Leona). Null uses the champion's usual archetype.</param>
-    public static GameAnalysis? Analyze(AllGameData data, StaticGameData staticData, IReadOnlyList<AugmentInfo>? augments = null, Archetype? playstyle = null)
+    public static GameAnalysis? Analyze(
+        AllGameData data, StaticGameData staticData, IReadOnlyList<AugmentInfo>? augments = null, Archetype? playstyle = null, IReadOnlySet<int>? popularItems = null)
     {
         if (data.ActivePlayer is not { } active)
             return null;
@@ -143,6 +150,7 @@ public static class GameAnalyzer
         {
             Mode = mode,
             Augments = augments ?? [],
+            PopularItems = popularItems ?? new HashSet<int>(),
         };
     }
 
@@ -177,6 +185,7 @@ public static class GameAnalyzer
             Threat = EstimateThreat(items, player.Scores),
             Scores = player.Scores,
             HasSmite = player.HasSmite,
+            AllItemIds = player.Items.SelectMany(i => Enumerable.Repeat(i.ItemID, Math.Max(1, i.Count))).ToList(),
             Position = Positions.Parse(player.Position),
             Level = Math.Max(1, player.Level),
             Stats = StatEstimator.Estimate(champion.Stats, Math.Max(1, player.Level), items, mode).WithRealStats(realStats),

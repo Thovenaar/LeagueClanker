@@ -22,6 +22,12 @@ public sealed class AppSettings
     public bool PlaySounds { get; set; } = true;
     public bool CheckForUpdates { get; set; } = true;
 
+    /// <summary>In game, show only the next item, what to buy and the matchup.</summary>
+    public bool Compact { get; set; }
+
+    /// <summary>Nudge op.gg's most played items for your champion up the in-game build.</summary>
+    public bool UsePopularItems { get; set; } = true;
+
     public static AppSettings Load()
     {
         try
@@ -73,6 +79,8 @@ public sealed class SettingsViewModel(AppSettings settings) : INotifyPropertyCha
     public bool AutoApply { get => settings.AutoApply; set => Update(settings.AutoApply, value, v => settings.AutoApply = v); }
     public bool PlaySounds { get => settings.PlaySounds; set => Update(settings.PlaySounds, value, v => settings.PlaySounds = v); }
     public bool CheckForUpdates { get => settings.CheckForUpdates; set => Update(settings.CheckForUpdates, value, v => settings.CheckForUpdates = v); }
+    public bool Compact { get => settings.Compact; set => Update(settings.Compact, value, v => settings.Compact = v); }
+    public bool UsePopularItems { get => settings.UsePopularItems; set => Update(settings.UsePopularItems, value, v => settings.UsePopularItems = v); }
 
     private bool Update<T>(T current, T value, Action<T> store, [CallerMemberName] string? name = null)
     {

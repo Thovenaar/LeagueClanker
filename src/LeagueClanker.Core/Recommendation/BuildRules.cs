@@ -37,6 +37,7 @@ public static class BuildRules
         new TrueDamageRule(),
         new NoFrontlineRule(),
         new TeamDamageSkewRule(),
+        new PopularItemsRule(),
     ];
 
     public static string Percent(double share) => $"{Math.Round(share * 100):0}%";
@@ -345,4 +346,17 @@ public sealed class TeamDamageSkewRule : IBuildRule
 
         return null;
     }
+}
+
+/// <summary>
+/// op.gg's most played items for your champion get a nudge, so the build starts from what players of the champion buy.
+/// The nudge is small: the game's situations still decide, so a popular item that doesn't fit this game stays low.
+/// </summary>
+public sealed class PopularItemsRule : IBuildRule
+{
+    private const double Weight = 0.8;
+
+    public Situation? Evaluate(GameAnalysis game) => game.PopularItems.Count == 0
+        ? null
+        : new Situation("popular", $"op.gg's most played items for {game.Me.Name} include it", Weight, item => game.PopularItems.Contains(item.Id) ? 1 : 0);
 }

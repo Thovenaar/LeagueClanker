@@ -43,6 +43,9 @@ public sealed record BuildRecommendation(
     /// <summary>Every candidate item in ranked order; <see cref="Items"/> is the top of this list.</summary>
     public IReadOnlyList<ScoredItem> Ranked { get; init; } = Items;
 
+    /// <summary>Your finished legendaries, scored like the candidates. Used to suggest swaps once your build is full.</summary>
+    public IReadOnlyList<ScoredItem> Owned { get; init; } = [];
+
     public ScoredItem? Find(int itemId) => Ranked.FirstOrDefault(s => s.Item.Id == itemId);
 
     public string DamageSummary =>
@@ -93,6 +96,7 @@ public sealed class RecommendationEngine(StaticGameData data, IReadOnlyList<IBui
             * game.Augments.Aggregate(1.0, (weight, augment) => AugmentRules.Answers(augment, s) ? weight * OwnedDecay : weight));
 
         var mine = AugmentRules.WithAugmentStats(game.Me.Stats, game.Augments);
+        var ownedScores = owned.Where(i => i.Kind == ItemKind.Legendary).Select(i => Score(i, profile, mine, situations, weights)).ToList();
         var map = game.Mode.MapId();
         var candidates = data.Items.LegendariesOn(map)
             .Where(Available)
@@ -120,7 +124,7 @@ public sealed class RecommendationEngine(StaticGameData data, IReadOnlyList<IBui
             .OfType<Advice>()
             .ToList();
 
-        return new BuildRecommendation(game, ranked.Take(maxItems).ToList(), boots.FirstOrDefault(), situations, advice) { Ranked = ranked };
+        return new BuildRecommendation(game, ranked.Take(maxItems).ToList(), boots.FirstOrDefault(), situations, advice) { Ranked = ranked, Owned = ownedScores };
     }
 
     private static ScoredItem Score(ItemInfo item, ArchetypeProfile profile, StatBlock mine, IReadOnlyList<Situation> situations, Dictionary<Situation, double> weights) =>

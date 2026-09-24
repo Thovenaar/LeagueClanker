@@ -104,6 +104,15 @@ $shots = [ordered]@{
         Save-Window $p "build.png"
         $p
     }
+    compact = {
+        $p = Start-App "--demo", "samples/ap-heavy.json"
+        Start-Sleep -Seconds 6
+        Invoke-Element $p "Compact mode"
+        Start-Sleep -Milliseconds 800
+        Save-Window $p "compact.png"
+        Invoke-Element $p "Compact mode"   # back to the full view, so the next start isn't compact
+        $p
+    }
     pivot = {
         $p = Start-App "--demo", "samples/pivot-demo"
         Start-Sleep -Seconds 14

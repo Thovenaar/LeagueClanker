@@ -59,8 +59,8 @@ public static class ItemSetBuilder
         return new ItemSetDefinition($"{TitlePrefix} {me.Name}", me.Champion.Key, rec.Game.Mode.MapId(), blocks);
     }
 
-    // op.gg's most played start when there is one. Otherwise a Doran's item, a jungle pet or the support item.
-    private static IEnumerable<ItemSetEntry> StartingItems(PlayerProfile me, OpggChampion? opgg, GameMode mode)
+    /// <summary>op.gg's most played start when there is one. Otherwise a Doran's item, a jungle pet or the support item.</summary>
+    public static IEnumerable<ItemSetEntry> StartingItems(PlayerProfile me, OpggChampion? opgg, GameMode mode)
     {
         if (mode == GameMode.SummonersRift && opgg?.StarterItems.FirstOrDefault() is { } start)
             return start.Ids.GroupBy(id => id).Select(g => new ItemSetEntry(g.Key, g.Count()));

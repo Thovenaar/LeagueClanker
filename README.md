@@ -2,7 +2,7 @@
 
 A local Windows app that watches your League of Legends game and ranks what to buy next. It works out every player's stats from their champion, level and items, and recomputes whenever anyone's items, level or K/D change, every 2 seconds at most.
 
-The window shows the build you accepted. When the game shifts enough that a different build would clearly be better, it suggests a pivot, and you choose. Decline, and it won't nag about those items again, but "Switch anyway" stays one click away.
+The window shows the build you accepted, and what your gold buys toward the next item right now. When the game shifts enough that a different build would clearly be better, it suggests a pivot, and you choose. Decline, and it won't nag about those items again, but "Switch anyway" stays one click away.
 
 It explains itself in plain sentences:
 
@@ -27,6 +27,10 @@ In champ select it suggests bans, checks your team's comp, and shows your lane o
 | Picking | Banning |
 |---|---|
 | ![Champ select with lane matchup, playstyle and runes](docs/screenshots/champselect.png) | ![Ban phase with ban suggestions and team comp check](docs/screenshots/draft.png) |
+
+For playing on one screen there's a compact mode, with just the next item, what to buy and the matchup:
+
+<img src="docs/screenshots/compact.png" alt="Compact mode" width="400">
 
 The screenshots come from the demo snapshots in `samples/`, not a live game.
 
@@ -212,9 +216,19 @@ The same source decides the rest of what *Apply* writes. The settings choose whi
 - **Skill order.** Which ability to max first and the first six levels, from op.gg's most played order.
 - **Item set.** A set named "LeagueClanker Jinx" in the shop's recommended tab. It has starting items (op.gg's most played start, or a Doran's item, jungle pet or World Atlas), the item advisor's core build for this game with your playstyle against the enemies you can see, boots, situational items, and op.gg's most played three-item core. Your own item sets are read first and written back untouched. Only a set LeagueClanker wrote for the same champion gets replaced.
 
+### In game: what to buy, tips and compact mode
+
+- **Buy now.** The card above your build turns your current gold into a purchase toward your next item. The shop only charges for the parts you don't own yet, so it counts those. When the whole item is affordable it says so ("Buy Black Cleaver now: 1,100g with the parts you have"). Otherwise it picks the parts that spend the most of your gold, bigger parts first: "1,450 gold: buy Spectre's Cowl (1,250g) toward Kaenic Rookern (2,900g left)". When nothing fits, it says how much to save up. It follows your gold in steps of 50.
+- **Starting items.** In the first two minutes of a Summoner's Rift game, before you buy anything, it shows what to start with: op.gg's most played start, or a Doran's item, a jungle pet or World Atlas.
+- **Tips.** Once all six item slots hold finished items, it suggests swapping your weakest item when a new one scores at least a point higher for this game. From 25 minutes, with 500 gold spare, it suggests an elixir for your playstyle. Supports, junglers and full builds get a reminder to carry a Control Ward.
+- **op.gg's popular items.** With op.gg as the stats source, the two most played cores for your champion get a small nudge in the ranking (the `PopularItemsRule`). The game's situations still decide, so a popular item that doesn't fit this game stays low. You can turn this off in the settings.
+- **Compact mode.** The ▭ button in the title bar shrinks the window to the next item, what to buy and the matchup.
+
 ### Settings, logs and snapshots
 
-The gear in the title bar opens the settings: the stats source, what *Apply* writes, *Apply automatically*, sounds, and the update check. Settings are saved in `%LOCALAPPDATA%\LeagueClanker\settings.json`.
+The gear in the title bar opens the settings: the stats source, what *Apply* writes, *Apply automatically*, compact mode, op.gg's popular items, sounds, and the update check. Settings are saved in `%LOCALAPPDATA%\LeagueClanker\settings.json`.
+
+<img src="docs/screenshots/settings.png" alt="Settings" width="400">
 
 Errors the app recovers from, like op.gg not answering, go to `%LOCALAPPDATA%\LeagueClanker\log.txt`. The settings have a button to open it.
 
@@ -311,6 +325,7 @@ All in `Recommendation/BuildRules.cs`.
 | TrueDamageRule | 2+ true damage champions | health |
 | NoFrontlineRule | you're a frontliner and no ally is | health and resists |
 | TeamDamageSkewRule | your team is 75%+ one damage type | % penetration |
+| PopularItemsRule | op.gg is the stats source and has data for your champion | op.gg's two most played cores, gently |
 
 To add a rule, implement `IBuildRule`, return a `Situation` with a label, a sentence, an impact and a match function, and add it to `BuildRules.Default`. Thresholds and weights are constants at the top of each rule. Archetype stat weights and core items are in `ArchetypeProfiles.cs`. Change one, rerun the CLI on the samples, and see what moved.
 
@@ -318,6 +333,7 @@ To add a rule, implement `IBuildRule`, return a `Situation` with a label, a sent
 
 - Enemy stats are estimates. Runes, stat shards and stacking passives (Malphite, Cho'Gath, Sion) don't show up in the API.
 - Only stats and keyword traits count. Rabadon's Deathcap's AP multiplier, for example, is invisible to the scorer. The core-item bonus papers over some of this.
+- "Buy now" plans toward your next item only. It doesn't pick up a cheap part of a later item when your gold doesn't fit the next one.
 - Your own archetype comes from Riot's class tags plus a short override list. Off-meta picks like AP Shaco get the wrong item pool. A manual archetype picker in the window would fix it.
 - Arena isn't supported. Riot's policy also rules out showing win rates for augments and Arena items, so the augment advisor reasons from card effects only.
 - Augment tags come from description text. Expect some cards to be tagged wrong until they've been reviewed with `--augments`.

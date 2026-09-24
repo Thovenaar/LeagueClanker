@@ -3,6 +3,7 @@ using System.Reflection;
 using System.Net.Http;
 using System.Windows;
 using LeagueClanker.Core;
+using LeagueClanker.Core.Analysis;
 using LeagueClanker.Core.Augments;
 using LeagueClanker.Core.LeagueClient;
 using LeagueClanker.Core.LiveClient;
@@ -73,6 +74,32 @@ public partial class App : Application
                 data, runes, matchups, new SpellAdvisor(data.Spells, opgg), opgg, new DraftAdvisor(opgg, data.Champions), notes));
             viewModel.Matchups = matchups;
             viewModel.Notes = notes;
+
+            // op.gg's data for your champion: popular items for the build, starting items at the start.
+            GameAnalysis? liveGame = null;
+            async Task LoadLiveOpggAsync()
+            {
+                if (liveGame is not { } game)
+                    return;
+                var useOpgg = viewModel.Settings.RuneSource == RuneSourceKind.StatsSite && game.Mode is GameMode.SummonersRift or GameMode.Aram or GameMode.AramMayhem;
+                var champion = useOpgg ? await LoadOpggChampionAsync(opgg, game) : null;
+                if (liveGame != game)
+                    return; // another game or champion by now
+                advisor.PopularItems = champion is not null && viewModel.Settings.UsePopularItems
+                    ? champion.CoreItems.Take(2).SelectMany(c => c.Ids).Where(id => data.Items.Get(id)?.Kind == ItemKind.Legendary).ToHashSet()
+                    : new HashSet<int>();
+                viewModel.SetOpggChampion(champion);
+            }
+            viewModel.LiveChampionChanged += (_, game) =>
+            {
+                liveGame = game;
+                _ = LoadLiveOpggAsync();
+            };
+            viewModel.Settings.PropertyChanged += (_, e) =>
+            {
+                if (e.PropertyName is nameof(SettingsViewModel.UsePopularItems) or nameof(SettingsViewModel.RuneSource))
+                    _ = LoadLiveOpggAsync();
+            };
             _ = RunChampSelectAsync(viewModel, data, champSelectDemo);
 
             await foreach (var update in advisor.RunAsync(PollInterval, _cts.Token))
@@ -89,6 +116,20 @@ public partial class App : Application
         finally
         {
             (source as IDisposable)?.Dispose();
+        }
+    }
+
+    private static async Task<OpggChampion?> LoadOpggChampionAsync(OpggClient opgg, GameAnalysis game)
+    {
+        try
+        {
+            var aram = game.Mode is GameMode.Aram or GameMode.AramMayhem;
+            return await opgg.GetChampionAsync(game.Me.Champion.Key, aram, OpggClient.RoleFor(game.Me.Position, game.Me.Archetype), default);
+        }
+        catch (Exception ex) when (ex is HttpRequestException or System.Text.Json.JsonException or TaskCanceledException)
+        {
+            Log.Error("op.gg data for the live game", ex);
+            return null;
         }
     }
 
