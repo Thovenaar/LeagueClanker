@@ -13,7 +13,8 @@ public class GameAnalyzerTests
     [InlineData("Thresh", new[] { "Support", "Tank" }, 5, 6, Archetype.Tank)]
     [InlineData("Lulu", new[] { "Support", "Mage" }, 4, 7, Archetype.Enchanter)]
     [InlineData("Teemo", new[] { "Marksman", "Mage" }, 5, 7, Archetype.Mage)]
-    [InlineData("KogMaw", new[] { "Marksman", "Mage" }, 8, 5, Archetype.Marksman)]
+    [InlineData("KogMaw", new[] { "Marksman", "Mage" }, 8, 5, Archetype.OnHit)] // override: on-hit, not crit
+    [InlineData("Caitlyn", new[] { "Marksman" }, 8, 2, Archetype.Marksman)]
     [InlineData("Mordekaiser", new[] { "Fighter", "Mage" }, 4, 7, Archetype.ApBruiser)]
     [InlineData("Fizz", new[] { "Assassin", "Fighter" }, 6, 7, Archetype.ApAssassin)]
     [InlineData("Gwen", new[] { "Fighter" }, 7, 5, Archetype.ApBruiser)] // override: builds AP

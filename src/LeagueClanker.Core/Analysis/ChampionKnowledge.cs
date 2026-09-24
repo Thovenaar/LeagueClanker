@@ -70,7 +70,11 @@ public static class ChampionKnowledge
         new Dictionary<string, Archetype>(StringComparer.OrdinalIgnoreCase)
         {
             ["Gwen"] = Archetype.ApBruiser,
-            ["MasterYi"] = Archetype.Marksman,
+            ["Kalista"] = Archetype.OnHit,
+            ["Kayle"] = Archetype.OnHit,
+            ["KogMaw"] = Archetype.OnHit,
+            ["MasterYi"] = Archetype.OnHit,
+            ["Vayne"] = Archetype.OnHit,
             ["Nilah"] = Archetype.Marksman,
             ["Pantheon"] = Archetype.AdAssassin,
             ["Tryndamere"] = Archetype.Marksman,

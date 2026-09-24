@@ -126,6 +126,7 @@ public static class LateGameAdvisor
             {
                 Archetype.Tank or Archetype.Bruiser => ElixirOfIron,
                 Archetype.Marksman or Archetype.AdAssassin => ElixirOfWrath,
+                Archetype.OnHit => me.DamageType == DamageType.Magic ? ElixirOfSorcery : ElixirOfWrath,
                 _ => ElixirOfSorcery,
             };
             if (items.Get(elixir) is { } item)

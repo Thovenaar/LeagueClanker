@@ -31,6 +31,11 @@ public sealed class PlayerProfile
     public string Name => Champion.Name;
 
     /// <summary>How much this champion contributes to the team's damage. Tanks and enchanters deal less than carries.</summary>
+    /// <summary>Physical or magic, for rules like armor versus magic pen. On-hit follows the champion's actual damage split.</summary>
+    public DamageType DamageType => Archetype == Archetype.OnHit
+        ? (MagicShare >= 0.5 ? DamageType.Magic : DamageType.Physical)
+        : Archetype.DamageTypeOf();
+
     public double DamageWeight => Threat * Archetype switch { Archetype.Tank => 0.5, Archetype.Enchanter => 0.4, _ => 1.0 };
 
     public int Level { get; init; } = 1;
@@ -221,6 +226,7 @@ public static class GameAnalyzer
             : archetype switch
             {
                 Archetype.Marksman or Archetype.AdAssassin => 0.1,
+                Archetype.OnHit => 0.45,
                 Archetype.Bruiser => 0.15,
                 Archetype.Mage => 0.9,
                 Archetype.ApAssassin or Archetype.ApBruiser or Archetype.Enchanter => 0.85,

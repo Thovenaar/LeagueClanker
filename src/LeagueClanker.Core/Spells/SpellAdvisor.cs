@@ -78,7 +78,7 @@ public sealed class SpellAdvisor(SummonerSpellCatalog spells, OpggClient? opgg =
                 Position.Top => (SummonerSpellCatalog.Teleport, "Teleport to get back to lane and join fights"),
                 Position.Middle when request.Playstyle.IsFrontline() => (SummonerSpellCatalog.Teleport, "Teleport to get back to lane and join fights"),
                 Position.Middle => (SummonerSpellCatalog.Ignite, "Ignite to finish kills in lane"),
-                Position.Bottom => request.Playstyle == Archetype.Marksman
+                Position.Bottom => request.Playstyle is Archetype.Marksman or Archetype.OnHit
                     ? (SummonerSpellCatalog.Heal, "Heal for you and your support")
                     : (SummonerSpellCatalog.Barrier, "Barrier to survive burst"),
                 Position.Support when request.Playstyle == Archetype.Enchanter => (SummonerSpellCatalog.Exhaust, "Exhaust to shut down a diving enemy"),

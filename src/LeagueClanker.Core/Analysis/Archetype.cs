@@ -13,6 +13,9 @@ public enum Archetype
     ApBruiser,
     Tank,
     Enchanter,
+
+    /// <summary>Attack speed and on-hit items (Blade of the Ruined King, Nashor's Tooth), physical or magic.</summary>
+    OnHit,
 }
 
 public enum DamageType
@@ -48,15 +51,16 @@ public static class ArchetypeClassifier
         };
     }
 
+    /// <summary>On-hit can go either way; <see cref="PlayerProfile.DamageType"/> decides it from the champion and items.</summary>
     public static DamageType DamageTypeOf(this Archetype archetype) => archetype switch
     {
-        Archetype.Marksman or Archetype.AdAssassin or Archetype.Bruiser => DamageType.Physical,
+        Archetype.Marksman or Archetype.AdAssassin or Archetype.Bruiser or Archetype.OnHit => DamageType.Physical,
         Archetype.Mage or Archetype.ApAssassin or Archetype.ApBruiser => DamageType.Magic,
         _ => DamageType.None,
     };
 
     public static bool IsSquishy(this Archetype archetype) =>
-        archetype is Archetype.Marksman or Archetype.Mage or Archetype.AdAssassin or Archetype.ApAssassin or Archetype.Enchanter;
+        archetype is Archetype.Marksman or Archetype.Mage or Archetype.AdAssassin or Archetype.ApAssassin or Archetype.Enchanter or Archetype.OnHit;
 
     public static bool IsFrontline(this Archetype archetype) =>
         archetype is Archetype.Tank or Archetype.Bruiser or Archetype.ApBruiser;
@@ -69,6 +73,7 @@ public static class ArchetypeClassifier
         Archetype.AdAssassin => "AD assassin",
         Archetype.ApAssassin => "AP assassin",
         Archetype.ApBruiser => "AP bruiser",
+        Archetype.OnHit => "On-hit",
         _ => archetype.ToString(),
     };
 }

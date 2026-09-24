@@ -227,11 +227,12 @@ op.gg's ranked data is read for all ranks. That's about four times the games of 
 
 ### Champ select: playstyle and runes
 
-Every champion can be played more than one way: AP Ezreal, AD Thresh, tank or AD Leona. In champ select the app shows eight playstyles: marksman, mage, AD assassin, AP assassin, bruiser, AP bruiser, tank and enchanter. It picks the default from your champion and role:
+Every champion can be played more than one way: AP Ezreal, AD Thresh, tank or AD Leona. In champ select the app shows nine playstyles: marksman, mage, AD assassin, AP assassin, bruiser, AP bruiser, tank, enchanter and on-hit. It picks the default from your champion and role:
 
 - Your role is the position champ select assigns you. In blind pick and normals, where nothing is assigned, it's the role you queued for.
 - The default is how the champion is normally played, which is also what the item advisor assumes. In support, a fighter who can tank, like Taric or Braum, defaults to tank.
 - ARAM has no roles, so AD and AP champions default to their damage playstyle and tanks to tank.
+- **On-hit** is for attack speed builds around items whose attacks deal extra damage: Blade of the Ruined King, Kraken Slayer, Nashor's Tooth, Guinsoo's Rageblade, Wit's End and Terminus. It values attack speed first and AD and AP both at half, and items with an on-hit effect get 0.8 extra. Your damage counts as magic or physical by your actual split, so on-hit Kayle is treated as magic and Vayne as physical. Kayle, Kog'Maw, Kalista, Vayne and Master Yi default to it; on-hit Katarina, Kai'Sa or Teemo is one click away.
 
 Change it with one click. The choice carries into the game, where it decides your item build: an AP Ezreal gets AP items. You can change it in game too, with *Playing as* under your champion's name. The build switches right away, without a pivot suggestion, because it was your decision.
 

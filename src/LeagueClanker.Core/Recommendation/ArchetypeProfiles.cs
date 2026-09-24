@@ -15,6 +15,9 @@ public sealed record ArchetypeProfile(
     IReadOnlySet<string> ClassicCoreItems,
     double MinFit = 1.3)
 {
+    /// <summary>Points for item effects the archetype builds around, on top of the item's stats.</summary>
+    public IReadOnlyDictionary<ItemTraits, double> TraitBonuses { get; init; } = new Dictionary<ItemTraits, double>();
+
     public const double CoreItemBonus = 0.8;
 
     private const double AttackSpeedCap = 2.5;
@@ -23,7 +26,8 @@ public sealed record ArchetypeProfile(
     /// <param name="mine">Your current stats. Stats past their cap are worth nothing to you.</param>
     public double BaseScore(ItemInfo item, StatBlock? mine = null) =>
         item.StatsFor(mine).Sum(s => StatWeights.GetValueOrDefault(s.Key) * StatScale.Normalize(s.Key, Useful(s.Key, s.Value, mine)))
-        + ((item.IsClassic ? ClassicCoreItems : CoreItems).Contains(item.Name) ? CoreItemBonus : 0);
+        + ((item.IsClassic ? ClassicCoreItems : CoreItems).Contains(item.Name) ? CoreItemBonus : 0)
+        + TraitBonuses.Where(t => item.Has(t.Key)).Sum(t => t.Value);
 
     // Crit stops at 100%. Attack speed stops at 2.5 per second; bonus attack speed scales base attack speed.
     // Classic cooldown reduction stops at 40%.
@@ -79,6 +83,19 @@ public static class ArchetypeProfiles
 
     public static readonly IReadOnlyDictionary<Archetype, ArchetypeProfile> All = new Dictionary<Archetype, ArchetypeProfile>
     {
+        // Attack speed first, AD and AP both at half: on-hit damage is often magic (Nashor's, Guinsoo's, Wit's End).
+        [Archetype.OnHit] = new(Archetype.OnHit,
+            Weights((Stat.AttackSpeed, 1.3), (Stat.AttackDamage, 0.6), (Stat.AbilityPower, 0.6), (Stat.LifeSteal, 0.4),
+                (Stat.Omnivamp, 0.3), (Stat.MagicPen, 0.3), (Stat.ArmorPenPercent, 0.2), (Stat.Health, 0.3), (Stat.Armor, 0.2),
+                (Stat.MagicResist, 0.25), (Stat.MoveSpeed, 0.3), (Stat.MoveSpeedPercent, 0.3), (Stat.Tenacity, 0.3),
+                (Stat.AbilityHaste, 0.2), (Stat.CritChance, 0.05)),
+            Names("Blade of The Ruined King", "Kraken Slayer", "Nashor's Tooth", "Guinsoo's Rageblade", "Wit's End", "Terminus",
+                "Berserker's Greaves"),
+            Names("Blade of The Ruined King", "Nashor's Tooth", "Wit's End", "Guinsoo's Rageblade", "Berserker's Greaves"))
+        {
+            TraitBonuses = new Dictionary<ItemTraits, double> { [ItemTraits.OnHit] = 0.8 },
+        },
+
         [Archetype.Marksman] = new(Archetype.Marksman,
             Weights((Stat.AttackDamage, 1.0), (Stat.AttackSpeed, 1.0), (Stat.CritChance, 1.1), (Stat.CritDamage, 0.8), (Stat.ArmorPenPercent, 0.6),
                 (Stat.Lethality, 0.2), (Stat.LifeSteal, 0.5), (Stat.MoveSpeed, 0.3), (Stat.MoveSpeedPercent, 0.3),

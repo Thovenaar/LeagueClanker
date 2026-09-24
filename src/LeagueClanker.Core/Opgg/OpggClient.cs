@@ -107,7 +107,7 @@ public sealed class OpggClient : IMatchupData
         ? position
         : playstyle switch
         {
-            Archetype.Marksman => Position.Bottom,
+            Archetype.Marksman or Archetype.OnHit => Position.Bottom,
             Archetype.Enchanter => Position.Support,
             Archetype.Mage or Archetype.ApAssassin or Archetype.AdAssassin => Position.Middle,
             _ => Position.Top,

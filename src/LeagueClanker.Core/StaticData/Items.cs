@@ -54,6 +54,7 @@ public enum ItemTraits
     ResistShred = 1 << 8,     // Reduces the target's armor or magic resist
     GrantsShield = 1 << 9,    // Gives its owner or allies shields
     Sustain = 1 << 10,        // Life steal, omnivamp or heal power, in stats or passives
+    OnHit = 1 << 11,          // Attacks deal extra damage on-hit (Blade of the Ruined King, Nashor's Tooth), not a spellblade proc
 }
 
 public enum ItemKind
@@ -323,6 +324,9 @@ public sealed partial class ItemCatalog
         var traits = ItemTraits.None;
 
         if (Regex.IsMatch(text, @"\bWounds\b")) traits |= ItemTraits.AntiHeal;
+        if (Regex.Split(text, @"(?<=[.!])\s").Any(s => Regex.IsMatch(s, @"(?<!next )\bAttacks? (deal|deals|apply|applies)\b[^.]{0,120}On-Hit", RegexOptions.IgnoreCase)
+                                                        && !s.Contains("after using an Ability", StringComparison.OrdinalIgnoreCase)))
+            traits |= ItemTraits.OnHit;
         if (Regex.IsMatch(text, @"Shield Reaver|reduces? (the )?Shields", RegexOptions.IgnoreCase)) traits |= ItemTraits.AntiShield;
         if (Regex.IsMatch(text, @"less damage from Critical Strikes", RegexOptions.IgnoreCase)) traits |= ItemTraits.CritReduction;
         // Classic wording: Randuin's "reduces the attacker's Attack Speed", Zhonya's "Invulnerable and Untargetable",

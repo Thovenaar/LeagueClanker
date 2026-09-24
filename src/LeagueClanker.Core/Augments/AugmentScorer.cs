@@ -336,16 +336,16 @@ public sealed class AugmentScorer
         var a = me.Archetype;
         return trigger switch
         {
-            AugmentTrigger.Attacks => a switch { Archetype.Marksman => 1.0, Archetype.Bruiser => 0.8, Archetype.AdAssassin or Archetype.ApBruiser => 0.5, Archetype.Tank => 0.4, _ => 0.2 },
+            AugmentTrigger.Attacks => a switch { Archetype.Marksman or Archetype.OnHit => 1.0, Archetype.Bruiser => 0.8, Archetype.AdAssassin or Archetype.ApBruiser => 0.5, Archetype.Tank => 0.4, _ => 0.2 },
             AugmentTrigger.Crits => Math.Clamp(me.Stats.CritChance / 100 + (a == Archetype.Marksman ? 0.5 : 0) + 0.15 * CountItems(ctx, i => i.Stat(Stat.CritChance) > 0), 0.1, 1.2),
-            AugmentTrigger.AbilityHits => a switch { Archetype.Mage or Archetype.ApAssassin => 1.0, Archetype.ApBruiser or Archetype.AdAssassin => 0.9, Archetype.Marksman => 0.5, _ => 0.7 },
+            AugmentTrigger.AbilityHits => a switch { Archetype.Mage or Archetype.ApAssassin => 1.0, Archetype.ApBruiser or Archetype.AdAssassin => 0.9, Archetype.Marksman or Archetype.OnHit => 0.5, _ => 0.7 },
             AugmentTrigger.Ultimate => 0.7,
             AugmentTrigger.Healing => me.Champion.Has(ChampionTraits.Healer) || a is Archetype.Bruiser or Archetype.ApBruiser ? 0.8 : 0.3,
             AugmentTrigger.AllySupport => a == Archetype.Enchanter ? 1.0 : me.Champion.Has(ChampionTraits.Shielder) || me.Champion.Has(ChampionTraits.Healer) ? 0.5 : 0.1,
             AugmentTrigger.Shields => me.Champion.Has(ChampionTraits.Shielder) ? 0.9 : 0.3,
             AugmentTrigger.LowHealth => a is Archetype.Bruiser or Archetype.ApBruiser ? 0.8 : a == Archetype.Tank ? 0.6 : 0.3,
             AugmentTrigger.Immobilize => me.Champion.Has(ChampionTraits.HeavyCrowdControl) ? 1.0 : 0.25,
-            AugmentTrigger.Takedowns => a.IsAssassin() ? 0.9 : a == Archetype.Marksman ? 0.6 : 0.4,
+            AugmentTrigger.Takedowns => a.IsAssassin() ? 0.9 : a is Archetype.Marksman or Archetype.OnHit ? 0.6 : 0.4,
             AugmentTrigger.Dashes => ChampionKnowledge.Dashers.Contains(id) ? 1.0 : 0.1,
             AugmentTrigger.Pets => ChampionKnowledge.Pets.Contains(id) ? NicheMatch : 0.0,
             AugmentTrigger.Spinning => ChampionKnowledge.Spinners.Contains(id) ? NicheMatch : 0.0,
@@ -355,8 +355,8 @@ public sealed class AugmentScorer
             AugmentTrigger.SummonerSpells => 0.6,
             AugmentTrigger.Death => 0.3,
             AugmentTrigger.Distance => me.Stats.IsRanged ? 0.8 : 0.2,
-            AugmentTrigger.AttackDamage => a.DamageTypeOf() == DamageType.Physical ? 1.0 : 0.15,
-            AugmentTrigger.AbilityPower => a.DamageTypeOf() == DamageType.Magic || a == Archetype.Enchanter ? 1.0 : 0.15,
+            AugmentTrigger.AttackDamage => me.DamageType == DamageType.Physical ? 1.0 : a == Archetype.OnHit ? 0.6 : 0.15,
+            AugmentTrigger.AbilityPower => me.DamageType == DamageType.Magic || a == Archetype.Enchanter ? 1.0 : a == Archetype.OnHit ? 0.6 : 0.15,
             AugmentTrigger.MaxHealth => a == Archetype.Tank ? 1.0 : a is Archetype.Bruiser or Archetype.ApBruiser ? 0.7 : 0.25,
             AugmentTrigger.BonusResists => a == Archetype.Tank ? 1.0 : a is Archetype.Bruiser or Archetype.ApBruiser ? 0.6 : 0.15,
             AugmentTrigger.MoveSpeed => 0.5,
@@ -368,10 +368,10 @@ public sealed class AugmentScorer
     private static double MechanicValue(AugmentEffect effect, PlayerProfile me)
     {
         var a = me.Archetype;
-        var dealsDamage = a.DamageTypeOf() != DamageType.None;
+        var dealsDamage = me.DamageType != DamageType.None;
         return effect switch
         {
-            AugmentEffect.OnHit => a switch { Archetype.Marksman => 1.0, Archetype.Bruiser or Archetype.ApBruiser => 0.6, _ => 0.2 },
+            AugmentEffect.OnHit => a switch { Archetype.Marksman or Archetype.OnHit => 1.0, Archetype.Bruiser or Archetype.ApBruiser => 0.6, _ => 0.2 },
             AugmentEffect.TrueDamage => dealsDamage ? 0.8 : 0.3,
             AugmentEffect.MaxHealthDamage => dealsDamage ? 0.7 : 0.4,
             AugmentEffect.Burn => a is Archetype.Mage or Archetype.ApBruiser or Archetype.Tank ? 0.7 : 0.4,
@@ -388,7 +388,7 @@ public sealed class AugmentScorer
             AugmentEffect.Keystones => 0.6,
             AugmentEffect.AntiHeal => 0.3,
             AugmentEffect.Dash => a.IsAssassin() || a.IsFrontline() ? 0.6 : 0.4,
-            AugmentEffect.AttackRange => me.Stats.IsRanged ? (a == Archetype.Marksman ? 0.8 : 0.4) : 0.2,
+            AugmentEffect.AttackRange => me.Stats.IsRanged ? (a is Archetype.Marksman or Archetype.OnHit ? 0.8 : 0.4) : 0.2,
             AugmentEffect.Damage => dealsDamage ? 0.6 : 0.3,
             _ => 0.3,
         };

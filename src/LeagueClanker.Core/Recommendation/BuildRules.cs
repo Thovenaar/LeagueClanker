@@ -110,7 +110,7 @@ public sealed class TankShredRule : IBuildRule
     public Situation? Evaluate(GameAnalysis game)
     {
         // No enemies yet: blind pick champ select builds a pre-game item set before anyone is visible.
-        var damage = game.Me.Archetype.DamageTypeOf();
+        var damage = game.Me.DamageType;
         if (damage == DamageType.None || game.Enemies.Players.Count == 0)
             return null;
 
@@ -150,7 +150,7 @@ public sealed class SquishyTeamRule : IBuildRule
 {
     public Situation? Evaluate(GameAnalysis game)
     {
-        var damage = game.Me.Archetype.DamageTypeOf();
+        var damage = game.Me.DamageType;
         var squishies = game.Enemies.Squishies;
         if (damage == DamageType.None || squishies.Count < 3 || game.Enemies.Tanks.Count > 1)
             return null;
@@ -332,7 +332,7 @@ public sealed class TeamDamageSkewRule : IBuildRule
 
     public Situation? Evaluate(GameAnalysis game)
     {
-        var damage = game.Me.Archetype.DamageTypeOf();
+        var damage = game.Me.DamageType;
         var team = game.MyTeam;
         if (game.Allies.Players.Count == 0)
             return null; // a "team" of just you says nothing

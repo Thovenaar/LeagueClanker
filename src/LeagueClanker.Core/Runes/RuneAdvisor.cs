@@ -67,6 +67,7 @@ public static class KeystoneFit
     private static readonly Dictionary<Archetype, HashSet<string>> Fits = new()
     {
         [Archetype.Marksman] = Names("Lethal Tempo", "Press the Attack", "Fleet Footwork", "Hail of Blades", "First Strike", "Conqueror"),
+        [Archetype.OnHit] = Names("Lethal Tempo", "Hail of Blades", "Press the Attack", "Conqueror", "Fleet Footwork"),
         [Archetype.Mage] = Names("Arcane Comet", "Summon Aery", "Electrocute", "Dark Harvest", "Deathfire Touch", "First Strike",
             "Unsealed Spellbook", "Stormraider's Surge", "Glacial Augment"),
         [Archetype.ApAssassin] = Names("Electrocute", "Dark Harvest", "First Strike", "Arcane Comet", "Stormraider's Surge", "Hail of Blades",

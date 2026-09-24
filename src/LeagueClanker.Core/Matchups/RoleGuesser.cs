@@ -49,6 +49,7 @@ public static class RoleGuesser
     private static IReadOnlyDictionary<Position, double> ClassRates(ChampionInfo champion) => ArchetypeClassifier.Classify(champion) switch
     {
         Archetype.Marksman => Rates((Position.Bottom, 0.85), (Position.Middle, 0.1)),
+        Archetype.OnHit => Rates((Position.Bottom, 0.5), (Position.Top, 0.3), (Position.Middle, 0.2)),
         Archetype.Enchanter => Rates((Position.Support, 0.9)),
         Archetype.Mage => Rates((Position.Middle, 0.65), (Position.Support, 0.25)),
         Archetype.ApAssassin => Rates((Position.Middle, 0.6), (Position.Jungle, 0.3)),

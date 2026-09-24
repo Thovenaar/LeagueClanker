@@ -427,7 +427,10 @@ static void PrintMatchup(MatchupReport? report)
 RuneSourceKind RuneSource() => Option("--source") == "rules" ? RuneSourceKind.OwnRules : RuneSourceKind.StatsSite;
 
 static Archetype? ParseStyle(string? style) =>
-    style is null ? null : Playstyles.All.FirstOrDefault(a => a.DisplayName().Replace(" ", "").Equals(style.Replace(" ", ""), StringComparison.OrdinalIgnoreCase));
+    style is null ? null : Playstyles.All.FirstOrDefault(a => Compact(a.DisplayName()).Equals(Compact(style), StringComparison.OrdinalIgnoreCase));
+
+// "AP assassin", "apassassin", "on-hit" and "onhit" all match.
+static string Compact(string text) => text.Replace(" ", "").Replace("-", "");
 
 void PrintRunes(RuneRequest request, RuneRecommendation rec)
 {
