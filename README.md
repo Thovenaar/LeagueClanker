@@ -66,7 +66,7 @@ For ARAM: Mayhem augments, give it a snapshot, the offered cards, and the cards 
 dotnet run --project src/LeagueClanker.Cli -- --mayhem samples/mayhem/jinx-level7.json --picked "It's Critical" --offer "Critical Rhythm;Recursion;Celestial Body"
 ```
 
-Add `--rerolled "Recursion"` for cards whose reroll is used up.
+Add `--rerolled "Recursion"` for cards whose reroll is used up, and `--golden "Celestial Body"` for the card with the golden reroll.
 
 `--augments` lists all 225 augments with the tags the parser gave them. `--scan` reads an offer from a screenshot, or from the running game with `--scan screen`. Add `--verbose` to see every line of text it recognized:
 
@@ -137,7 +137,12 @@ It also says which cards to reroll. Each card in an offer has its own reroll, an
 - **KEEP**: your best card.
 - **REROLL**: you won't take it, so reroll it.
 - **REROLL LAST**: your best card, but a reroll usually beats it. Reroll the others first, and this one only if it's still your best.
+- **GOLDEN REROLL** and **GOLDEN REROLL LAST**: the same, for the card whose reroll is golden.
 - **REROLLED**: its reroll is used up.
+
+A golden reroll comes from the Mayhem progression track. In Silver and Gold offers it sometimes appears on one card, and it rerolls that card into the next tier. The advice then compares that card with the higher tier: on a card you won't take it's always worth using, and on your best card it's worth it when the higher tier usually beats it. The app can't see which card has the golden button, so mark it with *Golden*. On screen, a card that changed into a higher tier counts as the golden reroll being used.
+
+After you pick "Stats on Stats on Stats!", the next offer has two rerolls per card, and the advice says so.
 
 Each card also shows how often a reroll beats it. For example: "Keep Critical Rhythm. Reroll Recursion and Celestial Body: you won't take them, so a reroll can only help." Or: "Reroll Minionmancer and Celestial Body first. If All For You is still your best card after that, reroll it too: a reroll beats it 75% of the time."
 

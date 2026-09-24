@@ -1,4 +1,5 @@
 using System.Windows;
+using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 
 namespace LeagueClanker.App;
@@ -42,6 +43,14 @@ public partial class MainWindow : Window
     private void OnRemovePicked(object sender, RoutedEventArgs e) => ViewModel.Augments.RemoveFromPicked(CardName(sender));
 
     private void OnPickOption(object sender, RoutedEventArgs e) => ViewModel.Augments.Pick(CardName(sender));
+
+    // Mouse, keyboard and accessibility tools all toggle IsChecked. A freshly built row also sets it from
+    // the view model, which matches the row already and is ignored.
+    private void OnGoldenChanged(object sender, RoutedEventArgs e)
+    {
+        if (sender is ToggleButton { DataContext: AugmentOptionRow row } toggle && toggle.IsChecked != row.IsGolden)
+            ViewModel.Augments.ToggleGolden(row.Name);
+    }
 
     private void OnRerolledOption(object sender, RoutedEventArgs e)
     {

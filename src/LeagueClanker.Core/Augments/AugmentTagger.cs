@@ -125,6 +125,7 @@ internal static partial class AugmentTagger
             MentionedItems = items is null ? [] : FindItems(description, items),
             CritChanceBonus = Amount(CritGrantRegex(), description),
             AttackSpeedBonus = Amount(AttackSpeedGrantRegex(), description),
+            GrantsExtraRerolls = description.Contains("additional reroll", StringComparison.OrdinalIgnoreCase),
             HasDrawback = DrawbackRegex().IsMatch(description),
             IsRandom = RandomRegex().IsMatch(description),
             IsQuest = entry.ContainsKey("questinfo") || name.StartsWith("Quest:", StringComparison.OrdinalIgnoreCase),

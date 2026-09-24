@@ -123,6 +123,44 @@ public class AugmentAdvisorTests
         Assert.Null(noneLeft.Reroll);
     }
 
+    [Fact]
+    public void GoldenReroll_OnACardYouWontTake_IsAlwaysUsed()
+    {
+        var ctx = BigPoolContext(picked: ["Rhythm"]);
+        var state = new RerollState { Golden = Card("Pack Leader") };
+
+        var reroll = _bigAdvisor.Rank([Card("Lucky"), Card("Pack Leader"), Card("Plated")], ctx, state).Reroll!;
+
+        Assert.Equal(RerollAction.Keep, reroll.For(Card("Lucky"))!.Action);
+        Assert.Equal(RerollAction.GoldenReroll, reroll.For(Card("Pack Leader"))!.Action);
+        Assert.Equal(RerollAction.Reroll, reroll.For(Card("Plated"))!.Action);
+        Assert.Equal("Keep Lucky. Golden-reroll Pack Leader (it becomes a Prismatic card) and reroll Plated: you won't take them, so a reroll can only help.", reroll.Text);
+    }
+
+    [Fact]
+    public void GoldenReroll_OnAWeakBestCard_IsUsedLast()
+    {
+        var offer = new[] { Card("Pack Leader"), Card("Plated") };
+        var keeper = _bigAdvisor.Rank(offer, BigPoolContext()).Best.Augment;
+
+        var reroll = _bigAdvisor.Rank(offer, BigPoolContext(), new RerollState { Golden = keeper }).Reroll!;
+
+        Assert.Equal(RerollAction.GoldenRerollLast, reroll.For(keeper)!.Action);
+        Assert.Contains("golden-reroll it too", reroll.Text);
+    }
+
+    [Fact]
+    public void ExtraRerolls_KeepACardRerollableAfterOneReroll()
+    {
+        var plated = Card("Plated");
+        var state = new RerollState { RerollsPerCard = 2, Used = new Dictionary<AugmentInfo, int> { [plated] = 1 } };
+
+        var reroll = _bigAdvisor.Rank([Card("Lucky"), Card("Pack Leader"), plated], BigPoolContext(picked: ["Rhythm"]), state).Reroll!;
+
+        Assert.Equal(RerollAction.Reroll, reroll.For(plated)!.Action);
+        Assert.Contains("up to 2 times each", reroll.Text);
+    }
+
     private static AugmentInfo Card(string name) => BigPool.Find(name)!;
 
     private static AugmentContext BigPoolContext(string[]? picked = null)

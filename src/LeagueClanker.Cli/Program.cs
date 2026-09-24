@@ -13,7 +13,7 @@ using LeagueClanker.Vision;
 //                                             replay snapshots through the pivot planner, accepting pivots (or declining)
 //   LeagueClanker.Cli --items                 list the item catalog with detected traits (for tuning rules)
 //   LeagueClanker.Cli --augments              list Mayhem augments with their tags
-//   LeagueClanker.Cli --mayhem <game.json> --offer "A;B;C" [--picked "X;Y"] [--rerolled "A"]
+//   LeagueClanker.Cli --mayhem <game.json> --offer "A;B;C" [--picked "X;Y"] [--rerolled "A"] [--golden "B"]
 //                                             rank an augment offer and say which cards to reroll
 //   LeagueClanker.Cli --scan <image.png | screen> [--verbose]
 //                                             read an augment offer from a screenshot or the game
@@ -63,9 +63,14 @@ if (args is ["--mayhem", var gamePath, ..])
         Situations = rec.Situations,
     };
 
-    var rerolled = NamesAfter("--rerolled").Select(Resolve).ToHashSet();
+    var rerolls = new RerollState
+    {
+        Used = NamesAfter("--rerolled").Select(Resolve).ToDictionary(a => a, _ => 1),
+        Golden = NamesAfter("--golden").Select(Resolve).FirstOrDefault(),
+        RerollsPerCard = ctx.Picked.Count > 0 && ctx.Picked[^1].GrantsExtraRerolls ? 2 : 1,
+    };
     var started = DateTime.UtcNow;
-    var advice = new AugmentAdvisor(augments).Rank(offer, ctx, rerolled);
+    var advice = new AugmentAdvisor(augments).Rank(offer, ctx, rerolls);
     var elapsed = DateTime.UtcNow - started;
     var me = rec.Game.Me;
     Console.WriteLine($"=== {me.Name} ({me.Archetype.DisplayName()}), {rec.Game.Mode.DisplayName()} ===");

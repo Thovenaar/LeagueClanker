@@ -92,6 +92,20 @@ public class AugmentDataTests
     }
 
     [Fact]
+    public void Catalog_SpotsCardsThatGiveExtraRerolls()
+    {
+        var catalog = AugmentCatalog.ParseWikiModule("""
+            return {
+                ["Stats on Stats on Stats!"] = { ["description"] = "Gain 4 Stat Bonus. Additionally, on the next round of augment selection, you gain an additional reroll per augment slot.", ["tier"] = "Prismatic" },
+                ["Stats!"] = { ["description"] = "Gain 2 Stat Bonus.", ["tier"] = "Silver" },
+            }
+            """);
+
+        Assert.True(catalog.Find("Stats on Stats on Stats!")!.GrantsExtraRerolls);
+        Assert.False(catalog.Find("Stats!")!.GrantsExtraRerolls);
+    }
+
+    [Fact]
     public void Catalog_FindIsForgivingAndSkipsDisabledCards()
     {
         var catalog = TestAugments.Catalog;

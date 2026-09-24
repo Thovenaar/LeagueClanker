@@ -154,6 +154,28 @@
             <Setter Property="FontWeight" Value="Normal" />
         </Style>
 
+        <!-- "Golden" marker on an offered card: outline when off, filled gold when on -->
+        <Style x:Key="GoldenToggle" TargetType="ToggleButton">
+            <Setter Property="Foreground" Value="{StaticResource GoldBrush}" />
+            <Setter Property="FontSize" Value="10" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ToggleButton">
+                        <Border x:Name="Bg" Background="Transparent" BorderBrush="{StaticResource GoldBrush}" BorderThickness="1" CornerRadius="4" Padding="6,1">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Bg" Property="Background" Value="{StaticResource GoldBrush}" />
+                                <Setter Property="Foreground" Value="#FF0E1217" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <!-- Borderless x for removing a chip -->
         <Style x:Key="RemoveButton" TargetType="Button" BasedOn="{StaticResource ChromeButton}">
             <Setter Property="Width" Value="16" />

@@ -9,11 +9,12 @@ namespace LeagueClanker.App;
 
 public sealed record AugmentRow(string Name, string Tier, string Description);
 
-/// <param name="Badge">KEEP, REROLL, REROLL LAST, REROLLED, or BEST when rerolls don't apply.</param>
-/// <param name="CanReroll">The card still has its reroll and the advice is to use it.</param>
+/// <param name="Badge">KEEP, REROLL, REROLL LAST, GOLDEN REROLL, REROLLED, or BEST when rerolls don't apply.</param>
+/// <param name="CanReroll">The card still has a reroll and the advice is to use it.</param>
+/// <param name="CanBeGolden">The card still has its reroll, so it can be the one with the golden reroll.</param>
 public sealed record AugmentOptionRow(
     int Rank, string Name, string Tier, string Description, string Badge, bool BadgeFilled, bool CanReroll,
-    string Scores, string RerollNote, IReadOnlyList<string> Reasons, string Combos);
+    bool CanBeGolden, bool IsGolden, string Scores, string RerollNote, IReadOnlyList<string> Reasons, string Combos);
 
 /// <summary>
 /// Augment offers for ARAM: Mayhem, ranked. Offers are read from the screen when possible (<see cref="OnScan"/>);
@@ -35,8 +36,11 @@ public sealed class AugmentPickerViewModel : INotifyPropertyChanged
     private int _level;
     private string? _lastDetected;
     private List<AugmentInfo> _lastDetectedCards = [];
-    private readonly HashSet<AugmentInfo> _rerolled = [];
-    private int _pendingRerolls;
+    // Rerolls spent on the slot each offered card sits in, the card with the golden reroll, and rerolls
+    // pressed by hand whose replacement card hasn't been typed yet.
+    private readonly Dictionary<AugmentInfo, int> _rerollsUsed = [];
+    private AugmentInfo? _golden;
+    private readonly Queue<(int Used, bool Golden)> _pendingReplacements = new();
     private bool _offerFromScreen;
     private int _scansWithoutOffer;
 
@@ -112,8 +116,7 @@ public sealed class AugmentPickerViewModel : INotifyPropertyChanged
         _picked.Clear();
         _lastDetected = null;
         _lastDetectedCards = [];
-        _rerolled.Clear();
-        _pendingRerolls = 0;
+        ClearRerolls();
         _offerFromScreen = false;
         _scansWithoutOffer = 0;
         SearchText = "";
@@ -124,20 +127,17 @@ public sealed class AugmentPickerViewModel : INotifyPropertyChanged
     {
         if (Find(name) is not { } augment || _offer.Contains(augment) || _picked.Contains(augment))
             return;
-        if (_offer.Count >= OfferSize || (_offer.Count > 0 && _offer[0].Tier != augment.Tier))
+        // Every card in one offer shares a tier, except the one a golden reroll lifted a tier.
+        var baseTier = _offer.Count > 0 ? _offer.Min(a => a.Tier) : augment.Tier;
+        var goldenResult = _pendingReplacements.TryPeek(out var next) && next.Golden && augment.Tier == baseTier + 1;
+        if (_offer.Count >= OfferSize || (augment.Tier != baseTier && !goldenResult))
         {
-            // A new offer: every card in one offer shares a tier.
             _offer.Clear();
-            _rerolled.Clear();
-            _pendingRerolls = 0;
+            ClearRerolls();
         }
         _offer.Add(augment);
-        if (_pendingRerolls > 0)
-        {
-            // This card replaced one you pressed "Rerolled" on, so its own reroll is used up.
-            _rerolled.Add(augment);
-            _pendingRerolls--;
-        }
+        if (_pendingReplacements.TryDequeue(out var replaced))
+            _rerollsUsed[augment] = replaced.Used; // it sits in a slot that already spent rerolls
         SearchText = "";
         Changed();
     }
@@ -159,8 +159,7 @@ public sealed class AugmentPickerViewModel : INotifyPropertyChanged
             return;
         _picked.Add(augment);
         _offer.Clear();
-        _rerolled.Clear();
-        _pendingRerolls = 0;
+        ClearRerolls();
         _offerFromScreen = false;
         Changed();
     }
@@ -170,9 +169,33 @@ public sealed class AugmentPickerViewModel : INotifyPropertyChanged
     {
         if (Find(name) is not { } augment || !_offer.Remove(augment))
             return;
-        _pendingRerolls++;
+        var golden = augment == _golden;
+        _pendingReplacements.Enqueue((golden ? RerollsPerCard : _rerollsUsed.GetValueOrDefault(augment) + 1, golden));
+        if (golden)
+            _golden = null;
         Changed();
-        Status = $"Type the card that replaced {augment.Name}.";
+        Status = golden
+            ? $"Type the {augment.Tier + 1} card that replaced {augment.Name}."
+            : $"Type the card that replaced {augment.Name}.";
+    }
+
+    /// <summary>Marks the card whose reroll button is golden in game (it rerolls into the next tier). Press again to unmark.</summary>
+    public void ToggleGolden(string name)
+    {
+        if (Find(name) is not { } augment || !_offer.Contains(augment))
+            return;
+        _golden = _golden == augment ? null : augment;
+        _ = RankAsync();
+    }
+
+    /// <summary>2 rerolls per card in the selection right after "Stats on Stats on Stats!", otherwise 1.</summary>
+    private int RerollsPerCard => _picked.Count > 0 && _picked[^1].GrantsExtraRerolls ? 2 : 1;
+
+    private void ClearRerolls()
+    {
+        _rerollsUsed.Clear();
+        _golden = null;
+        _pendingReplacements.Clear();
     }
 
     /// <summary>
@@ -188,12 +211,13 @@ public sealed class AugmentPickerViewModel : INotifyPropertyChanged
             if (key == _lastDetected)
                 return;
 
-            // One or two cards changed while others stayed: those are rerolls, and can't be rerolled again.
-            var sameOffer = _lastDetectedCards.Count > 0 && detected.Any(_lastDetectedCards.Contains) && detected[0].Tier == _lastDetectedCards[0].Tier;
+            // One or two cards changed while others stayed: those were rerolled. Cards are read left to right,
+            // so a changed position tells which slot spent a reroll. A card a tier higher came from the golden reroll.
+            var sameOffer = _lastDetectedCards.Count > 0 && detected.Any(_lastDetectedCards.Contains);
             if (!sameOffer)
-                _rerolled.Clear();
-            foreach (var card in detected.Where(c => sameOffer && !_lastDetectedCards.Contains(c)))
-                _rerolled.Add(card);
+                ClearRerolls();
+            else
+                RecordRerolls(_lastDetectedCards, detected);
 
             _lastDetected = key;
             _lastDetectedCards = detected.ToList();
@@ -208,6 +232,26 @@ public sealed class AugmentPickerViewModel : INotifyPropertyChanged
         {
             // We can't see which card was clicked, only that the cards are gone.
             Status = "The offer closed. Which card did you take? Press \"I picked this\" on it.";
+        }
+    }
+
+    private void RecordRerolls(IReadOnlyList<AugmentInfo> before, IReadOnlyList<AugmentInfo> after)
+    {
+        var baseTier = before.Min(a => a.Tier);
+        for (var i = 0; i < after.Count; i++)
+        {
+            if (before.Contains(after[i]))
+                continue;
+            var replaced = before.Count == after.Count ? before[i] : null;
+            if (after[i].Tier > baseTier)
+            {
+                _rerollsUsed[after[i]] = RerollsPerCard;
+                _golden = null;
+            }
+            else
+            {
+                _rerollsUsed[after[i]] = (replaced is null ? 0 : _rerollsUsed.GetValueOrDefault(replaced)) + 1;
+            }
         }
     }
 
@@ -289,8 +333,13 @@ public sealed class AugmentPickerViewModel : INotifyPropertyChanged
 
         IsRanking = true;
         var advisor = _advisor;
-        var rerolled = _rerolled.ToHashSet();
-        var advice = await Task.Run(() => advisor.Rank(offer, ctx, rerolled));
+        var rerolls = new RerollState
+        {
+            Used = new Dictionary<AugmentInfo, int>(_rerollsUsed),
+            Golden = _golden is not null && offer.Contains(_golden) ? _golden : null,
+            RerollsPerCard = RerollsPerCard,
+        };
+        var advice = await Task.Run(() => advisor.Rank(offer, ctx, rerolls));
         if (version != _rankVersion)
             return; // the offer or game changed while simulating; a newer ranking is on its way
 
@@ -302,12 +351,14 @@ public sealed class AugmentPickerViewModel : INotifyPropertyChanged
                 RerollAction.Keep => ("KEEP", true),
                 RerollAction.Reroll => ("REROLL", false),
                 RerollAction.RerollLast => ("REROLL LAST", false),
+                RerollAction.GoldenReroll => ("GOLDEN REROLL", false),
+                RerollAction.GoldenRerollLast => ("GOLDEN REROLL LAST", false),
                 RerollAction.AlreadyRerolled => ("REROLLED", false),
                 _ => (i == 0 ? "BEST" : "", true),
             };
             var note = reroll is null || reroll.Action == RerollAction.AlreadyRerolled
                 ? ""
-                : $"A reroll beats it {reroll.RerollBeatsIt:P0} of the time.";
+                : $"A {(reroll.Action is RerollAction.GoldenReroll or RerollAction.GoldenRerollLast ? "golden " : "")}reroll beats it {reroll.RerollBeatsIt:P0} of the time.";
             return new AugmentOptionRow(
                 i + 1,
                 o.Augment.Name,
@@ -315,7 +366,9 @@ public sealed class AugmentPickerViewModel : INotifyPropertyChanged
                 o.Augment.Description,
                 badge,
                 filled,
-                reroll?.Action is RerollAction.Reroll or RerollAction.RerollLast,
+                reroll?.Action is RerollAction.Reroll or RerollAction.RerollLast or RerollAction.GoldenReroll or RerollAction.GoldenRerollLast,
+                rerolls.RerollsLeft(o.Augment) > 0 && o.Augment.Tier < AugmentTier.Prismatic,
+                o.Augment == rerolls.Golden,
                 $"now {o.Now:0.0} · with future picks {o.Expected:0.0}",
                 note,
                 o.Reasons.OrderByDescending(r => Math.Abs(r.Points)).Take(3).Select(r => (r.Points < 0 ? "− " : "+ ") + r.Text).ToList(),
@@ -333,7 +386,8 @@ public sealed class AugmentPickerViewModel : INotifyPropertyChanged
             : _offer.Count == 0 && WantsScan ? "Watching your screen for the augment offer. You can also type the cards."
             : _offer.Count == 0 ? "Type the cards you're offered. Add cards you already have as picked."
             : _offer.Count < OfferSize ? $"Add the other {OfferSize - _offer.Count} offered card{(OfferSize - _offer.Count == 1 ? "" : "s")}, or look at the ranking so far."
-            : "Ranked for your champion, cards and items.");
+            : RerollsPerCard > 1 ? "You have 2 rerolls per card this time (Stats on Stats on Stats!)."
+            : "Ranked for your champion, cards and items. If a card's reroll button is golden, mark it with Golden.");
     }
 
     private AugmentInfo? Find(string name) => _catalog?.Find(name);

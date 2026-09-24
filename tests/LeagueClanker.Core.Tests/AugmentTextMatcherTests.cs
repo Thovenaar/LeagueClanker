@@ -65,6 +65,16 @@ public class AugmentTextMatcherTests
     }
 
     [Fact]
+    public void AcceptsOneCardOfTheNextTierAfterAGoldenReroll()
+    {
+        var lines = new[] { Line("Critical Rhythm", 500, 400), Line("Stats on Stats on Stats!", 900, 400), Line("Recursion", 1300, 400) };
+
+        var offer = AugmentTextMatcher.FindOffer(lines, Catalog);
+
+        Assert.Equal(["Critical Rhythm", "Stats on Stats on Stats!", "Recursion"], offer.Select(d => d.Augment.Name));
+    }
+
+    [Fact]
     public void IgnoresStrayNamesOfAnotherTier()
     {
         var lines = new[]

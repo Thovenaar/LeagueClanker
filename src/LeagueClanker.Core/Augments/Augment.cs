@@ -112,6 +112,9 @@ public sealed record AugmentInfo
     /// <summary>Bonus attack speed in percent the card grants outright.</summary>
     public double AttackSpeedBonus { get; init; }
 
+    /// <summary>Gives an extra reroll per card in the next selection ("Stats on Stats on Stats!").</summary>
+    public bool GrantsExtraRerolls { get; init; }
+
     /// <summary>It comes with a downside ("but ...", "cannot ...").</summary>
     public bool HasDrawback { get; init; }
 

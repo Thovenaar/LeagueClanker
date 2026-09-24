@@ -51,7 +51,18 @@ public static class AugmentTextMatcher
             .ThenByDescending(g => g.Sum(d => d.Confidence))
             .FirstOrDefault();
 
-        return offer?.OrderByDescending(d => d.Confidence).Take(OfferSize).OrderBy(d => d.X).ToList() ?? [];
+        if (offer is null)
+            return [];
+
+        var cards = offer.OrderByDescending(d => d.Confidence).Take(OfferSize).ToList();
+        if (cards.Count < OfferSize && offer.Key < AugmentTier.Prismatic)
+        {
+            // A golden reroll turns one card into a card of the next tier.
+            var golden = matches.Values.Where(d => d.Augment.Tier == offer.Key + 1).MaxBy(d => d.Confidence);
+            if (golden is not null)
+                cards.Add(golden);
+        }
+        return cards.OrderBy(d => d.X).ToList();
     }
 
     /// <summary>Every line, plus each line joined with the line right below it (long names wrap).</summary>

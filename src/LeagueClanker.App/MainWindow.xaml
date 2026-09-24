@@ -295,6 +295,11 @@
                                             <DockPanel>
                                                 <Button DockPanel.Dock="Right" Style="{StaticResource SmallButton}" Content="I picked this" Click="OnPickOption"
                                                         AutomationProperties.Name="{Binding Name, StringFormat=I picked {0}}" />
+                                                <ToggleButton x:Name="GoldenToggle" DockPanel.Dock="Right" Content="Golden" Checked="OnGoldenChanged" Unchecked="OnGoldenChanged" Margin="0,0,4,0"
+                                                              IsChecked="{Binding IsGolden, Mode=OneWay}" Style="{StaticResource GoldenToggle}"
+                                                              ToolTip="This card's reroll button is golden: it rerolls into the next tier"
+                                                              Visibility="{Binding CanBeGolden, Converter={StaticResource BoolToVisibility}}"
+                                                              AutomationProperties.Name="{Binding Name, StringFormat=Golden {0}}" />
                                                 <Button DockPanel.Dock="Right" Style="{StaticResource SmallButton}" Content="Rerolled" Click="OnRerolledOption" Margin="0,0,4,0"
                                                         ToolTip="You rerolled it in game: type the card you got instead"
                                                         Visibility="{Binding CanReroll, Converter={StaticResource BoolToVisibility}}"
