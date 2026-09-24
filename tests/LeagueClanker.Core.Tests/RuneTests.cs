@@ -1,6 +1,7 @@
 using System.Net;
 using LeagueClanker.Core.Analysis;
 using LeagueClanker.Core.LeagueClient;
+using LeagueClanker.Core.Opgg;
 using LeagueClanker.Core.Runes;
 using LeagueClanker.Core.StaticData;
 
@@ -127,7 +128,7 @@ public class RuneTests
     public async Task Opgg_PicksTheMostPlayedPageThatFitsThePlaystyle()
     {
         var handler = new FakeHandler(_ => OpggJson(mainRole: "ADC"));
-        var opgg = new OpggRuneSource(Runes, new HttpClient(handler));
+        var opgg = new OpggRuneSource(Runes, new OpggClient(new HttpClient(handler)));
 
         var marksman = await opgg.RecommendAsync(new RuneRequest(Jinx, Archetype.Marksman, Position.Bottom, GameMode.SummonersRift), default);
         var mage = await opgg.RecommendAsync(new RuneRequest(Jinx, Archetype.Mage, Position.Bottom, GameMode.SummonersRift), default);
@@ -145,7 +146,7 @@ public class RuneTests
     public async Task Opgg_AsksForTheRightRoleAndMode()
     {
         var handler = new FakeHandler(path => OpggJson(mainRole: "ADC", games: path.Contains("support") ? 100 : 12000));
-        var opgg = new OpggRuneSource(Runes, new HttpClient(handler));
+        var opgg = new OpggRuneSource(Runes, new OpggClient(new HttpClient(handler)));
 
         await opgg.RecommendAsync(new RuneRequest(Leona, Archetype.Tank, Position.Support, GameMode.SummonersRift), default);
         await opgg.RecommendAsync(new RuneRequest(Jinx, Archetype.Marksman, Position.None, GameMode.Aram), default);
@@ -158,8 +159,8 @@ public class RuneTests
     [Fact]
     public async Task Advisor_FallsBackToTheRules_WhenOpggHasNothingOrFails()
     {
-        var empty = new RuneAdvisor(Rules, new OpggRuneSource(Runes, new HttpClient(new FakeHandler(_ => OpggJson("ADC")))));
-        var down = new RuneAdvisor(Rules, new OpggRuneSource(Runes, new HttpClient(new FakeHandler(_ => throw new HttpRequestException("offline")))));
+        var empty = new RuneAdvisor(Rules, new OpggRuneSource(Runes, new OpggClient(new HttpClient(new FakeHandler(_ => OpggJson("ADC"))))));
+        var down = new RuneAdvisor(Rules, new OpggRuneSource(Runes, new OpggClient(new HttpClient(new FakeHandler(_ => throw new HttpRequestException("offline"))))));
         var request = new RuneRequest(Jinx, Archetype.Tank, Position.Bottom, GameMode.SummonersRift);
 
         var noPage = await empty.RecommendAsync(request, RuneSourceKind.StatsSite);

@@ -3,6 +3,8 @@ using LeagueClanker.Core.Analysis;
 using LeagueClanker.Core.Augments;
 using LeagueClanker.Core.LeagueClient;
 using LeagueClanker.Core.LiveClient;
+using LeagueClanker.Core.Matchups;
+using LeagueClanker.Core.Opgg;
 using LeagueClanker.Core.Recommendation;
 using LeagueClanker.Core.Runes;
 using LeagueClanker.Core.StaticData;
@@ -22,7 +24,9 @@ using LeagueClanker.Vision;
 //   LeagueClanker.Cli --runes <champion> [--position support] [--style tank] [--mode aram] [--enemies "A;B"] [--source rules]
 //                                             recommend a rune page (from op.gg unless --source rules)
 //   LeagueClanker.Cli --champselect [--style tank] [--source rules] [--apply]
-//                                             recommend runes for your champ select pick, and write them into the client
+//                                             runes and lane matchup for your champ select pick; --apply writes the runes
+//   LeagueClanker.Cli --matchup <champion | -> --position top --enemies "A;B;C" [--hover]
+//                                             guess enemy roles, show your lane matchup, or counter picks with "-" or --hover
 
 Console.OutputEncoding = System.Text.Encoding.UTF8;
 using var cts = new CancellationTokenSource();
@@ -31,6 +35,7 @@ Console.CancelKeyPress += (_, e) => { e.Cancel = true; cts.Cancel(); };
 Console.WriteLine("Loading Data Dragon...");
 var data = await new DataDragonClient().LoadAsync(cts.Token);
 Console.WriteLine($"Patch {data.Version}: {data.Items.Legendaries.Count} legendary items, {data.Items.Boots.Count} boots.\n");
+var opgg = new OpggClient();
 
 if (args is ["--items", ..])
 {
@@ -61,8 +66,7 @@ if (args is ["--runes", var championName, ..])
     var champion = data.Champions.Find(championName) ?? throw new ArgumentException($"Unknown champion '{championName}'.");
     var position = Positions.Parse(Option("--position"));
     var mode = Option("--mode")?.ToLowerInvariant() switch { "aram" => GameMode.Aram, "mayhem" => GameMode.AramMayhem, _ => GameMode.SummonersRift };
-    var enemies = (Option("--enemies") ?? "").Split(';', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
-        .Select(n => data.Champions.Find(n) ?? throw new ArgumentException($"Unknown champion '{n}'.")).ToList();
+    var enemies = Champions(Option("--enemies"));
     var request = new RuneRequest(champion, ParseStyle(Option("--style")) ?? Playstyles.Default(champion, position), position, mode) { Enemies = enemies };
     PrintRunes(request, await RuneAdvisorFor().RecommendAsync(request, RuneSource(), cts.Token));
     return;
@@ -89,8 +93,20 @@ if (args is ["--champselect", ..])
     };
     var recommendation = await RuneAdvisorFor().RecommendAsync(request, RuneSource(), cts.Token);
     PrintRunes(request, recommendation);
+    PrintMatchup(await new MatchupAdvisor(opgg, data.Champions).AnalyzeAsync(
+        new MatchupRequest(champion, state.IsLocked, state.Position, state.Mode, state.Enemies) { Pickable = state.Pickable.Count > 0 ? state.Pickable : null, Mastery = state.Mastery },
+        cts.Token));
     if (args.Contains("--apply"))
         Console.WriteLine((await new RunePageWriter(client).ApplyAsync(recommendation.Page, RunePageWriter.PageName(champion), cts.Token)).Message);
+    return;
+}
+
+if (args is ["--matchup", var who, ..])
+{
+    var me = who == "-" ? null : data.Champions.Find(who) ?? throw new ArgumentException($"Unknown champion '{who}'.");
+    var request = new MatchupRequest(me, IsLocked: me is not null && !args.Contains("--hover"), Positions.Parse(Option("--position")),
+        GameMode.SummonersRift, Champions(Option("--enemies")));
+    PrintMatchup(await new MatchupAdvisor(opgg, data.Champions).AnalyzeAsync(request, cts.Token));
     return;
 }
 
@@ -233,7 +249,39 @@ async Task<BuildRecommendation?> RecommendAsync(string path, IReadOnlyList<Augme
     return new BuildAdvisor(new FileGameDataSource(path), data) { Augments = augments ?? [] }.RecommendOnce(game);
 }
 
-RuneAdvisor RuneAdvisorFor() => new(new RuleRuneSource(data.Runes), new OpggRuneSource(data.Runes));
+RuneAdvisor RuneAdvisorFor() => new(new RuleRuneSource(data.Runes), new OpggRuneSource(data.Runes, opgg));
+
+List<ChampionInfo> Champions(string? names) =>
+    (names ?? "").Split(';', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
+        .Select(n => data.Champions.Find(n) ?? throw new ArgumentException($"Unknown champion '{n}'.")).ToList();
+
+static void PrintMatchup(MatchupReport? report)
+{
+    if (report is null)
+    {
+        Console.WriteLine("No lane matchup: that needs Summoner's Rift and a role.\n");
+        return;
+    }
+
+    Console.WriteLine($"=== Lane: {report.Position.DisplayName()} ===");
+    if (report.EnemyRoles.Count > 0)
+        Console.WriteLine($"  Enemy roles{(report.RolesAreGuessed ? " (guessed)" : "")}: "
+                          + string.Join(", ", report.EnemyRoles.Select(r => $"{r.Champion.Name} {r.Position.DisplayName().ToLowerInvariant()} ({r.Likelihood:P0})")));
+    Console.WriteLine(report.Opponent is null
+        ? $"  Your lane opponent hasn't picked yet."
+        : $"  Lane opponent: {report.Opponent.Name}{(report.Partner is null ? "" : $" with {report.Partner.Name}")}");
+    if (report.Matchup is { } m)
+        Console.WriteLine($"  vs {m.Opponent.Name}: {m.WinRate:P1} win rate over {m.Games:N0} games ({m.Verdict})");
+    if (report.CounterPicks.Count > 0)
+    {
+        Console.WriteLine($"  Good picks vs {report.Opponent!.Name}:");
+        foreach (var pick in report.CounterPicks)
+            Console.WriteLine($"    {pick.Champion.Name,-14} {pick.WinRate,6:P1}  {pick.Games,7:N0} games{(pick.YouPlayIt ? $"  (you play this: {pick.MasteryPoints:N0} mastery)" : "")}");
+    }
+    if (report.Note is not null)
+        Console.WriteLine($"  {report.Note}");
+    Console.WriteLine();
+}
 
 RuneSourceKind RuneSource() => Option("--source") == "rules" ? RuneSourceKind.OwnRules : RuneSourceKind.StatsSite;
 

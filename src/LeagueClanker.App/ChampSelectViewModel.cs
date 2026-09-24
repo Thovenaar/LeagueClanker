@@ -4,6 +4,7 @@ using System.Runtime.CompilerServices;
 using LeagueClanker.Core;
 using LeagueClanker.Core.Analysis;
 using LeagueClanker.Core.LeagueClient;
+using LeagueClanker.Core.Matchups;
 using LeagueClanker.Core.Runes;
 using LeagueClanker.Core.StaticData;
 
@@ -12,6 +13,8 @@ namespace LeagueClanker.App;
 public sealed record PlaystyleOption(Archetype Value, string Label, bool IsSelected);
 
 public sealed record RuneRow(string Name, string IconUrl);
+
+public sealed record CounterRow(string Name, string IconUrl, string WinRate, string Games, bool YouPlayIt);
 
 /// <summary>
 /// Champ select: pick how you'll play your champion, see the rune page for it, and write that page into the client.
@@ -24,9 +27,11 @@ public sealed class ChampSelectViewModel : INotifyPropertyChanged
 
     private StaticGameData? _data;
     private RuneAdvisor? _advisor;
+    private MatchupAdvisor? _matchups;
     private ChampSelectState? _state;
     private RuneRecommendation? _recommendation;
     private int _requestVersion;
+    private int _matchupVersion;
 
     private bool _isActive;
     private string _championName = "";
@@ -44,6 +49,15 @@ public sealed class ChampSelectViewModel : INotifyPropertyChanged
     private string _applyStatus = "";
     private bool _canApply;
     private bool _isBusy;
+    private bool _hasLane;
+    private string _laneTitle = "";
+    private string _opponentText = "";
+    private string _opponentIconUrl = "";
+    private string _matchupText = "";
+    private string _counterHeader = "";
+    private IReadOnlyList<CounterRow> _counterPicks = [];
+    private string _enemyRoles = "";
+    private string _laneNote = "";
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
@@ -78,12 +92,34 @@ public sealed class ChampSelectViewModel : INotifyPropertyChanged
     public bool CanApply { get => _canApply; private set => Set(ref _canApply, value); }
     public bool IsBusy { get => _isBusy; private set => Set(ref _isBusy, value); }
 
+    /// <summary>True on Summoner's Rift with a known role: then there's a lane opponent to show, or to wait for.</summary>
+    public bool HasLane { get => _hasLane; private set => Set(ref _hasLane, value); }
+
+    public string LaneTitle { get => _laneTitle; private set => Set(ref _laneTitle, value); }
+
+    /// <summary>"vs Darius", "vs Caitlyn and Lux", or who you're waiting for.</summary>
+    public string OpponentText { get => _opponentText; private set => Set(ref _opponentText, value); }
+
+    public string OpponentIconUrl { get => _opponentIconUrl; private set => Set(ref _opponentIconUrl, value); }
+
+    /// <summary>"Garen vs Darius: 50.4% win rate over 2,792 games · even". Empty until you have a champion.</summary>
+    public string MatchupText { get => _matchupText; private set => Set(ref _matchupText, value); }
+
+    public string CounterHeader { get => _counterHeader; private set => Set(ref _counterHeader, value); }
+    public IReadOnlyList<CounterRow> CounterPicks { get => _counterPicks; private set => Set(ref _counterPicks, value); }
+
+    /// <summary>"Enemy roles (guessed): Darius top · Amumu jungle · ..."</summary>
+    public string EnemyRoles { get => _enemyRoles; private set => Set(ref _enemyRoles, value); }
+
+    public string LaneNote { get => _laneNote; private set => Set(ref _laneNote, value); }
+
     public Archetype? SelectedPlaystyle => Playstyles.FirstOrDefault(p => p.IsSelected)?.Value;
 
-    public void Configure(StaticGameData data, RuneAdvisor advisor, RuneSourceKind source)
+    public void Configure(StaticGameData data, RuneAdvisor advisor, MatchupAdvisor matchups, RuneSourceKind source)
     {
         _data = data;
         _advisor = advisor;
+        _matchups = matchups;
         _source = source;
         Raise(nameof(UseStatsSite), nameof(UseOwnRules));
     }
@@ -106,6 +142,7 @@ public sealed class ChampSelectViewModel : INotifyPropertyChanged
             return;
 
         Raise(nameof(HasChampion));
+        _ = RecomputeMatchupAsync();
         if (state.Champion is not { } champion || _data is null)
         {
             ChampionName = "Pick or hover a champion";
@@ -199,6 +236,52 @@ public sealed class ChampSelectViewModel : INotifyPropertyChanged
         _recommendation = recommendation;
         ShowPage(recommendation, _data.Runes);
         CanApply = ApplyHandler is not null;
+    }
+
+    private async Task RecomputeMatchupAsync()
+    {
+        if (_state is not { } state || _matchups is null || _data is null)
+            return;
+
+        var version = ++_matchupVersion;
+        var request = new MatchupRequest(state.Champion, state.IsLocked, state.Position, state.Mode, state.Enemies)
+        {
+            Pickable = state.Pickable.Count > 0 ? state.Pickable : null,
+            Mastery = state.Mastery,
+        };
+        var report = await _matchups.AnalyzeAsync(request);
+        if (version != _matchupVersion)
+            return;
+
+        ShowMatchup(report, state, _data);
+    }
+
+    private void ShowMatchup(MatchupReport? report, ChampSelectState state, StaticGameData data)
+    {
+        HasLane = report is not null;
+        if (report is null)
+            return;
+
+        LaneTitle = $"{report.Position.DisplayName().ToUpperInvariant()} LANE";
+        OpponentIconUrl = report.Opponent is { } opponent ? data.ChampionIconUrl(opponent.Id) : "";
+        OpponentText = report.Opponent is null
+            ? $"Waiting for the enemy {report.Position.DisplayName().ToLowerInvariant()} to pick."
+            : report.Partner is { } partner ? $"vs {report.Opponent.Name} and {partner.Name}" : $"vs {report.Opponent.Name}";
+        if (report is { Opponent: not null, RolesAreGuessed: true })
+            OpponentText += " (guessed)";
+
+        MatchupText = report.Matchup is { } m && state.Champion is { } me
+            ? $"{me.Name} vs {m.Opponent.Name}: {m.WinRate:P1} win rate over {m.Games:N0} games · {m.Verdict}"
+            : "";
+        CounterHeader = report.Opponent is null ? "" : $"GOOD PICKS VS {report.Opponent.Name.ToUpperInvariant()}";
+        CounterPicks = report.CounterPicks
+            .Select(c => new CounterRow(c.Champion.Name, data.ChampionIconUrl(c.Champion.Id), $"{c.WinRate:P1}", $"{c.Games:N0} games", c.YouPlayIt))
+            .ToList();
+        EnemyRoles = report.EnemyRoles.Count == 0
+            ? ""
+            : $"Enemy roles{(report.RolesAreGuessed ? " (guessed)" : "")}: "
+              + string.Join(" \u00b7 ", report.EnemyRoles.Select(r => $"{r.Champion.Name} {r.Position.DisplayName().ToLowerInvariant()}"));
+        LaneNote = report.Note ?? "";
     }
 
     private void ShowPage(RuneRecommendation recommendation, RuneCatalog runes)

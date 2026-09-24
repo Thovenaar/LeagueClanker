@@ -22,6 +22,9 @@ public sealed class PlayerProfile
     /// <summary>Junglers take Smite. League Classic has jungle items that only make sense then.</summary>
     public bool HasSmite { get; init; }
 
+    /// <summary>Their role, when the game reports it (matchmade Summoner's Rift games).</summary>
+    public Position Position { get; init; }
+
     public string Name => Champion.Name;
 
     /// <summary>How much this champion contributes to the team's damage. Tanks and enchanters deal less than carries.</summary>
@@ -174,6 +177,7 @@ public static class GameAnalyzer
             Threat = EstimateThreat(items, player.Scores),
             Scores = player.Scores,
             HasSmite = player.HasSmite,
+            Position = Positions.Parse(player.Position),
             Level = Math.Max(1, player.Level),
             Stats = StatEstimator.Estimate(champion.Stats, Math.Max(1, player.Level), items, mode).WithRealStats(realStats),
         };

@@ -4,6 +4,7 @@ using System.Runtime.CompilerServices;
 using System.Windows;
 using LeagueClanker.Core;
 using LeagueClanker.Core.Analysis;
+using LeagueClanker.Core.Matchups;
 using LeagueClanker.Core.Recommendation;
 using LeagueClanker.Core.Runes;
 using LeagueClanker.Core.StaticData;
@@ -50,6 +51,8 @@ public sealed class MainViewModel : INotifyPropertyChanged
     private IReadOnlyList<PlayerRow> _team = [];
     private string _playstyleLabel = "";
     private IReadOnlyList<PlaystyleOption> _livePlaystyles = [];
+    private string _matchupLine = "";
+    private string? _matchupKey;
 
     // The playstyle you chose (or champ select defaulted to), and for which champion. The build advisor uses it.
     private string? _playstyleChampion;
@@ -108,6 +111,12 @@ public sealed class MainViewModel : INotifyPropertyChanged
     public string PlaystyleLabel { get => _playstyleLabel; private set => Set(ref _playstyleLabel, value); }
 
     public IReadOnlyList<PlaystyleOption> LivePlaystyles { get => _livePlaystyles; private set => Set(ref _livePlaystyles, value); }
+
+    /// <summary>Looks up your lane matchup in game. Set by the app.</summary>
+    public MatchupAdvisor? Matchups { get; set; }
+
+    /// <summary>"vs Caitlyn: 53.1% win rate over 2,484 games · favored". Empty without a lane.</summary>
+    public string MatchupLine { get => _matchupLine; private set => Set(ref _matchupLine, value); }
 
     /// <summary>You picked another playstyle in game. The build follows on the next poll.</summary>
     public void ChangePlaystyle(Archetype playstyle)
@@ -193,6 +202,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
         ChampionLine = me.Name;
         PlaystyleLabel = $"{me.Archetype.DisplayName()} ▾";
         LivePlaystyles = Playstyles.All.Select(a => new PlaystyleOption(a, a.DisplayName(), a == me.Archetype)).ToList();
+        _ = ShowMatchupAsync(rec.Game);
         DamageSummary = rec.DamageSummary;
         AdShare = new GridLength(rec.Game.Enemies.PhysicalShare, GridUnitType.Star);
         ApShare = new GridLength(rec.Game.Enemies.MagicShare, GridUnitType.Star);
@@ -221,6 +231,31 @@ public sealed class MainViewModel : INotifyPropertyChanged
             Augments.SetGame(rec, _planner.Upcoming.Select(i => i.Item).ToList());
         else if (_tab == Tab.Augments)
             SelectTab(Tab.Build);
+    }
+
+    // The lane matchup only changes when champions or roles do, so it's looked up once per combination.
+    private async Task ShowMatchupAsync(GameAnalysis game)
+    {
+        var request = Matchups is null ? null : MatchupRequest.ForGame(game);
+        var key = request is null ? null : $"{request.Me?.Id}|{request.Position}|{string.Join(',', request.Enemies.Select(e => e.Id))}";
+        if (key == _matchupKey)
+            return;
+        _matchupKey = key;
+        if (request is null)
+        {
+            MatchupLine = "";
+            return;
+        }
+
+        var report = await Matchups!.AnalyzeAsync(request);
+        if (key != _matchupKey)
+            return;
+        MatchupLine = report switch
+        {
+            { Matchup: { } m } => $"vs {m.Opponent.Name}: {m.WinRate:P1} win rate over {m.Games:N0} games \u00b7 {m.Verdict}",
+            { Opponent: { } opponent } => $"vs {opponent.Name}",
+            _ => "",
+        };
     }
 
     private void SelectTab(Tab tab)

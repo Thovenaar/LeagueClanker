@@ -22,7 +22,7 @@ In League Classic it recommends from the old item shop, with the old stats:
 
 <img src="docs/screenshots/classic.png" alt="League Classic build" width="400">
 
-In champ select you pick how you'll play your champion, and one click writes the matching rune page into the client:
+In champ select it shows your lane opponent, champions that beat them before you lock in, and how your pick does against them. You pick how you'll play, and one click writes the matching rune page into the client:
 
 <img src="docs/screenshots/champselect.png" alt="Champ select with playstyle and rune page" width="400">
 
@@ -62,6 +62,8 @@ dotnet run --project src/LeagueClanker.App -- --demo samples/mayhem/jinx-level7.
 dotnet run --project src/LeagueClanker.App -- --champselect samples/champselect/leona-support.json
 ```
 
+`samples/champselect/top-vs-darius.json` is a top laner who hasn't locked in yet, against a Darius, so it shows counter picks.
+
 Point it at a folder to replay snapshots in order, one every 10 seconds. `samples/pivot-demo` is a Garen game where the enemy team switches from AD to AP items, which triggers a pivot suggestion:
 
 ```bash
@@ -94,7 +96,13 @@ For rune pages, name a champion. Add a role, a playstyle, the mode or enemies to
 dotnet run --project src/LeagueClanker.Cli -- --runes Ezreal --position bottom --style mage
 ```
 
-During champ select, `--champselect` does the same for your pick, and `--champselect --apply` writes the page into the client.
+During champ select, `--champselect` does the same for your pick and adds your lane matchup. `--champselect --apply` writes the page into the client.
+
+`--matchup` guesses the enemy roles and shows your lane matchup. Use `-` instead of a champion, or add `--hover`, to see counter picks:
+
+```bash
+dotnet run --project src/LeagueClanker.Cli -- --matchup - --position top --enemies "Darius;Amumu;Caitlyn"
+```
 
 `--augments` lists all 225 augments with the tags the parser gave them. `--scan` reads an offer from a screenshot, or from the running game with `--scan screen`. Add `--verbose` to see every line of text it recognized:
 
@@ -124,6 +132,8 @@ During a game the app reads Riot's official Live Client Data API on localhost, a
 
 In champ select it reads the League client's local API, the same one Porofessor, Blitz and Mobalytics use to import runes. Writing your rune page when you press *Apply* is the only thing it changes. Riot doesn't document that API, but it has tolerated rune importers for years.
 
+It only uses what the client shows you: picks as they lock in, your own role, mastery and champions. It doesn't try to reveal what champ select hides, like player names in ranked or enemy picks in blind pick. That's what gets tools banned, while counters and matchup stats are what every approved app shows.
+
 Riot's third-party policy allows apps that highlight decisions with multiple choices rather than dictate them. That's why every suggestion comes with an alternative and a reason.
 
 ## How it works
@@ -151,6 +161,18 @@ Accepting swaps just those items. Declining remembers them for the rest of the g
 
 Your next three purchases keep the order of the latest ranking, so a new augment can move your third item to first without asking. Moving a later item into those three does need a pivot.
 
+### Champ select: lane matchup
+
+The client shows each enemy champion once it's locked in, but not their role. `RoleGuesser` guesses the roles: every enemy gets a different role, and the guess is the combination op.gg's play rates make most likely. Garen goes top, and Lux goes support when their Syndra is already mid. The guess updates with every pick. Offline, it guesses from champion classes instead.
+
+The enemy in your role is your lane opponent. In bottom lane you also see the other half of their duo.
+
+- **Before you lock in**, it lists up to five champions that beat your lane opponent: your win rate with each champion against them, from op.gg. It only lists champions you can pick, with at least 200 games and a win rate of 51% or more. Champions with 20,000+ mastery points come first and are marked *you play this*. The champion you're hovering is left out, since its matchup is shown already.
+- **Once you have a champion**, it shows that matchup: "Garen vs Darius: 50.4% win rate over 2,792 games · even". 52% and up counts as favored, 48% and below as tough.
+- **In game**, the matchup line sits under your champion's name. Matchmade games report every role, so nothing is guessed there.
+
+op.gg's ranked data is read for all ranks. That's about four times the games of their default Emerald+ filter. With only a hundred games a pairing's win rate jumps around; Ornn looked like a 60% counter to Darius at Emerald+, and is 54% over all ranks. ARAM, Arena and League Classic have no lanes, so they get no matchup.
+
 ### Champ select: playstyle and runes
 
 Every champion can be played more than one way: AP Ezreal, AD Thresh, tank or AD Leona. In champ select the app shows eight playstyles: marksman, mage, AD assassin, AP assassin, bruiser, AP bruiser, tank and enchanter. It picks the default from your champion and role:
@@ -163,7 +185,7 @@ Change it with one click. The choice carries into the game, where it decides you
 
 The rune page comes from the source you choose, and the app remembers the choice:
 
-- **op.gg** (default): the most played page on op.gg for your champion, role or ARAM, and playstyle. Pages whose keystone doesn't fit your playstyle are skipped, so AP Ezreal doesn't get Lethal Tempo. Pages with fewer than 50 games are skipped too. The data comes from the unofficial JSON API behind op.gg's champion pages, once per champion and role per session.
+- **op.gg** (default): the most played page on op.gg for your champion, role or ARAM, and playstyle. Pages whose keystone doesn't fit your playstyle are skipped, so AP Ezreal doesn't get Lethal Tempo. Pages with fewer than 50 games are skipped too. The data comes from the unofficial JSON API behind op.gg's champion pages, all ranks, once per champion and role per session.
 - **Own rules**: a standard page per playstyle in `RuleRuneSource.cs`, like Aftershock for engage tanks and Grasp for tanks in lane, adjusted to the enemy picks you can see. Two tanks swap Coup de Grace for Cut Down. Heavy crowd control gets the tenacity shard. Three ranged champions swap Bone Plating for Second Wind, and two assassins swap it back.
 
 When op.gg has no page for your playstyle (AD Thresh), or doesn't answer, you get the rules' page with a line saying so. Runes are named, not numbered, so if Riot removes one, the first rune of that row takes its place.
@@ -273,6 +295,7 @@ To add a rule, implement `IBuildRule`, return a `Situation` with a label, a sent
 - Screen reading has only been tested on a mock screenshot, not on real games yet.
 - The core-item lists and weights are my best guess for patch 16.18. Real win-rate data per matchup would beat them.
 - Writing rune pages has been tested against a simulated client, not yet against a real one. The client's local API and op.gg's JSON API are both undocumented and can change.
+- Enemy roles are guessed until the game starts. Flex picks (a mid Gragas, a top Seraphine) can land in the wrong role, and so can the lane opponent.
 - The rule pages and keystone lists are hand-made for patch 16.19. New keystones need adding to `KeystoneFit` before op.gg pages with them are used.
 - Rune pages assume today's runes. League Classic's old runes and masteries aren't supported.
 - League Classic's mode string is unverified until someone saves a snapshot from a real game (see *Running it from source*). The classic-item check covers the likely cases.
@@ -284,7 +307,7 @@ To add a rule, implement `IBuildRule`, return a `Situation` with a label, a sent
 
 Augment data comes from the [League of Legends Wiki](https://wiki.leagueoflegends.com/en-us/Module:MayhemAugmentData/data) under CC BY-SA 3.0.
 
-Rune statistics come from [op.gg](https://www.op.gg) when you choose op.gg as the rune source. LeagueClanker isn't affiliated with op.gg.
+Rune statistics, role play rates and matchups come from [op.gg](https://www.op.gg). LeagueClanker isn't affiliated with op.gg.
 
 
 LeagueClanker isn't endorsed by Riot Games and doesn't reflect the views or opinions of Riot Games or anyone officially involved in producing or managing Riot Games properties. Riot Games, and all associated properties are trademarks or registered trademarks of Riot Games, Inc.

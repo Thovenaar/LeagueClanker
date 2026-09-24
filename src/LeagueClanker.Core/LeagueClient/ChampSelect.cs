@@ -9,9 +9,18 @@ namespace LeagueClanker.Core.LeagueClient;
 public sealed record ChampSelectState(
     ChampionInfo? Champion, Position Position, GameMode Mode, IReadOnlyList<ChampionInfo> Allies, IReadOnlyList<ChampionInfo> Enemies)
 {
-    /// <summary>Changes when anything that affects the rune page changes.</summary>
+    /// <summary>True once you've locked in your pick. Before that, <see cref="Champion"/> may just be a hover.</summary>
+    public bool IsLocked { get; init; }
+
+    /// <summary>Champions you can pick. Empty when unknown.</summary>
+    public IReadOnlySet<int> Pickable { get; init; } = new HashSet<int>();
+
+    /// <summary>Your mastery points per champion key.</summary>
+    public IReadOnlyDictionary<int, int> Mastery { get; init; } = new Dictionary<int, int>();
+
+    /// <summary>Changes when anything that affects the rune page or the matchup changes.</summary>
     public string Fingerprint =>
-        $"{Champion?.Id}|{Position}|{Mode}|{string.Join(',', Enemies.Select(e => e.Id))}";
+        $"{Champion?.Id}|{IsLocked}|{Position}|{Mode}|{string.Join(',', Enemies.Select(e => e.Id))}";
 
     public static ChampSelectState? From(ClientSnapshot snapshot, ChampionCatalog champions)
     {
@@ -31,9 +40,18 @@ public sealed record ChampSelectState(
         IReadOnlyList<ChampionInfo> Picks(IEnumerable<ChampSelectPlayer> players) =>
             players.Select(p => champions.GetByKey(p.ChampionId)).OfType<ChampionInfo>().ToList();
 
+        // Locked once your pick action is done. Modes without pick turns (ARAM) hand you a champion: that counts as locked.
+        var myPicks = session.Actions.SelectMany(turn => turn).Where(a => a.Type == "pick" && a.ActorCellId == session.LocalPlayerCellId).ToList();
+        var isLocked = myPicks.Count > 0 ? myPicks.Any(a => a.Completed) : me?.ChampionId > 0;
+
         return new ChampSelectState(
             champions.GetByKey(championKey), position, mode,
-            Picks(session.MyTeam.Where(p => p != me)), Picks(session.TheirTeam));
+            Picks(session.MyTeam.Where(p => p != me)), Picks(session.TheirTeam))
+        {
+            IsLocked = isLocked,
+            Pickable = snapshot.PickableChampionIds.ToHashSet(),
+            Mastery = snapshot.Mastery.GroupBy(m => m.ChampionId).ToDictionary(g => g.Key, g => g.Max(m => m.ChampionPoints)),
+        };
     }
 }
 

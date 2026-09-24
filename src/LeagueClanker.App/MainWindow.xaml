@@ -99,6 +99,52 @@
                         </StackPanel>
                     </DockPanel>
 
+                    <!-- Lane: who you'll face, how that matchup goes, and before you lock in, what beats them -->
+                    <StackPanel Visibility="{Binding HasLane, Converter={StaticResource BoolToVisibility}}">
+                        <TextBlock Style="{StaticResource SectionHeader}" Text="{Binding LaneTitle}" />
+                        <DockPanel>
+                            <Image DockPanel.Dock="Left" Source="{Binding OpponentIconUrl, TargetNullValue={x:Null}}" Width="22" Height="22" Margin="0,0,8,0"
+                                   Visibility="{Binding OpponentIconUrl, Converter={StaticResource HasContent}}" />
+                            <TextBlock Text="{Binding OpponentText}" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center" TextWrapping="Wrap" />
+                        </DockPanel>
+                        <TextBlock Text="{Binding MatchupText}" FontSize="11" TextWrapping="Wrap" Margin="0,4,0,0"
+                                   Visibility="{Binding MatchupText, Converter={StaticResource HasContent}}" />
+
+                        <StackPanel Visibility="{Binding CounterPicks, Converter={StaticResource HasContent}}">
+                            <TextBlock Text="{Binding CounterHeader}" Foreground="{StaticResource AccentBrush}" FontSize="10" FontWeight="Bold" Margin="0,8,0,3" />
+                            <ItemsControl ItemsSource="{Binding CounterPicks}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate DataType="{x:Type local:CounterRow}">
+                                        <Border Background="{StaticResource CardBrush}" CornerRadius="4" Padding="6,3" Margin="0,0,0,3">
+                                            <DockPanel>
+                                                <TextBlock DockPanel.Dock="Right" Text="{Binding Games}" Foreground="{StaticResource MutedBrush}" FontSize="10"
+                                                           VerticalAlignment="Center" Margin="8,0,0,0" />
+                                                <TextBlock DockPanel.Dock="Right" Text="{Binding WinRate}" FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                                <Image Source="{Binding IconUrl}" Width="20" Height="20" />
+                                                <TextBlock Text="{Binding Name}" FontSize="11" Margin="6,0,0,0" VerticalAlignment="Center" />
+                                                <Border x:Name="Played" Visibility="Collapsed" BorderBrush="{StaticResource AccentBrush}" BorderThickness="1"
+                                                        CornerRadius="3" Padding="4,0" Margin="6,0,0,0" VerticalAlignment="Center" HorizontalAlignment="Left">
+                                                    <TextBlock Text="you play this" Foreground="{StaticResource AccentBrush}" FontSize="9" />
+                                                </Border>
+                                            </DockPanel>
+                                        </Border>
+                                        <DataTemplate.Triggers>
+                                            <DataTrigger Binding="{Binding YouPlayIt}" Value="True">
+                                                <Setter TargetName="Played" Property="Visibility" Value="Visible" />
+                                            </DataTrigger>
+                                        </DataTemplate.Triggers>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                            <TextBlock Text="Your win rate with each champion against them on op.gg, all ranks." Foreground="{StaticResource MutedBrush}" FontSize="10" />
+                        </StackPanel>
+
+                        <TextBlock Text="{Binding EnemyRoles}" Foreground="{StaticResource MutedBrush}" FontSize="10" TextWrapping="Wrap" Margin="0,6,0,0"
+                                   Visibility="{Binding EnemyRoles, Converter={StaticResource HasContent}}" />
+                        <TextBlock Text="{Binding LaneNote}" Foreground="{StaticResource MutedBrush}" FontSize="10" TextWrapping="Wrap" Margin="0,4,0,0"
+                                   Visibility="{Binding LaneNote, Converter={StaticResource HasContent}}" />
+                    </StackPanel>
+
                     <StackPanel Visibility="{Binding HasChampion, Converter={StaticResource BoolToVisibility}}">
                         <TextBlock Style="{StaticResource SectionHeader}" Text="HOW DO YOU WANT TO PLAY?" />
                         <ItemsControl ItemsSource="{Binding Playstyles}">
@@ -180,11 +226,14 @@
                     </DockPanel>
 
                     <!-- How you play this champion. Changing it rebuilds the item list. -->
-                    <StackPanel Orientation="Horizontal" Margin="0,-6,0,8">
+                    <StackPanel Orientation="Horizontal" Margin="0,-6,0,4">
                         <TextBlock Text="Playing as" Foreground="{StaticResource MutedBrush}" FontSize="11" />
                         <Button Style="{StaticResource LinkButton}" Content="{Binding PlaystyleLabel}" Margin="5,0,0,0" Click="OnPlaystyleMenu"
                                 ToolTip="Change how you play this champion, e.g. AP instead of AD" AutomationProperties.Name="Change playstyle" />
                     </StackPanel>
+                    <TextBlock Text="{Binding MatchupLine}" Foreground="{StaticResource MutedBrush}" FontSize="11" TextTrimming="CharacterEllipsis" Margin="0,0,0,8"
+                               Visibility="{Binding MatchupLine, Converter={StaticResource HasContent}}" ToolTip="Your lane matchup on op.gg, all ranks" />
+                    <Border Height="4" Visibility="{Binding MatchupLine, Converter={StaticResource HasContent}, ConverterParameter=invert}" />
 
                     <!-- Enemy damage split bar -->
                     <TextBlock Text="{Binding DamageSummary}" Foreground="{StaticResource MutedBrush}" FontSize="11" Margin="0,0,0,4" />

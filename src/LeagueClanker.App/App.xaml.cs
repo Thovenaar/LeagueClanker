@@ -6,6 +6,8 @@ using LeagueClanker.Core;
 using LeagueClanker.Core.Augments;
 using LeagueClanker.Core.LeagueClient;
 using LeagueClanker.Core.LiveClient;
+using LeagueClanker.Core.Matchups;
+using LeagueClanker.Core.Opgg;
 using LeagueClanker.Core.Runes;
 using LeagueClanker.Core.StaticData;
 using LeagueClanker.Vision;
@@ -53,8 +55,11 @@ public partial class App : Application
             viewModel.PlaystyleChanged += (_, playstyle) => advisor.Playstyle = playstyle;
 
             var userAgent = $"LeagueClanker/{AppVersion} (+https://github.com/Thovenaar/LeagueClanker)";
-            var runes = new RuneAdvisor(new RuleRuneSource(data.Runes), new OpggRuneSource(data.Runes, userAgent: userAgent));
-            viewModel.ChampSelect.Configure(data, runes, settings.RuneSource);
+            var opgg = new OpggClient(userAgent: userAgent);
+            var runes = new RuneAdvisor(new RuleRuneSource(data.Runes), new OpggRuneSource(data.Runes, opgg));
+            var matchups = new MatchupAdvisor(opgg, data.Champions);
+            viewModel.ChampSelect.Configure(data, runes, matchups, settings.RuneSource);
+            viewModel.Matchups = matchups;
             viewModel.ChampSelect.SourceChanged += (_, runeSource) =>
             {
                 settings.RuneSource = runeSource;

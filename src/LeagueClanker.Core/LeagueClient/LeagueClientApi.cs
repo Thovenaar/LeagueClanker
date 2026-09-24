@@ -15,6 +15,26 @@ public sealed class ChampSelectSession
     public int LocalPlayerCellId { get; init; }
     public List<ChampSelectPlayer> MyTeam { get; init; } = [];
     public List<ChampSelectPlayer> TheirTeam { get; init; } = [];
+
+    /// <summary>Bans and picks in turn order, grouped per turn.</summary>
+    public List<List<ChampSelectAction>> Actions { get; init; } = [];
+}
+
+public sealed class ChampSelectAction
+{
+    public int ActorCellId { get; init; }
+    public int ChampionId { get; init; }
+
+    /// <summary>"pick" or "ban".</summary>
+    public string Type { get; init; } = "";
+
+    public bool Completed { get; init; }
+}
+
+public sealed class ChampionMastery
+{
+    public int ChampionId { get; init; }
+    public int ChampionPoints { get; init; }
 }
 
 public sealed class ChampSelectPlayer
@@ -86,7 +106,13 @@ public interface IRunePageStore
 }
 
 /// <summary>What the League client knows before the game starts. Null fields mean "not available right now".</summary>
-public sealed record ClientSnapshot(ChampSelectSession? ChampSelect, GameflowSession? Gameflow, Lobby? Lobby);
+public sealed record ClientSnapshot(ChampSelectSession? ChampSelect, GameflowSession? Gameflow, Lobby? Lobby)
+{
+    /// <summary>Champions you can pick right now: owned ones and the free rotation. Empty when unknown.</summary>
+    public IReadOnlyList<int> PickableChampionIds { get; init; } = [];
+
+    public IReadOnlyList<ChampionMastery> Mastery { get; init; } = [];
+}
 
 public interface IClientSource
 {
@@ -102,6 +128,9 @@ public interface IClientSource
 public sealed class LeagueClientApi : IClientSource, IRunePageStore, IDisposable
 {
     private readonly HttpClient _http;
+
+    // Mastery only changes after a game, so it's read once per connection.
+    private IReadOnlyList<ChampionMastery>? _mastery;
 
     public LeagueClientApi(Lockfile lockfile) : this(lockfile.Port, lockfile.Password)
     {
@@ -179,7 +208,9 @@ public sealed class LeagueClientApi : IClientSource, IRunePageStore, IDisposable
 
         var gameflow = await GetOrNullAsync<GameflowSession>("lol-gameflow/v1/session", ct);
         var lobby = await GetOrNullAsync<Lobby>("lol-lobby/v2/lobby", ct);
-        return new ClientSnapshot(session, gameflow, lobby);
+        var pickable = await GetOrNullAsync<List<int>>("lol-champ-select/v1/pickable-champion-ids", ct);
+        _mastery ??= await GetOrNullAsync<List<ChampionMastery>>("lol-champion-mastery/v1/local-player/champion-mastery", ct);
+        return new ClientSnapshot(session, gameflow, lobby) { PickableChampionIds = pickable ?? [], Mastery = _mastery ?? [] };
     }
 
     public Task<PerkPage?> GetCurrentPageAsync(CancellationToken ct) => GetOrNullAsync<PerkPage>("lol-perks/v1/currentpage", ct);
