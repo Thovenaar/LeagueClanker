@@ -262,7 +262,7 @@ Scoring every item on its own gave builds that looked random: full AP Katarina i
 3. **Your playstyle follows.** The chosen build's style becomes your playstyle, in game and in champ select, so runes and augment advice match it. You don't need to pick on-hit by hand. A playstyle you pick yourself stays, and limits the choice to builds of that kind.
 4. **One swap at most.** A later item (never the first three) is swapped when another item answers this game at least 1 point better, with a real reason, like anti-heal against healers. The window says so: "For this game: Chempunk Chainsword instead of Terminus: enemy has heavy healing".
 
-The window shows which build it follows and why: "Build: op.gg's on-hit build (56.8% win rate over 444 games), over the AP burst build (43.7%)." When the chosen build changes mid-game, it's a pivot you accept, like any other. Without op.gg's data (Arena, League Classic, a rare pick, op.gg down, or the setting off), items are scored one by one as before.
+The list keeps the build's order, which is the order players buy it in; only an item you've started moves up. The window shows which build it follows and why: "Build: op.gg's on-hit build (56.8% win rate over 444 games), over the AP burst build (43.7%)." When the chosen build changes mid-game, it's a pivot you accept, like any other. Without op.gg's data (Arena, League Classic, a rare pick, op.gg down, or the setting off), items are scored one by one as before.
 
 ### In game: what to buy, tips and compact mode
 
@@ -277,7 +277,7 @@ The window shows which build it follows and why: "Build: op.gg's on-hit build (5
 
 ### Between games: recap and your stats
 
-`History/` keeps track of the games you play. While a game runs, `GameRecorder` notes every item LeagueClanker put in your build and every pivot you took or turned down. When the game's API goes away, it writes a recap to `%LOCALAPPDATA%\LeagueClanker\games.json`, which keeps your last 200 games. Games under 5 minutes, like remakes and Practice Tool peeks, get no recap. The result comes from the game's end event. When the app misses it, for example because you left early, the recap has no result and doesn't count toward your record.
+`History/` keeps track of the games you play. While a game runs, `GameRecorder` notes every item LeagueClanker put in your build and every pivot you took or turned down. When the game's API goes away, it writes a recap to `%LOCALAPPDATA%\LeagueClanker\games.json`, which keeps your last 200 games. Games under 5 minutes, like remakes and Practice Tool peeks, get no recap. The result comes from the game's end event. The game sometimes closes before that event reaches the app; then the app reads the result from the League client's end-of-game screen, matched by your champion and the game's length. Without either, the recap has no result and doesn't count toward your record.
 
 The recap says who you laned against, your final legendary items and boots, how many of them were in LeagueClanker's build, and each pivot with its time. It shows whenever you're not in champ select or a game.
 

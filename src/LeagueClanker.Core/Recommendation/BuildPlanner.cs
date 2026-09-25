@@ -156,7 +156,10 @@ public sealed class BuildPlanner
         // What you buy next only changes through pivots, but the order among those items follows the game:
         // a new augment can make your third item the one to buy first. Promoting a later item into your
         // next purchases is a pivot, so the next few and the rest are ordered separately.
-        var score = latest.Ranked.ToDictionary(s => s.Item.Id, s => s.Total);
+        // With an op.gg build, its order is the buy order players use, so the ranking's order decides, not item scores.
+        var score = latest.Meta is null
+            ? latest.Ranked.ToDictionary(s => s.Item.Id, s => s.Total)
+            : latest.Ranked.Select((s, index) => (s.Item.Id, Score: -index * 10.0)).ToDictionary(x => x.Id, x => x.Score);
         _plan = [.. Reorder(_plan.Take(NearTerm).ToList(), score), .. Reorder(_plan.Skip(NearTerm).ToList(), score)];
 
         _plan = FinishStartedFirst(_plan, latest);

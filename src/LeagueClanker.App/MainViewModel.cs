@@ -279,6 +279,13 @@ public sealed class MainViewModel : INotifyPropertyChanged
         Raise(nameof(ShowHistory));
     }
 
+    /// <summary>The League client told the result the game didn't: show it.</summary>
+    public void UpdateRecap(GameRecap recap)
+    {
+        ShowRecap(recap);
+        GamePlayed?.Invoke(this, recap);
+    }
+
     private void ShowRecap(GameRecap recap)
     {
         if (_data is not { } data)

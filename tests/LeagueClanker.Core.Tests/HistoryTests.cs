@@ -137,6 +137,43 @@ public class HistoryTests
     }
 
     [Fact]
+    public void EndOfGame_ReadsTheResultFromTheClientsEndScreen()
+    {
+        // Trimmed from lol-end-of-game/v1/eog-stats-block after a real ARAM: Mayhem game.
+        var result = EndOfGame.Parse("""
+            {"gameId": 7994235113, "gameMode": "KIWI", "gameLength": 1542,
+             "localPlayer": {"championId": 12, "stats": {"WIN": 1}},
+             "teams": [{"teamId": 200, "isPlayerTeam": true, "isWinningTeam": true}, {"teamId": 100, "isPlayerTeam": false, "isWinningTeam": false}]}
+            """)!;
+        var recap = Recap("Alistar", 12, null, Now) with { DurationSeconds = 1533 };
+
+        Assert.True(result.Win);
+        Assert.True(result.Matches(recap));
+        Assert.False(result.Matches(recap with { ChampionKey = 86 }));
+        Assert.Null(EndOfGame.Parse("{}"));
+    }
+
+    [Fact]
+    public void Store_ReplacesARecap()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"lc-games-{Guid.NewGuid()}.json");
+        try
+        {
+            var store = new RecapStore(path);
+            var recap = Recap("Alistar", 12, null, Now);
+            store.Add(recap);
+
+            store.Replace(recap, recap with { Win = true });
+
+            Assert.True(new RecapStore(path).Games.Single().Win);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
     public void Analyze_ReadsTheResultFromTheGameEndEvent()
     {
         var game = TestData.Game(allies: [("Garen", [])], enemies: [("Annie", [])]);

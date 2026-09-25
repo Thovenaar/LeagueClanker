@@ -84,6 +84,22 @@ public sealed class RecapStore(string path)
         games.Insert(0, recap);
         if (games.Count > MaxGames)
             games.RemoveRange(MaxGames, games.Count - MaxGames);
+        Save(games);
+    }
+
+    /// <summary>Replaces a saved recap, e.g. when the League client tells the result the game didn't.</summary>
+    public void Replace(GameRecap old, GameRecap updated)
+    {
+        var games = Load();
+        var index = games.IndexOf(old);
+        if (index < 0)
+            return;
+        games[index] = updated;
+        Save(games);
+    }
+
+    private void Save(List<GameRecap> games)
+    {
         try
         {
             Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(path))!);

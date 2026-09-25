@@ -417,6 +417,13 @@ public sealed class LeagueClientApi : IClientSource, IRunePageStore, IChampSelec
         await EnsureSuccessAsync(response, ct);
     }
 
+    /// <summary>The last game's result from the end-of-game screen. Null before the client has it.</summary>
+    public async Task<History.EndOfGameResult?> GetEndOfGameAsync(CancellationToken ct)
+    {
+        using var doc = await GetOrNullAsync<JsonDocument>("lol-end-of-game/v1/eog-stats-block", ct);
+        return doc is null ? null : History.EndOfGame.Parse(doc.RootElement.GetRawText());
+    }
+
     /// <summary>The client's language, like "de_DE". Null when the client doesn't say.</summary>
     public async Task<string?> GetLocaleAsync(CancellationToken ct) =>
         (await GetOrNullAsync<RegionLocale>("riotclient/region-locale", ct))?.Locale;

@@ -105,5 +105,18 @@ public class MetaBuildsTests
         Assert.StartsWith("Wound Blade instead of Heart: enemy", rec.Meta!.Swap);
     }
 
+    [Fact]
+    public void Planner_KeepsTheBuildsBuyOrder_OverItemScores()
+    {
+        var game = Game([("Annie", [])], [("Garen", []), ("Braum", []), ("Ornn", [])]);
+        var advisor = new BuildAdvisor(new FileGameDataSource("unused.json"), Data) { MetaBuilds = Builds };
+        var planner = new BuildPlanner { Items = Data.Items };
+
+        planner.Update(advisor.RecommendOnce(game)!);
+        planner.Update(advisor.RecommendOnce(game)!); // the second update used to re-sort the next items by score
+
+        Assert.Equal([Kraken, Botrk, Nashors], planner.Upcoming.Take(3).Select(i => i.Item.Id));
+    }
+
     private static GameAnalysis Analyze(int[] items) => GameAnalyzer.Analyze(Game([("Annie", items)], [("Garen", [])]), Data)!;
 }

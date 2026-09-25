@@ -103,13 +103,17 @@ public partial class App : Application
             viewModel.Notes = notes;
             var recaps = new RecapStore(gamesDemo is null ? Path.Combine(AppPaths.DataFolder, "games.json") : CopyToTemp(gamesDemo));
             viewModel.UseRecaps(recaps, data);
+            if (recaps.Games.FirstOrDefault() is { Win: null } unfinished)
+                _ = FillInResultAsync(viewModel, recaps, unfinished); // the client still shows that game's end screen
             void RefreshStats() => viewModel.SetStats(PersonalStats.Combine(recaps.Games, _matchHistory, data.Champions));
             RefreshStats();
             _refreshStats = RefreshStats;
-            viewModel.GamePlayed += (_, _) =>
+            viewModel.GamePlayed += (_, recap) =>
             {
                 RefreshStats();
                 _historyStale = true;
+                if (recap.Win is null)
+                    _ = FillInResultAsync(viewModel, recaps, recap);
             };
 
             // op.gg's data for your champion: popular items for the build, starting items at the start.
@@ -189,6 +193,28 @@ public partial class App : Application
     }
 
     private Action? _refreshStats;
+
+    // The connected League client, for reading the end-of-game screen.
+    private LeagueClientApi? _client;
+
+    /// <summary>
+    /// The game closed before its "GameEnd" event reached the app, so the recap has no result. The client's end-of-game
+    /// screen does; it takes a few seconds to arrive, so ask for up to a minute and a half.
+    /// </summary>
+    private async Task FillInResultAsync(MainViewModel viewModel, RecapStore recaps, GameRecap recap)
+    {
+        for (var attempt = 0; attempt < 30; attempt++)
+        {
+            await Task.Delay(TimeSpan.FromSeconds(3), _cts.Token);
+            if (_client is not { } client || await client.GetEndOfGameAsync(_cts.Token) is not { } result || !result.Matches(recap))
+                continue;
+            var updated = recap with { Win = result.Win };
+            recaps.Replace(recap, updated);
+            viewModel.UpdateRecap(updated);
+            Log.Write($"Result from the end-of-game screen: {(result.Win ? "win" : "loss")}");
+            return;
+        }
+    }
     private Func<string, Task>? _useClientLocale;
 
     private async Task UseClientLocaleAsync(LeagueClientApi client)
@@ -306,6 +332,7 @@ public partial class App : Application
                         lockfile = found;
                         client = found is null ? null : new LeagueClientApi(found);
                         _champSelectSource = client;
+                        _client = client;
                         _historyStale = client is not null;
                         Log.Write(client is null ? "League client closed" : $"Connected to the League client on port {found!.Port}");
                         snapshot = client is null ? null : await client.TryGetChampSelectAsync(_cts.Token);
