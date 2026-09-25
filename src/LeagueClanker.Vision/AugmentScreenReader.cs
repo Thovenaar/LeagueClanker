@@ -21,6 +21,9 @@ public sealed class AugmentScreenReader
     private readonly AugmentCatalog _catalog;
     private readonly OcrEngine? _ocr;
 
+    // Windows' OCR engine reads one image at a time; the timed scan and "Read cards now" can overlap.
+    private readonly SemaphoreSlim _oneAtATime = new(1, 1);
+
     /// <param name="locale">The League client's language, like "de_DE". Cards are read in that language when Windows can.</param>
     public AugmentScreenReader(AugmentCatalog catalog, string? locale = null)
     {
@@ -89,7 +92,16 @@ public sealed class AugmentScreenReader
     private async Task<IReadOnlyList<TextLine>> ReadAsync(ScreenImage area, double scale)
     {
         using var bitmap = SoftwareBitmap.CreateCopyFromBuffer(area.Pixels.AsBuffer(), BitmapPixelFormat.Bgra8, area.Width, area.Height, BitmapAlphaMode.Ignore);
-        var result = await _ocr!.RecognizeAsync(bitmap);
+        OcrResult result;
+        await _oneAtATime.WaitAsync();
+        try
+        {
+            result = await _ocr!.RecognizeAsync(bitmap);
+        }
+        finally
+        {
+            _oneAtATime.Release();
+        }
 
         return result.Lines
             .Where(l => l.Words.Count > 0)

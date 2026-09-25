@@ -45,6 +45,9 @@ public sealed class BuildPlanner
     public const double ReorderMargin = 0.5;
 
     private readonly HashSet<int> _declined = [];
+
+    // The last pivot you accepted, so the same swap is never suggested again right after.
+    private string? _acceptedPivot;
     private List<ItemInfo> _plan = [];
     private HashSet<string> _planSituations = [];
     private string? _championId;
@@ -87,6 +90,7 @@ public sealed class BuildPlanner
         if (PendingPivot is not { } pivot || Latest is not { } latest)
             return;
 
+        _acceptedPivot = Key(pivot);
         var dropped = pivot.Drop.Select(i => i.Id).ToHashSet();
         var rank = latest.Ranked.Select((s, index) => (s.Item.Id, index)).ToDictionary(x => x.Id, x => x.index);
         _plan = _plan.Where(i => !dropped.Contains(i.Id))
@@ -119,6 +123,7 @@ public sealed class BuildPlanner
     public void Reset()
     {
         _declined.Clear();
+        _acceptedPivot = null;
         _plan = [];
         _planSituations = [];
         _championId = null;
@@ -198,7 +203,11 @@ public sealed class BuildPlanner
     private Pivot? DetectPivot(BuildRecommendation latest)
     {
         var planNext = Upcoming.Take(NearTerm).ToList();
-        var latestNext = latest.Ranked.Take(NearTerm).ToList();
+        // Compare with the latest ranking in the order the plan uses: an item you've started goes first in both.
+        var latestNext = FinishStartedFirst(latest.Ranked.Select(s => s.Item).ToList(), latest)
+            .Take(NearTerm)
+            .Select(i => latest.Find(i.Id)!)
+            .ToList();
         var planIds = planNext.Select(s => s.Item.Id).ToHashSet();
         var latestIds = latestNext.Select(s => s.Item.Id).ToHashSet();
 
@@ -206,9 +215,11 @@ public sealed class BuildPlanner
         LatestDifferences = added.Select(s => s.Item).ToList();
         CanSwitch = added.Count > 0;
 
-        // Only items with a real in-game reason that you haven't already turned down.
+        // Only items with a real in-game reason that you haven't already turned down. With an op.gg build, only its own
+        // items: once most of it is bought, filler items fill the next slots, and swapping between fillers isn't worth asking.
         var fresh = added
             .Where(s => !_declined.Contains(s.Item.Id) && s.Reasons.Any(r => r.Points >= MinReasonPoints))
+            .Where(s => latest.Meta is not { } meta || meta.Includes(s.Item))
             .ToList();
         if (fresh.Count == 0)
             return null;
@@ -232,9 +243,13 @@ public sealed class BuildPlanner
             .Select(s => _planSituations.Contains(s.Label) ? s.Description : $"{s.Description} (new)")
             .ToList();
 
-        return new Pivot(fresh.Select(s => s.Item).ToList(), dropped.Select(s => s.Item).ToList(), reasons, gain)
+        var pivot = new Pivot(fresh.Select(s => s.Item).ToList(), dropped.Select(s => s.Item).ToList(), reasons, gain)
         {
             SituationLabels = situations.Select(s => s.Label).ToList(),
         };
+        return Key(pivot) == _acceptedPivot ? null : pivot;
     }
+
+    private static string Key(Pivot pivot) =>
+        $"{string.Join(",", pivot.Add.Select(i => i.Id).Order())}|{string.Join(",", pivot.Drop.Select(i => i.Id).Order())}";
 }

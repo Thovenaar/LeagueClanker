@@ -295,7 +295,7 @@ if (paths.Count == 1)
 
 if (paths.Count > 1)
 {
-    var planner = new BuildPlanner();
+    var planner = new BuildPlanner { Items = data.Items };
     foreach (var path in paths)
     {
         if (await RecommendAsync(path) is not { } rec)

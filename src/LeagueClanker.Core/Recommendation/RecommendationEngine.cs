@@ -146,13 +146,16 @@ public sealed class RecommendationEngine(StaticGameData data, IReadOnlyList<IBui
             var pool = choice.Build.Situational.Count > 0
                 ? choice.Build.Situational.Where(Available).Select(i => Score(i, profile, mine, situations, freshWeights)).ToList()
                 : ranked;
-            if (build.Where(s => !core.Contains(s.Item.Id)).MinBy(Points) is { } weakest
+            // Never swap out an item you've started: you'd rather finish it (the planner puts it first anyway).
+            bool Started(ItemInfo item) => item.TotalGold > 0
+                && 1 - (double)BuyAdvisor.RemainingCost(item, owned, data.Items) / item.TotalGold >= BuildPlanner.StartedShare;
+            if (build.Where(s => !core.Contains(s.Item.Id) && !Started(s.Item)).MinBy(Points) is { } weakest
                 && pool.Where(s => build.All(b => b.Item.Id != s.Item.Id) && s.Reasons.Any(r => r.Points >= BuildPlanner.MinReasonPoints)).MaxBy(Points) is { } better
                 && Points(better) >= Points(weakest) + SwapMargin)
             {
                 build[build.IndexOf(weakest)] = better;
                 var why = better.Reasons.First().Situation.Description;
-                meta = choice with { Swap = $"{better.Item.Name} instead of {weakest.Item.Name}: {char.ToLowerInvariant(why[0])}{why[1..]}" };
+                meta = choice with { Swap = $"{better.Item.Name} instead of {weakest.Item.Name}: {char.ToLowerInvariant(why[0])}{why[1..]}", SwapIn = better.Item };
             }
             ranked = [.. build, .. ranked.Where(s => build.All(b => b.Item.Id != s.Item.Id))];
 

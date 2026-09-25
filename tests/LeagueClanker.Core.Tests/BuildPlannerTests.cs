@@ -51,6 +51,9 @@ public class BuildPlannerTests
         Assert.Null(planner.PendingPivot);
         Assert.All(pivot.Add, added => Assert.Contains(added.Id, next));
         Assert.All(pivot.Drop, dropped => Assert.DoesNotContain(dropped.Id, next));
+
+        planner.Update(Garen(ApTeam)); // the next poll: the swap you just took isn't suggested again
+        Assert.Null(planner.PendingPivot);
     }
 
     [Fact]
