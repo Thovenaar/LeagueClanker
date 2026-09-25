@@ -15,6 +15,15 @@ namespace LeagueClanker.Core.Tests;
 /// <summary>Arena, ARAM: Mayhem Classic and Swiftplay.</summary>
 public class GameModesTests
 {
+    [Fact]
+    public void LeagueClassicChampions_ResolveByTheirJadeId_InAnyLanguage()
+    {
+        // A real League Classic game: "Jade_MissFortune". The display name is localized, so the id has to do.
+        var player = new LiveClient.LivePlayer { ChampionName = "Джинкс", RawChampionName = "game_character_displayname_Jade_Jinx" };
+
+        Assert.Equal("Jinx", TestData.Static.Champions.Resolve(player).Id);
+    }
+
     private static readonly ItemCatalog Items = ItemCatalog.Parse(JsonSerializer.Serialize(new
     {
         data = new Dictionary<string, object>

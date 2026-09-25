@@ -96,8 +96,13 @@ public sealed class ChampionCatalog
     /// <summary>Maps a live-game player to static champion data. Unknown champions get a neutral placeholder.</summary>
     public ChampionInfo Resolve(LivePlayer player)
     {
-        if (player.RawChampionName?.StartsWith(RawNamePrefix, StringComparison.OrdinalIgnoreCase) == true
-            && _byId.TryGetValue(player.RawChampionName[RawNamePrefix.Length..], out var byId))
+        // League Classic names its champions "Jade_MissFortune"; the display name is in the client's language, so use the id.
+        var rawId = player.RawChampionName?.StartsWith(RawNamePrefix, StringComparison.OrdinalIgnoreCase) == true
+            ? player.RawChampionName[RawNamePrefix.Length..]
+            : null;
+        if (rawId?.StartsWith("Jade_", StringComparison.OrdinalIgnoreCase) == true)
+            rawId = rawId[5..];
+        if (rawId is not null && _byId.TryGetValue(rawId, out var byId))
             return byId;
 
         return _byNormalizedName.GetValueOrDefault(Normalize(player.ChampionName))

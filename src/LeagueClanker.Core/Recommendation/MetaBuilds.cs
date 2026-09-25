@@ -13,11 +13,26 @@ public sealed record MetaBuild(Archetype Style, IReadOnlyList<ItemInfo> Core, IR
 {
     public IEnumerable<ItemInfo> Items => Core.Concat(Later);
 
+    /// <summary>Where the build comes from: "op.gg", or "Blitz" for League Classic.</summary>
+    public string Source { get; init; } = "op.gg";
+
+    /// <summary>False for curated builds without game counts (Blitz): then the game alone chooses.</summary>
+    public bool HasStats => Games > 0;
+
+    /// <summary>Items the source lists for when the game asks for them. When there are any, the one swap picks from these.</summary>
+    public IReadOnlyList<ItemInfo> Situational { get; init; } = [];
+
+    /// <summary>The build's boots, when the source names them. Null leaves boots to the game's situations.</summary>
+    public ItemInfo? Boots { get; init; }
+
     /// <summary>Identifies the build between updates, so the last choice can be kept.</summary>
     public string Key => $"{Style}:{string.Join(",", Core.Select(i => i.Id))}";
 
+    /// <summary>The source's own name for the build, like Blitz's "AD" or "Crit". Null names it after the style.</summary>
+    public string? Label { get; init; }
+
     /// <summary>"on-hit build", "AP burst build", "crit build".</summary>
-    public string Name => Style switch
+    public string Name => Label is { } label ? $"{label} build" : Style switch
     {
         Archetype.Marksman => "crit build",
         Archetype.AdAssassin => "lethality build",
@@ -40,12 +55,14 @@ public sealed record MetaChoice(MetaBuild Build, double Score, string? Because, 
     {
         get
         {
-            var text = $"op.gg's {Build.Name} ({Build.WinRate:P1} win rate over {Build.Games:N0} games)";
+            var text = Build.HasStats
+                ? $"{Build.Source}'s {Build.Name} ({Build.WinRate:P1} win rate over {Build.Games:N0} games)"
+                : $"{Build.Source}'s {Build.Name}";
             if (Others.Count == 0)
                 return text + ".";
             var other = Others[0].Build;
             return Because is null
-                ? $"{text}, over the {other.Name} ({other.WinRate:P1})."
+                ? other.HasStats ? $"{text}, over the {other.Name} ({other.WinRate:P1})." : $"{text}, over the {other.Name}."
                 : $"{text}, over the {other.Name}: {char.ToLowerInvariant(Because[0])}{Because[1..]}.";
         }
     }

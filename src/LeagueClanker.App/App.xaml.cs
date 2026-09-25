@@ -5,6 +5,7 @@ using System.Windows;
 using LeagueClanker.Core;
 using LeagueClanker.Core.Analysis;
 using LeagueClanker.Core.Augments;
+using LeagueClanker.Core.Blitz;
 using LeagueClanker.Core.History;
 using LeagueClanker.Core.LeagueClient;
 using LeagueClanker.Core.LiveClient;
@@ -122,6 +123,11 @@ public partial class App : Application
             {
                 if (liveGame is not { } game)
                     return;
+                if (game.Mode == GameMode.LeagueClassic)
+                {
+                    await LoadClassicBuildsAsync(game);
+                    return;
+                }
                 var useOpgg = viewModel.Settings.RuneSource == RuneSourceKind.StatsSite && game.Mode is GameMode.SummonersRift or GameMode.Aram or GameMode.AramMayhem;
                 var champion = useOpgg ? await LoadOpggChampionAsync(opgg, game) : null;
                 if (liveGame != game)
@@ -152,6 +158,24 @@ public partial class App : Application
                     Log.Error($"Loading augment win rates from {CommunityAugments.Source}", ex);
                     viewModel.Augments.SetCommunity(null);
                 }
+            }
+            // League Classic: op.gg has no data, Blitz has builds with the classic items.
+            async Task LoadClassicBuildsAsync(GameAnalysis game)
+            {
+                IReadOnlyList<MetaBuild> builds = [];
+                if (viewModel.Settings.UsePopularItems)
+                {
+                    try
+                    {
+                        builds = await new BlitzClassicBuilds().LoadAsync(game.Me.Champion.Key, game.Me.Position, data.Items, _cts.Token);
+                    }
+                    catch (Exception ex) when (ex is HttpRequestException or System.Text.Json.JsonException or TaskCanceledException)
+                    {
+                        Log.Error($"Loading {game.Me.Champion.Name}'s League Classic builds from {BlitzClassicBuilds.Source}", ex);
+                    }
+                }
+                if (liveGame == game)
+                    advisor.MetaBuilds = builds;
             }
             viewModel.LiveChampionChanged += (_, game) =>
             {

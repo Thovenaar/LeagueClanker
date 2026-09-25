@@ -341,6 +341,14 @@ async Task<BuildRecommendation?> RecommendAsync(string path, IReadOnlyList<Augme
         ?? throw new InvalidOperationException($"{path} does not contain a playable game.");
     var advisor = new BuildAdvisor(new FileGameDataSource(path), data) { Augments = augments ?? [] };
 
+    // League Classic: Blitz's builds with the classic items.
+    if (!args.Contains("--no-meta") && GameAnalyzer.Analyze(game, data) is { Mode: GameMode.LeagueClassic } classic)
+    {
+        advisor.MetaBuilds = await new LeagueClanker.Core.Blitz.BlitzClassicBuilds().LoadAsync(classic.Me.Champion.Key, classic.Me.Position, data.Items, cts.Token);
+        foreach (var build in advisor.MetaBuilds)
+            Console.WriteLine($"Blitz {build.Name}: {string.Join(", ", build.Core.Select(i => i.Name))} | later {string.Join(", ", build.Later.Select(i => i.Name))}");
+    }
+
     // op.gg's builds for the champion, unless --no-meta. The same as the app does in a live game.
     if (!args.Contains("--no-meta") && GameAnalyzer.Analyze(game, data) is { Mode: GameMode.SummonersRift or GameMode.Aram or GameMode.AramMayhem } analysis)
     {

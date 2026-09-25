@@ -315,9 +315,12 @@ League Classic is Summoner's Rift with the item shop, stats and champions of aro
 - the map is 453, or the mode is `JADE` (the codename in the item texts), or
 - the game reports itself as Summoner's Rift, but someone holds a classic item. Everyone starts with one, like Doran's Blade, so this kicks in within the first minute.
 
-Nobody has sent a real League Classic snapshot yet, so the second check is there in case Riot reports it as a normal Summoner's Rift game. That's also how `samples/classic/ashe-vs-tanks.json` reports it.
+A real League Classic game reports mode `JADE` on map 453, and its champions as `Jade_MissFortune`, which the app reads as Miss Fortune whatever the client's language. Champ select and the match history number the champions from 60000 (60021 is Miss Fortune). The second check stays for snapshots like `samples/classic/ashe-vs-tanks.json`, which report themselves as Summoner's Rift.
 
 What changes in League Classic:
+
+- **Builds from Blitz.** op.gg has no League Classic data, so the builds come from Blitz.gg's League Classic pages (`BlitzClassicBuilds`): curated builds per champion, like an AD and a crit build for Miss Fortune, with the classic items. They have no win rates, so the game's situations and the items you own choose between them, the same way as op.gg's builds on today's Summoner's Rift. The build follows Blitz's order: its core, then the first new option for slots 4, 5 and 6. The one swap picks from Blitz's situational items for that build, and its boots come first unless the game has a real reason for others.
+- **No runes.** League Classic uses its old masteries and runes, and the client's local API has no way to change them. Champ select says so instead of showing a rune page, and *Apply* only writes the summoner spells and the item set.
 
 - **The shop.** Only classic items are recommended. Old items are cheaper, so any item that builds into nothing and costs 1,100 gold or more counts as finished. Doran's items don't. Boots build from the classic Boots of Speed.
 - **Stats in passives.** Classic items keep some stats in their unique passives, like The Black Cleaver's "Wicked Edge: 10 Lethality", Ionian Boots' "15% Cooldown Reduction", the boots' move speed, and Last Whisper's "ignore 35% of your opponent's Armor". The parser reads those, but skips conditional ones like Mejai's "At 20 stacks, grants 15% Cooldown Reduction". Flat regeneration ("10 Mana Regen per 5 seconds") counts as 100% base regeneration.
@@ -422,8 +425,7 @@ To add a rule, implement `IBuildRule`, return a `Situation` with a label, a sent
 - Enemy roles are guessed until the game starts. Flex picks (a mid Gragas, a top Seraphine) can land in the wrong role, and so can the lane opponent.
 - The team comp check reads champion classes, a hand-kept crowd control list and the ability tooltips. A champion with one strong stun that isn't on the list counts as having little crowd control, because the tooltips need 3 abilities with it.
 - The rule pages and keystone lists are hand-made for patch 16.19. New keystones need adding to `KeystoneFit` before op.gg pages with them are used.
-- Rune pages assume today's runes. League Classic's old runes and masteries aren't supported.
-- League Classic's match history says "JADE" on map 453. The live game's mode string hasn't been captured yet, but the app detects the mode by map 453 and the classic items either way.
+- League Classic's masteries and old runes can't be set by apps: the client's local API only knows today's rune pages.
 - In League Classic, champion knowledge (roles, healers, crowd control) and base stats describe today's champions, not the old kits.
 - Runes and masteries aren't read in any mode, so they're missing from everyone's stats but yours.
 - The limited "Classic ARAM" variant, with classic items on Howling Abyss, gets the normal ARAM items.
@@ -437,6 +439,8 @@ Augment data comes from the League of Legends Wiki under CC BY-SA 3.0: [Mayhem](
 Rune pages, summoner spells, skill orders, starting and core items, role play rates and matchups come from [op.gg](https://www.op.gg). LeagueClanker isn't affiliated with op.gg.
 
 Augment names in other languages come from [Community Dragon](https://www.communitydragon.org). LeagueClanker isn't affiliated with Community Dragon.
+
+League Classic builds come from [Blitz.gg](https://blitz.gg). LeagueClanker isn't affiliated with Blitz.
 
 Mayhem augment win rates and champion favorites come from [arammayhem.com](https://arammayhem.com). LeagueClanker isn't affiliated with arammayhem.com.
 

@@ -142,8 +142,12 @@ public sealed class RecommendationEngine(StaticGameData data, IReadOnlyList<IBui
             var build = choice.Build.Items.Where(Available).Select(i => Score(i, profile, mine, situations, freshWeights)).ToList();
             var core = choice.Build.Core.Select(i => i.Id).ToHashSet();
             double Points(ScoredItem s) => s.Contributions.Sum(c => c.Points);
+            // The swap picks from the build's own situational items when the source lists them (Blitz), otherwise from every candidate.
+            var pool = choice.Build.Situational.Count > 0
+                ? choice.Build.Situational.Where(Available).Select(i => Score(i, profile, mine, situations, freshWeights)).ToList()
+                : ranked;
             if (build.Where(s => !core.Contains(s.Item.Id)).MinBy(Points) is { } weakest
-                && ranked.Where(s => build.All(b => b.Item.Id != s.Item.Id) && s.Reasons.Any(r => r.Points >= BuildPlanner.MinReasonPoints)).MaxBy(Points) is { } better
+                && pool.Where(s => build.All(b => b.Item.Id != s.Item.Id) && s.Reasons.Any(r => r.Points >= BuildPlanner.MinReasonPoints)).MaxBy(Points) is { } better
                 && Points(better) >= Points(weakest) + SwapMargin)
             {
                 build[build.IndexOf(weakest)] = better;
@@ -151,6 +155,11 @@ public sealed class RecommendationEngine(StaticGameData data, IReadOnlyList<IBui
                 meta = choice with { Swap = $"{better.Item.Name} instead of {weakest.Item.Name}: {char.ToLowerInvariant(why[0])}{why[1..]}" };
             }
             ranked = [.. build, .. ranked.Where(s => build.All(b => b.Item.Id != s.Item.Id))];
+
+            // The build's boots, unless the game has a real reason for others (Mercury's against heavy crowd control).
+            if (boots.Count > 0 && choice.Build.Boots is { } metaBoots && boots.FirstOrDefault(s => s.Item.Id == metaBoots.Id) is { } theirs
+                && !boots[0].Reasons.Any(r => r.Points >= BuildPlanner.MinReasonPoints))
+                boots = [theirs, .. boots.Where(s => s != theirs)];
         }
 
         return new BuildRecommendation(game, ranked.Take(maxItems).ToList(), boots.FirstOrDefault(), situations, advice)

@@ -150,7 +150,12 @@ public sealed class ChampSelectViewModel : INotifyPropertyChanged
 
     /// <summary>"Apply runes, spells and item set", depending on the settings.</summary>
     public string ApplyLabel =>
-        "Apply " + string.Join(", ", new[] { "runes", Settings.ApplySpells ? "spells" : null, Settings.ApplyItemSet ? "item set" : null }.OfType<string>());
+        "Apply " + string.Join(", ", new[] { ShowRunes ? "runes" : null, Settings.ApplySpells ? "spells" : null, Settings.ApplyItemSet ? "item set" : null }.OfType<string>());
+
+    /// <summary>False in League Classic: it uses its old masteries and runes, which the client doesn't let apps change.</summary>
+    public bool ShowRunes => _state?.Mode != GameMode.LeagueClassic;
+
+    public bool RunesNotSupported => !ShowRunes;
 
     /// <summary>True on Summoner's Rift with a known role: then there's a lane opponent to show, or to wait for.</summary>
     public bool HasLane { get => _hasLane; private set => Set(ref _hasLane, value); }
@@ -260,6 +265,7 @@ public sealed class ChampSelectViewModel : INotifyPropertyChanged
         var changed = _state?.Fingerprint != state.Fingerprint;
         var championChanged = _state?.Champion?.Id != state.Champion?.Id || _state?.Position != state.Position;
         _state = state;
+        Raise(nameof(ShowRunes), nameof(RunesNotSupported), nameof(ApplyLabel));
         if (!changed)
             return;
 
@@ -330,7 +336,8 @@ public sealed class ChampSelectViewModel : INotifyPropertyChanged
         }
         else
         {
-            await Try("rune page", () => Writer.WriteRunesAsync(runes.Page, RunePageWriter.PageName(champion), default));
+            if (ShowRunes)
+                await Try("rune page", () => Writer.WriteRunesAsync(runes.Page, RunePageWriter.PageName(champion), default));
             if (Settings.ApplySpells && _spells is { } spells)
                 await Try("summoner spells", () => Writer.WriteSpellsAsync(spells.First, spells.Second, default));
         }
