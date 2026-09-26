@@ -203,7 +203,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
 
     private string _buildSource = "";
 
-    /// <summary>Where the build comes from: "Build: op.gg's on-hit build (56.8% win rate over 444 games), over the AP burst build (43.7%)."</summary>
+    /// <summary>Where the build comes from: "Build: op.gg's on-hit build (56.8% win rate over 444 games), over the AP burst build (43.7% over 522 games)."</summary>
     public string BuildSource { get => _buildSource; private set => Set(ref _buildSource, value); }
 
     public IReadOnlyList<PlaystyleOption> LivePlaystyles { get => _livePlaystyles; private set => Set(ref _livePlaystyles, value); }
@@ -292,7 +292,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
             return;
         string Name(int id) => data.Items.Get(id)?.Name ?? id.ToString();
         var result = recap.Win switch { true => "Victory", false => "Defeat", null => "Game over" };
-        LastGameTitle = $"{result} \u00b7 {recap.ChampionName} ({recap.Playstyle.DisplayName().ToLowerInvariant()}) \u00b7 {TimeSpan.FromSeconds(recap.DurationSeconds):mm\\:ss}";
+        LastGameTitle = $"{result} \u00b7 {recap.ChampionName} ({recap.Playstyle.InText()}) \u00b7 {TimeSpan.FromSeconds(recap.DurationSeconds):mm\\:ss}";
 
         var lines = new List<string>();
         if (recap.LaneOpponent is { } opponent && data.Champions.Get(opponent) is { } lane)

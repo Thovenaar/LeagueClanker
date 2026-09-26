@@ -47,7 +47,7 @@ public sealed class RuneAdvisor(RuleRuneSource rules, IRuneSource? statsSite = n
             {
                 if (await statsSite.RecommendAsync(request, ct) is { } found)
                     return found;
-                note = $"op.gg has no {request.Playstyle.DisplayName().ToLowerInvariant()} page for {request.Champion.Name}, so this is LeagueClanker's own page.";
+                note = $"op.gg has no {request.Playstyle.InText()} page for {request.Champion.Name}, so this is LeagueClanker's own page.";
             }
             catch (Exception ex) when (ex is HttpRequestException or JsonException or InvalidOperationException
                                        || (ex is TaskCanceledException && !ct.IsCancellationRequested))

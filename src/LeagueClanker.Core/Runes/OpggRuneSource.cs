@@ -44,7 +44,7 @@ public sealed class OpggRuneSource(RuneCatalog catalog, OpggClient opgg) : IRune
             return null;
 
         var where = aram ? "ARAM" : role.DisplayName().ToLowerInvariant();
-        var reason = $"Most played {request.Playstyle.DisplayName().ToLowerInvariant()} page for {request.Champion.Name} ({where}) on op.gg.";
+        var reason = $"Most played {request.Playstyle.InText()} page for {request.Champion.Name} ({where}) on op.gg.";
         return new RuneRecommendation(best.Page, SourceName, [reason]) { Games = best.Games, WinRate = best.WinRate };
     }
 }

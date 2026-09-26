@@ -68,7 +68,7 @@ public sealed record MetaChoice(MetaBuild Build, double Score, string? Because, 
                 return text + ".";
             var other = Others[0].Build;
             return Because is null
-                ? other.HasStats ? $"{text}, over the {other.Name} ({other.WinRate:P1})." : $"{text}, over the {other.Name}."
+                ? other.HasStats ? $"{text}, over the {other.Name} ({other.WinRate:P1} over {other.Games:N0} games)." : $"{text}, over the {other.Name}."
                 : $"{text}, over the {other.Name}: {char.ToLowerInvariant(Because[0])}{Because[1..]}.";
         }
     }

@@ -48,5 +48,8 @@ public class OnHitTests
         Assert.Equal(Archetype.OnHit, game.Me.Archetype);
         Assert.Equal(game.Me.MagicShare >= 0.5 ? DamageType.Magic : DamageType.Physical, game.Me.DamageType);
         Assert.Equal("On-hit", Archetype.OnHit.DisplayName());
+        Assert.Equal("an AP assassin", Archetype.ApAssassin.WithArticle());
+        Assert.Equal("a marksman", Archetype.Marksman.WithArticle());
+        Assert.Equal("an on-hit champion", Archetype.OnHit.WithArticle());
     }
 }

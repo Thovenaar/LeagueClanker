@@ -68,6 +68,17 @@ public static class ArchetypeClassifier
     public static bool IsAssassin(this Archetype archetype) =>
         archetype is Archetype.AdAssassin or Archetype.ApAssassin;
 
+    /// <summary>For use inside a sentence: "marksman", "AP assassin" (AD and AP stay capitalized), "on-hit".</summary>
+    public static string InText(this Archetype archetype) =>
+        string.Join(" ", archetype.DisplayName().Split(' ').Select(w => w is "AD" or "AP" ? w : w.ToLowerInvariant()));
+
+    /// <summary>"a marksman", "an AP assassin", "an on-hit champion".</summary>
+    public static string WithArticle(this Archetype archetype)
+    {
+        var text = archetype == Archetype.OnHit ? "on-hit champion" : archetype.InText();
+        return ("aeiou".Contains(char.ToLowerInvariant(text[0])) ? "an " : "a ") + text;
+    }
+
     public static string DisplayName(this Archetype archetype) => archetype switch
     {
         Archetype.AdAssassin => "AD assassin",

@@ -325,7 +325,7 @@ public sealed class AugmentScorer
             if (parts.Factor < 0.35 && augment.Triggers != AugmentTrigger.None)
                 reasons.Add(new($"little use for {me.Name} ({DescribeWorstTrigger(augment.Triggers, ctx)})", -1));
             else if (top.Count > 0 && fit >= 0.8)
-                reasons.Add(new($"{string.Join(" and ", top)} {(top.Count == 1 ? "fits" : "fit")} a {me.Archetype.DisplayName().ToLowerInvariant()}", fit * 0.5));
+                reasons.Add(new($"{string.Join(" and ", top)} {(top.Count == 1 ? "fits" : "fit")} {me.Archetype.WithArticle()}", fit * 0.5));
         }
         return fit;
     }
