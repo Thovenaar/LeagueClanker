@@ -11,11 +11,15 @@ public class CommunityAugmentsTests
         <a href="/augments/old-card/" class="augment-rank-row grid" data-name="old card" data-rarity="gold" data-availability="disabled"><img src="/y.webp" alt="Old Card" width="44"><div class="text-right font-data text-base font-semibold">70.00%</div></a>
         """;
 
-    // Trimmed from arammayhem.com/build/garen/.
+    // Trimmed from arammayhem.com/build/garen/: six cards per rarity on the real page.
     private const string Garen = """
         <h2>Other stuff</h2><div title="Spin To Win">Spin To Win</div>
         <h2 class="x">Best Augments for Garen</h2>
+        <div class="px-3 py-2 text-sm font-semibold text-rarity-gold" data-astro-cid-kaiunzud>Gold</div>
+        <div class="line-clamp-2 font-medium" title="Tank Engine" data-astro-cid-kaiunzud>Tank Engine</div><div class="mt-1 flex" data-astro-cid-kaiunzud><span data-astro-cid-kaiunzud>Appearance rate: <span class="font-data text-foreground" data-astro-cid-kaiunzud>9.00%</span></span><span>Win rate: <span>59.89%</span></span></div>
+        <div class="px-3 py-2 text-sm font-semibold text-rarity-silver" data-astro-cid-kaiunzud>Silver</div>
         <div class="line-clamp-2 font-medium" title="Spin To Win" data-astro-cid-kaiunzud>Spin To Win</div><div class="mt-1 flex" data-astro-cid-kaiunzud><span data-astro-cid-kaiunzud>Appearance rate: <span class="font-data text-foreground" data-astro-cid-kaiunzud>12.63%</span></span><span>Win rate: <span>54.25%</span></span></div>
+        <div class="line-clamp-2 font-medium" title="Stay Resolute" data-astro-cid-kaiunzud>Stay Resolute</div><div class="mt-1 flex" data-astro-cid-kaiunzud><span data-astro-cid-kaiunzud>Appearance rate: <span class="font-data text-foreground" data-astro-cid-kaiunzud>6.30%</span></span><span>Win rate: <span>52.87%</span></span></div>
         """;
 
     [Fact]
@@ -30,11 +34,15 @@ public class CommunityAugmentsTests
     }
 
     [Fact]
-    public void ParseChampion_ReadsTheBestAugmentsSection()
+    public void ParseChampion_ReadsTheBestAugmentsSection_WithEachCardsStandingInItsRarity()
     {
         var picks = CommunityAugments.ParseChampion(Garen);
 
-        Assert.Equal(0.1263, picks.Single(p => p.Key == "Spin To Win").Value, 4);
+        Assert.Equal(["Tank Engine", "Spin To Win", "Stay Resolute"], picks.Keys);
+        Assert.Equal(0.1263, picks["Spin To Win"].Appearance, 4);
+        Assert.Equal(1, picks["Spin To Win"].Standing, 4);
+        Assert.Equal(1, picks["Tank Engine"].Standing, 4); // the top gold card, though taken less than Spin To Win
+        Assert.Equal(0.50, picks["Stay Resolute"].Standing, 2);
     }
 
     [Fact]
@@ -45,10 +53,14 @@ public class CommunityAugmentsTests
 
         var spin = community.Points(Card("Spin To Win"), reasons);
         var swing = community.Points(Card("Spin Me Right Round"), null);
+        var resolute = community.FavoritePoints(Card("Stay Resolute"), reasons);
 
-        Assert.Equal(0.85 + CommunityAugments.ChampionFavoritePoints, spin, 2); // 54.25% is 4.25 points over 50%
+        // 54.25% is 4.25 points over 50%; the top silver pick gets the full favorite bonus.
+        Assert.Equal(0.85 + CommunityAugments.ChampionFavoritePoints + CommunityAugments.ChampionTopPickPoints, spin, 2);
         Assert.Equal(-1.11, swing, 2);
-        Assert.Contains(reasons, r => r.Text == "a top pick on Garen (13% of games)");
+        Assert.Equal(CommunityAugments.ChampionFavoritePoints + 0.5 * CommunityAugments.ChampionTopPickPoints, resolute, 2);
+        Assert.Contains(reasons, r => r.Text == "the top pick on Garen (13% of games)");
+        Assert.Contains(reasons, r => r.Text == "a top pick on Garen (6% of games)");
         Assert.Equal(0, community.Points(Card("Unknown Card"), null));
     }
 

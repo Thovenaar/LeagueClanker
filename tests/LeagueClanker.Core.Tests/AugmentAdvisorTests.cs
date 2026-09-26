@@ -27,12 +27,62 @@ public class AugmentAdvisorTests
             Name = "Eureka", Tier = AugmentTier.Prismatic, Description = "",
             Effects = AugmentEffect.AbilityHaste, Triggers = AugmentTrigger.AbilityPower,
         };
-        var community = new CommunityAugments([new CommunityAugmentStat("Eureka", 0.60, 0.2)], new Dictionary<string, double>(), null);
+        var community = new CommunityAugments([new CommunityAugmentStat("Eureka", 0.60, 0.2)], new Dictionary<string, ChampionAugmentPick>(), null);
         var scorer = new AugmentScorer();
         double Boost(string champion) =>
             scorer.Value(eureka, [], Context(champion) with { Community = community }) - scorer.Value(eureka, [], Context(champion));
 
         Assert.True(Boost("Annie") > 2 * Boost("Braum"), $"mage {Boost("Annie"):0.00}, tank {Boost("Braum"):0.00}");
+    }
+
+    [Fact]
+    public void YourChampionsFavorite_BeatsACardThatWinsMoreOverAllChampions()
+    {
+        // arammayhem.com's win rates are over all champions; which cards your champion's players take is the only
+        // number about your champion. Draw Your Sword at 61% kept beating a Fizz's own favorites.
+        var favorite = new AugmentInfo { Name = "Recursion", Tier = AugmentTier.Gold, Description = "", Effects = AugmentEffect.AbilityHaste };
+        var generic = favorite with { Name = "Crowd Pleaser" };
+        var community = new CommunityAugments(
+            [new CommunityAugmentStat("Recursion", 0.51, 0.1), new CommunityAugmentStat("Crowd Pleaser", 0.61, 0.1)],
+            new Dictionary<string, ChampionAugmentPick> { ["Recursion"] = new(0.14, 1.0) }, "Annie");
+
+        var advice = _advisor.Rank([generic, favorite], Context("Annie") with { Community = community });
+
+        Assert.Equal("Recursion", advice.Best.Augment.Name);
+        Assert.Contains(advice.Best.Reasons, r => r.Text == "the top pick on Annie (14% of games)");
+    }
+
+    [Fact]
+    public void AFavoriteKeepsItsBonus_AndIsNotCalledLittleUse_EvenWhenItsTextSeemsOff()
+    {
+        // Pack Leader reads as pets only; if Jinx players still took it, they know something the text doesn't say.
+        var packLeader = TestAugments.Get("Pack Leader");
+        var community = new CommunityAugments([], new Dictionary<string, ChampionAugmentPick> { ["Pack Leader"] = new(0.10, 1.0) }, "Jinx");
+        var scorer = new AugmentScorer();
+        var reasons = new List<ScoreReason>();
+
+        var boost = scorer.Value(packLeader, [], Context("Jinx") with { Community = community }, reasons) - scorer.Value(packLeader, [], Context("Jinx"));
+
+        Assert.Equal(CommunityAugments.ChampionFavoritePoints + CommunityAugments.ChampionTopPickPoints, boost, 2);
+        Assert.DoesNotContain(reasons, r => r.Text.Contains("little use"));
+    }
+
+    [Fact]
+    public void ACardForDashingOrStealth_FitsADasherWithoutStealth()
+    {
+        // Shadow Runner fires after a dash or leaving stealth; Aatrox dashes, so it fits.
+        var shadowRunner = new AugmentInfo
+        {
+            Name = "Shadow Runner", Tier = AugmentTier.Silver, Description = "",
+            Effects = AugmentEffect.MoveSpeed, Triggers = AugmentTrigger.Dashes | AugmentTrigger.Stealth,
+        };
+        var scorer = new AugmentScorer();
+        var reasons = new List<ScoreReason>();
+
+        var aatrox = scorer.Value(shadowRunner, [], Context("Aatrox"), reasons);
+
+        Assert.True(aatrox > 3 * scorer.Value(shadowRunner, [], Context("Jinx")), $"Aatrox {aatrox:0.00}");
+        Assert.DoesNotContain(reasons, r => r.Text.Contains("little use"));
     }
 
     [Fact]

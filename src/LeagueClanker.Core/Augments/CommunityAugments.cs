@@ -8,12 +8,16 @@ namespace LeagueClanker.Core.Augments;
 /// <param name="PickRate">Share of games the card was taken when offered, 0-1.</param>
 public sealed record CommunityAugmentStat(string Name, double WinRate, double PickRate);
 
+/// <param name="Appearance">Share of your champion's games that took the card, 0-1.</param>
+/// <param name="Standing">Appearance next to the most taken card of the same rarity on the page: 1 for that card.</param>
+public sealed record ChampionAugmentPick(double Appearance, double Standing);
+
 /// <summary>
 /// Mayhem augment numbers from arammayhem.com: every card's win rate over all games, and the cards players of
 /// your champion take most. The advisor uses them as a base and adds its own reasoning (combos, items, the game).
 /// Off with the "community augment stats" setting.
 /// </summary>
-public sealed partial class CommunityAugments(IReadOnlyList<CommunityAugmentStat> global, IReadOnlyDictionary<string, double> championPicks, string? champion)
+public sealed partial class CommunityAugments(IReadOnlyList<CommunityAugmentStat> global, IReadOnlyDictionary<string, ChampionAugmentPick> championPicks, string? champion)
 {
     public const string Source = "arammayhem.com";
 
@@ -23,36 +27,48 @@ public sealed partial class CommunityAugments(IReadOnlyList<CommunityAugmentStat
     /// <summary>The most a win rate adds or takes away, so a few outliers (Transmute: Prismatic at 65%) don't drown out the rest.</summary>
     public const double MaxWinRatePoints = 1.5;
 
-    /// <summary>Bonus for a card that's among the ones your champion's players take most.</summary>
-    public const double ChampionFavoritePoints = 0.4;
+    /// <summary>
+    /// Bonus for a card among the six per rarity your champion's players take most. The site's win rates are over all
+    /// champions, so this is the only number about your champion: Draw Your Sword at 61% is great for a Jinx, not a Fizz.
+    /// </summary>
+    public const double ChampionFavoritePoints = 1.0;
+
+    /// <summary>Extra bonus for the most taken card of its rarity, less for the others by how often they're taken.</summary>
+    public const double ChampionTopPickPoints = 1.0;
 
     private readonly Dictionary<string, CommunityAugmentStat> _global = global
         .GroupBy(s => AugmentCatalog.Key(s.Name)).ToDictionary(g => g.Key, g => g.First());
 
-    private readonly Dictionary<string, double> _championPicks = championPicks.ToDictionary(p => AugmentCatalog.Key(p.Key), p => p.Value);
+    private readonly Dictionary<string, ChampionAugmentPick> _championPicks = championPicks.ToDictionary(p => AugmentCatalog.Key(p.Key), p => p.Value);
 
     public int Count => _global.Count;
     public string? Champion => champion;
 
     public CommunityAugmentStat? Get(AugmentInfo augment) => _global.GetValueOrDefault(AugmentCatalog.Key(augment.Name));
 
-    /// <summary>Points for the card from the community numbers, with the reasons shown next to it.</summary>
-    public double Points(AugmentInfo augment, List<ScoreReason>? reasons)
+    public bool IsChampionFavorite(AugmentInfo augment) => champion is not null && _championPicks.ContainsKey(AugmentCatalog.Key(augment.Name));
+
+    /// <summary>Points for the card's win rate over all champions, with the reason shown next to it.</summary>
+    public double WinRatePoints(AugmentInfo augment, List<ScoreReason>? reasons)
     {
-        var points = 0.0;
-        if (Get(augment) is { } stat)
-        {
-            var fromWinRate = Math.Clamp((stat.WinRate - 0.5) * 100 * PointsPerWinRatePoint, -MaxWinRatePoints, MaxWinRatePoints);
-            points += fromWinRate;
-            reasons?.Add(new($"{stat.WinRate:P1} win rate in Mayhem ({Source})", fromWinRate));
-        }
-        if (champion is not null && _championPicks.TryGetValue(AugmentCatalog.Key(augment.Name), out var appearance))
-        {
-            points += ChampionFavoritePoints;
-            reasons?.Add(new($"a top pick on {champion} ({appearance:P0} of games)", ChampionFavoritePoints));
-        }
+        if (Get(augment) is not { } stat)
+            return 0;
+        var points = Math.Clamp((stat.WinRate - 0.5) * 100 * PointsPerWinRatePoint, -MaxWinRatePoints, MaxWinRatePoints);
+        reasons?.Add(new($"{stat.WinRate:P1} win rate in Mayhem ({Source})", points));
         return points;
     }
+
+    /// <summary>Points for a card your champion's players take often, with the reason shown next to it.</summary>
+    public double FavoritePoints(AugmentInfo augment, List<ScoreReason>? reasons)
+    {
+        if (champion is null || !_championPicks.TryGetValue(AugmentCatalog.Key(augment.Name), out var pick))
+            return 0;
+        var points = ChampionFavoritePoints + ChampionTopPickPoints * pick.Standing;
+        reasons?.Add(new($"{(pick.Standing >= 1 ? "the top" : "a top")} pick on {champion} ({pick.Appearance:P0} of games)", points));
+        return points;
+    }
+
+    public double Points(AugmentInfo augment, List<ScoreReason>? reasons) => WinRatePoints(augment, reasons) + FavoritePoints(augment, reasons);
 
     /// <summary>Reads the ranking on arammayhem.com/augments/: one row per card with its rarity, win rate and pick rate.</summary>
     public static IReadOnlyList<CommunityAugmentStat> ParseRanking(string html) =>
@@ -62,15 +78,34 @@ public sealed partial class CommunityAugments(IReadOnlyList<CommunityAugmentStat
             .Select(r => new CommunityAugmentStat(WebUtility.HtmlDecode(r.Name.Groups[1].Value), Percent(r.Win), r.Pick.Success ? Percent(r.Pick) : 0))
             .ToList();
 
-    /// <summary>Reads "Best Augments for Garen" on a champion's build page: card name to how often its players take it.</summary>
-    public static IReadOnlyDictionary<string, double> ParseChampion(string html)
+    /// <summary>
+    /// Reads "Best Augments for Garen" on a champion's build page: card name to how often its players take it.
+    /// The page lists six cards per rarity, and a card's standing is measured within its rarity.
+    /// </summary>
+    public static IReadOnlyDictionary<string, ChampionAugmentPick> ParseChampion(string html)
     {
         var start = html.IndexOf(">Best Augments for ", StringComparison.Ordinal);
         if (start < 0)
-            return new Dictionary<string, double>();
-        return ChampionEntry().Matches(html[start..])
-            .GroupBy(m => WebUtility.HtmlDecode(m.Groups[1].Value))
-            .ToDictionary(g => g.Key, g => Percent(g.First()));
+            return new Dictionary<string, ChampionAugmentPick>();
+        var rarity = "";
+        var entries = new List<(string Rarity, string Name, double Appearance)>();
+        foreach (Match m in ChampionSection().Matches(html[start..]))
+        {
+            if (m.Groups["rarity"].Success)
+                rarity = m.Groups["rarity"].Value;
+            else
+                entries.Add((rarity, WebUtility.HtmlDecode(m.Groups["name"].Value),
+                    double.Parse(m.Groups["appearance"].Value, CultureInfo.InvariantCulture) / 100));
+        }
+        return entries
+            .GroupBy(e => e.Rarity)
+            .SelectMany(section =>
+            {
+                var top = section.Max(e => e.Appearance);
+                return section.Select(e => (e.Name, Pick: new ChampionAugmentPick(e.Appearance, top > 0 ? e.Appearance / top : 1)));
+            })
+            .GroupBy(e => e.Name)
+            .ToDictionary(g => g.Key, g => g.First().Pick);
     }
 
     /// <summary>arammayhem.com's page name for a champion: "Dr. Mundo" is "drmundo", "Kai'Sa" is "kaisa".</summary>
@@ -90,8 +125,8 @@ public sealed partial class CommunityAugments(IReadOnlyList<CommunityAugmentStat
     [GeneratedRegex(@"hidden text-right font-data text-sm[^""]*"">([\d.]+)%")]
     private static partial Regex RowPickRate();
 
-    [GeneratedRegex(@"title=""([^""]+)""[^>]*>[^<]*</div><div[^>]*><span[^>]*>Appearance rate: <span[^>]*>([\d.]+)%")]
-    private static partial Regex ChampionEntry();
+    [GeneratedRegex(@">(?<rarity>Prismatic|Gold|Silver)</div>|title=""(?<name>[^""]+)""[^>]*>[^<]*</div><div[^>]*><span[^>]*>Appearance rate: <span[^>]*>(?<appearance>[\d.]+)%")]
+    private static partial Regex ChampionSection();
 }
 
 /// <summary>Downloads the arammayhem.com pages and caches them for a day, like the wiki's card data.</summary>
@@ -108,7 +143,7 @@ public sealed class CommunityAugmentClient(HttpClient? http = null, string? cach
     public async Task<CommunityAugments> LoadAsync(string? championName, CancellationToken ct = default)
     {
         var ranking = CommunityAugments.ParseRanking(await GetCachedAsync("https://arammayhem.com/augments/", "arammayhem-ranking.html", ct));
-        IReadOnlyDictionary<string, double> picks = new Dictionary<string, double>();
+        IReadOnlyDictionary<string, ChampionAugmentPick> picks = new Dictionary<string, ChampionAugmentPick>();
         if (championName is not null)
         {
             var slug = CommunityAugments.ChampionSlug(championName);

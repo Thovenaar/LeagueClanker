@@ -245,19 +245,22 @@ public sealed class AugmentScorer
 
     /// <summary>
     /// A card's win rate over all champions counts only as far as yours can use it: Eureka turns AP into haste, which
-    /// does little for a tank Volibear, whatever its win rate. Low win rates count in full.
+    /// does little for a tank Volibear, whatever its win rate. Low win rates count in full. Your champion's favorites
+    /// count in full too: its players taking a card says more about fit than the card's text does.
     /// </summary>
     private double CommunityPoints(AugmentInfo augment, AugmentContext ctx, List<ScoreReason>? reasons)
     {
         if (ctx.Community is not { } community)
             return 0;
-        var points = community.Points(augment, reasons);
-        if (points <= 0)
-            return points;
-        // Unlike the fit, a card that scales with a stat you don't build keeps none of its win rate for scaling half.
-        var conditions = Each(augment.Triggers & ~ScalingTriggers).Select(t => TriggerAffinity(t, ctx)).DefaultIfEmpty(1.0).Average();
-        var scaling = Each(augment.Triggers & ScalingTriggers).Select(t => TriggerAffinity(t, ctx)).DefaultIfEmpty(1.0).Max();
-        return points * Math.Clamp(conditions * scaling, MinCommunityShare, 1.0);
+        var points = community.WinRatePoints(augment, reasons);
+        if (points > 0)
+        {
+            // Unlike the fit, a card that scales with a stat you don't build keeps none of its win rate for scaling half.
+            var conditions = Each(augment.Triggers & ~ScalingTriggers).Select(t => TriggerAffinity(t, ctx)).DefaultIfEmpty(1.0).Average();
+            var scaling = Each(augment.Triggers & ScalingTriggers).Select(t => TriggerAffinity(t, ctx)).DefaultIfEmpty(1.0).Max();
+            points *= Math.Clamp(conditions * scaling, MinCommunityShare, 1.0);
+        }
+        return points + community.FavoritePoints(augment, reasons);
     }
 
     /// <summary>The least of a good win rate a card keeps when your champion can barely use it.</summary>
@@ -322,7 +325,7 @@ public sealed class AugmentScorer
             var gate = Each(augment.Triggers & GateTriggers).FirstOrDefault(t => TriggerAffinity(t, ctx) >= 1.0);
             if (gate != AugmentTrigger.None)
                 reasons.Add(new($"{me.Name} has {DescribeGate(gate)}", 0.5));
-            if (parts.Factor < 0.35 && augment.Triggers != AugmentTrigger.None)
+            if (parts.Factor < 0.35 && augment.Triggers != AugmentTrigger.None && ctx.Community?.IsChampionFavorite(augment) != true)
                 reasons.Add(new($"little use for {me.Name} ({DescribeWorstTrigger(augment.Triggers, ctx)})", -1));
             else if (top.Count > 0 && fit >= 0.8)
                 reasons.Add(new($"{string.Join(" and ", top)} {(top.Count == 1 ? "fits" : "fit")} {me.Archetype.WithArticle()}", fit * 0.5));
@@ -342,8 +345,12 @@ public sealed class AugmentScorer
 
         // A card built around spinning, pets, stealth or stacks lives or dies by that. Its other conditions (ability
         // hits, the ultimate) describe how, and averaging them in watered down a Garen with Spin To Win.
-        if ((triggers & GateTriggers) != 0)
-            condition = Each(triggers & GateTriggers).Max(t => TriggerAffinity(t, ctx));
+        // A card that names both stealth and dashes fires on either (Shadow Runner), so a Fizz meets it.
+        var gates = triggers & GateTriggers;
+        if ((gates & AugmentTrigger.Stealth) != 0)
+            gates |= triggers & AugmentTrigger.Dashes;
+        if (gates != 0)
+            condition = Each(gates).Max(t => TriggerAffinity(t, ctx));
         var scale = scaling.Count > 0 ? scaling.Max() : 1.0;
         return condition * (0.5 + 0.5 * scale);
     }
