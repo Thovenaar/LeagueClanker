@@ -428,7 +428,8 @@ public sealed class LeagueClientApi : IClientSource, IRunePageStore, IChampSelec
     public async Task<string?> GetLocaleAsync(CancellationToken ct) =>
         (await GetOrNullAsync<RegionLocale>("riotclient/region-locale", ct))?.Locale;
 
-    // 404 means "not in that state right now" (no champ select, no lobby); a closed client means null too.
+    // 404 means "not in that state right now" (no champ select, no lobby); a closed client means null too, including one
+    // that closed mid-read, whose connection the app has already disposed.
     private async Task<T?> GetOrNullAsync<T>(string path, CancellationToken ct) where T : class
     {
         try
@@ -440,7 +441,7 @@ public sealed class LeagueClientApi : IClientSource, IRunePageStore, IChampSelec
             _lastRaw[path] = json;
             return JsonSerializer.Deserialize<T>(json, Json.Options);
         }
-        catch (Exception ex) when (ex is HttpRequestException or JsonException || (ex is TaskCanceledException && !ct.IsCancellationRequested))
+        catch (Exception ex) when (ex is HttpRequestException or JsonException or ObjectDisposedException || (ex is TaskCanceledException && !ct.IsCancellationRequested))
         {
             return null;
         }

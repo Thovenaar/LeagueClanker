@@ -264,6 +264,11 @@ public partial class App : Application
             Log.Write($"Read {_matchHistory.Count} Summoner's Rift and League Classic games from the match history");
             _refreshStats?.Invoke();
         }
+        catch (ObjectDisposedException)
+        {
+            // The client closed mid-read; the next connection reads the history again.
+            Log.Write("The League client closed while the match history was loading");
+        }
         catch (Exception ex) when (ex is HttpRequestException or System.Text.Json.JsonException or InvalidOperationException or TaskCanceledException)
         {
             Log.Error("Reading the match history", ex);

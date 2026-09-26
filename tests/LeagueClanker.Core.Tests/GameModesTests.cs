@@ -147,6 +147,17 @@ public class GameModesTests
         Assert.Equal(["Mine", "LeagueClanker Jinx"], JsonNode.Parse(client.Put!)!["itemSets"]!.AsArray().Select(s => s!["title"]!.GetValue<string>()));
     }
 
+    [Fact]
+    public async Task AClientThatClosedMidRead_ReadsAsNothing()
+    {
+        // When the League client closes, the app disposes its connection, possibly while a read is still going.
+        var api = new LeagueClientApi(new HttpClient(new FakeClient("{}")) { BaseAddress = new Uri("https://127.0.0.1:1/") });
+        api.Dispose();
+
+        Assert.Null(await api.GetLocaleAsync(default));
+        Assert.Null(await api.GetEndOfGameAsync(default));
+    }
+
     /// <summary>Answers GETs with one JSON body and records the PUT.</summary>
     private sealed class FakeClient(string body, long summonerId = 1) : HttpMessageHandler
     {
