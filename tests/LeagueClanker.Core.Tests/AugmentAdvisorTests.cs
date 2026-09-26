@@ -19,6 +19,23 @@ public class AugmentAdvisorTests
     }
 
     [Fact]
+    public void AGoodWinRate_CountsOnlyAsFarAsYourChampionCanUseTheCard()
+    {
+        // Eureka turns AP into haste: a 60% win rate over all champions says little about a tank's game with it.
+        var eureka = new AugmentInfo
+        {
+            Name = "Eureka", Tier = AugmentTier.Prismatic, Description = "",
+            Effects = AugmentEffect.AbilityHaste, Triggers = AugmentTrigger.AbilityPower,
+        };
+        var community = new CommunityAugments([new CommunityAugmentStat("Eureka", 0.60, 0.2)], new Dictionary<string, double>(), null);
+        var scorer = new AugmentScorer();
+        double Boost(string champion) =>
+            scorer.Value(eureka, [], Context(champion) with { Community = community }) - scorer.Value(eureka, [], Context(champion));
+
+        Assert.True(Boost("Annie") > 2 * Boost("Braum"), $"mage {Boost("Annie"):0.00}, tank {Boost("Braum"):0.00}");
+    }
+
+    [Fact]
     public void ASpinningCard_FitsASpinnerFully()
     {
         // Spin To Win also mentions ability hits and ultimates; those shouldn't water down Garen's spin.

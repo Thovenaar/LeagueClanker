@@ -147,6 +147,8 @@ public static class MetaBuilds
         if (allowed.Count == 0)
             return null;
 
+        // op.gg's popular-items nudge comes from the same builds, so it would only count their popularity twice.
+        situations = situations.Where(s => s.Label != PopularItemsRule.Label).ToList();
         var owned = game.Me.Items.Where(i => i.Kind == ItemKind.Legendary).Select(i => i.Id).ToHashSet();
         double Fit(MetaBuild b) => b.Items.Average(i => situations.Sum(s => s.Score(i)));
         double Score(MetaBuild b) =>

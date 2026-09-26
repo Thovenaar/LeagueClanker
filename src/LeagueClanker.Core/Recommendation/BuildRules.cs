@@ -357,9 +357,11 @@ public sealed class TeamDamageSkewRule : IBuildRule
 /// </summary>
 public sealed class PopularItemsRule : IBuildRule
 {
+    public const string Label = "popular";
+
     private const double Weight = 0.8;
 
     public Situation? Evaluate(GameAnalysis game) => game.PopularItems.Count == 0
         ? null
-        : new Situation("popular", $"op.gg's most played items for {game.Me.Name} include it", Weight, item => game.PopularItems.Contains(item.Id) ? 1 : 0);
+        : new Situation(Label, $"op.gg's most played items for {game.Me.Name} include it", Weight, item => game.PopularItems.Contains(item.Id) ? 1 : 0);
 }

@@ -190,7 +190,7 @@ public sealed class AugmentScorer
         {
             if (!_cards.TryGetValue(augment, out var card))
                 _cards[augment] = card = (scorer.ComputeFitParts(augment, ctx),
-                    scorer.ItemSynergy(augment, ctx, null) + Situational(augment, ctx, null) + (ctx.Community?.Points(augment, null) ?? 0));
+                    scorer.ItemSynergy(augment, ctx, null) + Situational(augment, ctx, null) + scorer.CommunityPoints(augment, ctx, null));
             return CombineFit(augment, card.Fit, statCounts) + card.ItemsAndSituations;
         }
 
@@ -240,8 +240,28 @@ public sealed class AugmentScorer
     {
         var fit = Fit(augment, ctx, statCounts, reasons);
         CountStats(augment, statCounts);
-        return fit + ItemSynergy(augment, ctx, reasons) + Situational(augment, ctx, reasons) + (ctx.Community?.Points(augment, reasons) ?? 0);
+        return fit + ItemSynergy(augment, ctx, reasons) + Situational(augment, ctx, reasons) + CommunityPoints(augment, ctx, reasons);
     }
+
+    /// <summary>
+    /// A card's win rate over all champions counts only as far as yours can use it: Eureka turns AP into haste, which
+    /// does little for a tank Volibear, whatever its win rate. Low win rates count in full.
+    /// </summary>
+    private double CommunityPoints(AugmentInfo augment, AugmentContext ctx, List<ScoreReason>? reasons)
+    {
+        if (ctx.Community is not { } community)
+            return 0;
+        var points = community.Points(augment, reasons);
+        if (points <= 0)
+            return points;
+        // Unlike the fit, a card that scales with a stat you don't build keeps none of its win rate for scaling half.
+        var conditions = Each(augment.Triggers & ~ScalingTriggers).Select(t => TriggerAffinity(t, ctx)).DefaultIfEmpty(1.0).Average();
+        var scaling = Each(augment.Triggers & ScalingTriggers).Select(t => TriggerAffinity(t, ctx)).DefaultIfEmpty(1.0).Max();
+        return points * Math.Clamp(conditions * scaling, MinCommunityShare, 1.0);
+    }
+
+    /// <summary>The least of a good win rate a card keeps when your champion can barely use it.</summary>
+    private const double MinCommunityShare = 0.2;
 
     /// <summary>What a card gives, valued for your champion, before repeated stats are discounted.</summary>
     private sealed record FitParts(IReadOnlyList<(AugmentEffect Effect, string Name, double Value)> Effects, double Factor);
