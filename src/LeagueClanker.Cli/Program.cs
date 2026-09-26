@@ -497,17 +497,26 @@ static void Print(BuildRecommendation? rec, double? gold = null, ItemCatalog? it
             Console.WriteLine($"  Swapped for this game: {meta.Swap}");
     }
 
-    Console.WriteLine("\nBuy next (most important first):");
     var rank = 1;
-    foreach (var item in rec.Items)
-        Console.WriteLine($"{rank++,3}. {item.Item.Name,-28} {item.Item.TotalGold,5}g  score {item.Total,4:0.0}  {Reasons(item)}");
+    if (rec.IsFull)
+    {
+        Console.WriteLine(rec.Swaps.Count == 0 ? "\nYour build is full, and no sale beats what you have." : "\nYour build is full. Worth selling:");
+        foreach (var swap in rec.Swaps)
+            Console.WriteLine($"{rank++,3}. {swap.Sell.Item.Name} (score {swap.Sell.Total:0.0}, {swap.Sell.Item.SellGold:N0}g back) for {swap.Buy.Item.Name} ({swap.Buy.Item.TotalGold:N0}g, score {swap.Buy.Total:0.0})  {Reasons(swap.Buy)}");
+    }
+    else
+    {
+        Console.WriteLine("\nBuy next (most important first):");
+        foreach (var item in rec.Items)
+            Console.WriteLine($"{rank++,3}. {item.Item.Name,-28} {item.Item.TotalGold,5}g  score {item.Total,4:0.0}  {Reasons(item)}");
+    }
 
     if (rec.Boots is { } boots)
         Console.WriteLine($"  Boots: {boots.Item.Name,-28} {boots.Item.TotalGold,5}g  {Reasons(boots)}");
 
     if (gold is { } g && items is not null)
     {
-        if (BuyAdvisor.Advise(rec.Items.FirstOrDefault()?.Item, me.Items, g, items) is { } buy)
+        if (BuyAdvisor.ForBuild(rec, rec.Items.FirstOrDefault()?.Item, g, items) is { } buy)
             Console.WriteLine($"\nBuy now: {buy.Text}");
         foreach (var tip in LateGameAdvisor.Advise(rec, g, items))
             Console.WriteLine($"Tip: {tip}");

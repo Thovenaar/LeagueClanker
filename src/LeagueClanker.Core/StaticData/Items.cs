@@ -70,6 +70,12 @@ public sealed record ItemInfo
     public required int Id { get; init; }
     public required string Name { get; init; }
     public required int TotalGold { get; init; }
+
+    /// <summary>What the shop pays back when you sell the item: 70% of its price for most items.</summary>
+    public int SellGold { get => _sellGold ?? TotalGold * 7 / 10; init => _sellGold = value; }
+
+    private readonly int? _sellGold;
+
     public required ItemKind Kind { get; init; }
     public required IReadOnlyDictionary<string, double> Stats { get; init; }
     public required ItemTraits Traits { get; init; }
@@ -215,6 +221,7 @@ public sealed partial class ItemCatalog
             Id = id,
             Name = json.GetStringOrEmpty("name"),
             TotalGold = gold.GetProperty("total").GetInt32(),
+            SellGold = gold.TryGetProperty("sell", out var sell) ? sell.GetInt32() : gold.GetProperty("total").GetInt32() * 7 / 10,
             Kind = ClassifyKind(id, json, tags, from),
             Stats = ParseStats(description),
             Traits = DetectTraits(description),

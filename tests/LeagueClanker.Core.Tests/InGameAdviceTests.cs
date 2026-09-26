@@ -86,6 +86,80 @@ public class InGameAdviceTests
     }
 
     [Fact]
+    public void FullBuild_SuggestsSellingTheItemThatFitsTheGameLeast()
+    {
+        var rec = Recommend(FullBuildVsMages(TestData.Plate));
+
+        var swap = Assert.Single(rec.Swaps.Take(1));
+        Assert.Equal("Plate", swap.Sell.Item.Name); // armor against five mages
+        Assert.Contains(swap.Buy.Item.Id, new[] { TestData.Cloak, TestData.Veil });
+        Assert.True(swap.Gain >= RecommendationEngine.SellMargin);
+    }
+
+    [Fact]
+    public void FullBuild_NeverSuggestsSwappingBack()
+    {
+        var before = Recommend(FullBuildVsMages(TestData.Plate)).Swaps[0];
+
+        var after = Recommend(FullBuildVsMages(before.Buy.Item.Id));
+
+        Assert.DoesNotContain(after.Swaps, s => s.Buy.Item.Id == TestData.Plate);
+    }
+
+    [Fact]
+    public void FullBuild_KeepsAnItemYourAugmentUpgrades()
+    {
+        var plate = TestData.Static.Items.Get(TestData.Plate)!;
+        var upgrade = new Augments.AugmentInfo { Name = "Upgrade Plate", Tier = Augments.AugmentTier.Silver, Description = "", MentionedItems = [plate] };
+
+        var rec = new RecommendationEngine(TestData.Static).Recommend(GameAnalyzer.Analyze(FullBuildVsMages(TestData.Plate), TestData.Static, augments: [upgrade])!);
+
+        Assert.DoesNotContain(rec.Swaps, s => s.Sell.Item.Id == TestData.Plate);
+    }
+
+    [Fact]
+    public void FullBuild_BuyNowSaysWhatToSell_AndWhatTheGoldBackPaysFor()
+    {
+        var rec = Recommend(FullBuildVsMages(TestData.Plate));
+        var buy = rec.Swaps[0].Buy.Item;
+
+        var now = BuyAdvisor.ForBuild(rec, rec.Items[0].Item, gold: 1000, TestData.Static.Items)!;
+        var later = BuyAdvisor.ForBuild(rec, rec.Items[0].Item, gold: 0, TestData.Static.Items)!;
+
+        // Plate costs 2,800 and sells for 70% of that.
+        Assert.Equal($"Sell Plate (1,960g back) and buy {buy.Name} ({buy.TotalGold:N0}g) now.", now.Text);
+        Assert.Equal($"Save up: {buy.TotalGold - 1960:N0}g more, then sell Plate (1,960g back) for {buy.Name} ({buy.TotalGold:N0}g).", later.Text);
+    }
+
+    [Fact]
+    public void NotFull_HasNoSwaps_AndBuysParts()
+    {
+        var game = TestData.Game(allies: [("Garen", [TestData.Plate])], enemies: [("Annie", [])]);
+        var rec = Recommend(game);
+
+        Assert.False(rec.IsFull);
+        Assert.Empty(rec.Swaps);
+        Assert.Equal(BuyAdvisor.Advise(rec.Items[0].Item, rec.Game.Me.Items, 5000, TestData.Static.Items)?.Text,
+            BuyAdvisor.ForBuild(rec, rec.Items[0].Item, 5000, TestData.Static.Items)?.Text);
+    }
+
+    [Fact]
+    public void SellGold_ComesFromDataDragon_OrElse70Percent()
+    {
+        var items = ItemCatalog.Parse(JsonSerializer.Serialize(new
+        {
+            data = new Dictionary<string, object>
+            {
+                ["3161"] = new { name = "Spear of Shojin", description = "", gold = new { total = 3100, sell = 2170, purchasable = true }, maps = new Dictionary<string, bool> { ["11"] = true }, tags = Array.Empty<string>(), from = Array.Empty<string>(), into = Array.Empty<string>() },
+                ["3071"] = Item("Black Cleaver", 3000),
+            },
+        }));
+
+        Assert.Equal(2170, items.Get(3161)!.SellGold);
+        Assert.Equal(2100, items.Get(3071)!.SellGold);
+    }
+
+    [Fact]
     public void PopularItems_NudgeTheRanking()
     {
         var game = TestData.Game(allies: [("Garen", [])], enemies: [("Annie", [])]);
@@ -126,6 +200,14 @@ public class InGameAdviceTests
             GameData = game.GameData,
         };
     }
+
+    private static BuildRecommendation Recommend(AllGameData game) =>
+        new RecommendationEngine(TestData.Static).Recommend(GameAnalyzer.Analyze(game, TestData.Static)!);
+
+    /// <summary>A full Garen build against five mages, with <paramref name="defense"/> next to its magic resist.</summary>
+    private static AllGameData FullBuildVsMages(int defense) =>
+        TestData.Game(allies: [("Garen", [defense, TestData.Veil, TestData.Heart, TestData.Cleaver, TestData.WoundBlade, TestData.ArmorBoots])],
+            enemies: [("Annie", []), ("Syndra", []), ("Lux", []), ("Brand", []), ("Xerath", [])]);
 
     private static AllGameData FullBuildGame(int minutes)
     {

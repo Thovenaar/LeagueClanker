@@ -51,6 +51,27 @@ public static class BuyAdvisor
         return new BuyAdvice($"{budget:N0} gold: buy {Join(buy.Select(i => i.Name))} ({best.Cost:N0}g) {goal}.", buy, best.Cost);
     }
 
+    /// <summary>
+    /// What to buy now: parts toward your next item, or once your build is full, the best item to sell and what the
+    /// gold it pays back buys. A full inventory has no room for parts.
+    /// </summary>
+    public static BuyAdvice? ForBuild(BuildRecommendation rec, ItemInfo? next, double gold, ItemCatalog items)
+    {
+        if (!rec.IsFull)
+            return Advise(next, rec.Game.Me.Items, gold, items);
+        if (rec.Swaps.FirstOrDefault() is not { } swap)
+            return null;
+
+        var (sell, buy) = (swap.Sell.Item, swap.Buy.Item);
+        var rest = rec.Game.Me.Items.ToList();
+        rest.Remove(sell);
+        var cost = RemainingCost(buy, rest, items);
+        var missing = cost - sell.SellGold - (int)gold;
+        return missing <= 0
+            ? new BuyAdvice($"Sell {sell.Name} ({sell.SellGold:N0}g back) and buy {buy.Name} ({cost:N0}g) now.", [buy], cost)
+            : new BuyAdvice($"Save up: {missing:N0}g more, then sell {sell.Name} ({sell.SellGold:N0}g back) for {buy.Name} ({cost:N0}g).", [], 0);
+    }
+
     /// <summary>What the shop still charges for the item, counting the parts you own.</summary>
     public static int RemainingCost(ItemInfo item, IReadOnlyList<ItemInfo> owned, ItemCatalog items) =>
         Resolve(item, owned.Select(i => i.Id).ToList(), items).Cost;
@@ -94,7 +115,7 @@ public static class BuyAdvisor
     }
 }
 
-/// <summary>Tips once your build is full or the game runs long: swaps, elixirs and control wards.</summary>
+/// <summary>Tips once your build is full or the game runs long: elixirs and control wards. Swaps are in <see cref="BuildRecommendation.Swaps"/>.</summary>
 public static class LateGameAdvisor
 {
     public const int ElixirOfIron = 2138;
@@ -102,23 +123,13 @@ public static class LateGameAdvisor
     public const int ElixirOfWrath = 2140;
     public const int ControlWard = 2055;
 
-    private const int FullBuild = 6;
-    private const double SwapMargin = 1.0;
     private static readonly TimeSpan ElixirTime = TimeSpan.FromMinutes(25);
 
     public static IReadOnlyList<string> Advise(BuildRecommendation rec, double gold, ItemCatalog items)
     {
         var tips = new List<string>();
         var me = rec.Game.Me;
-        var finished = me.Items.Count(i => i.Kind is ItemKind.Legendary or ItemKind.Boots);
-        var full = finished >= FullBuild;
-
-        // A full build can still improve: swap your weakest item when a new one scores clearly higher for this game.
-        if (full && rec.Owned.MinBy(s => s.Total) is { } weakest && rec.Ranked.FirstOrDefault() is { } best && best.Total - weakest.Total >= SwapMargin)
-        {
-            var why = best.Reasons.FirstOrDefault() is { } reason ? $" ({reason.Situation.Label})" : "";
-            tips.Add($"Swap {weakest.Item.Name} for {best.Item.Name}{why}: it fits this game better now.");
-        }
+        var full = rec.IsFull;
 
         if (full && TimeSpan.FromSeconds(rec.Game.GameTimeSeconds) >= ElixirTime && gold >= 500)
         {

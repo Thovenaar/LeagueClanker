@@ -463,12 +463,15 @@ public sealed class MainViewModel : INotifyPropertyChanged
         OwnedItems = finished.Select(i => new OwnedItemRow(i.Name, data.ItemIconUrl(i.Id))).ToList();
         var bootsSlot = finished.Any(i => i.Kind == ItemKind.Boots) || rec.Boots is not null ? 1 : 0;
         var slotsLeft = Math.Max(0, 6 - finished.Count(i => i.Kind == ItemKind.Legendary) - bootsSlot);
-        Items = _planner.Upcoming.Take(slotsLeft).Select((item, i) => ToRow(item, i + 1, data)).ToList();
         var planned = _planner.Upcoming.Take(slotsLeft).Select(s => s.Item.Id).ToList();
-        Alternatives = ItemDirections.Alternatives(rec, planned)
+        // A full build lists what's worth selling instead: the new item, with the one it replaces as its first tag.
+        Items = rec.IsFull
+            ? rec.Swaps.Select((s, i) => ToRow(s.Buy, i + 1, data) with { Reasons = [$"sell {s.Sell.Item.Name}", .. ToRow(s.Buy, 0, data).Reasons] }).ToList()
+            : _planner.Upcoming.Take(slotsLeft).Select((item, i) => ToRow(item, i + 1, data)).ToList();
+        Alternatives = rec.IsFull ? [] : ItemDirections.Alternatives(rec, planned)
             .Select(a => new AlternativeRow(a.Direction, a.Item.Item.Name, a.Item.Item.TotalGold, data.ItemIconUrl(a.Item.Item.Id)))
             .ToList();
-        BuildHeader = slotsLeft == 0 ? "YOUR BUILD IS FULL · SEE THE TIPS FOR SWAPS"
+        BuildHeader = rec.IsFull ? rec.Swaps.Count > 0 ? "YOUR BUILD IS FULL · WORTH SELLING ONE FOR" : "YOUR BUILD IS FULL · NOTHING BEATS IT"
             : finished.Count == 0 ? "YOUR BUILD · MOST IMPORTANT FIRST"
             : $"STILL TO BUY · {slotsLeft} SLOT{(slotsLeft == 1 ? "" : "S")} LEFT";
         Raise(nameof(NextItem));
@@ -507,7 +510,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
             return;
 
         var me = rec.Game.Me;
-        BuyText = BuyAdvisor.Advise(_planner.Upcoming.FirstOrDefault()?.Item, me.Items, _gold, data.Items)?.Text ?? "";
+        BuyText = BuyAdvisor.ForBuild(rec, _planner.Upcoming.FirstOrDefault()?.Item, _gold, data.Items)?.Text ?? "";
         Tips = LateGameAdvisor.Advise(rec, _gold, data.Items);
 
         var starting = rec.Game.Mode == GameMode.SummonersRift && rec.Game.GameTimeSeconds < 120 && me.Items.Count == 0;
