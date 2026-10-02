@@ -296,9 +296,14 @@ if (paths.Count == 1)
 if (paths.Count > 1)
 {
     var planner = new BuildPlanner { Items = data.Items };
+    BuildAdvisor? advisor = null;
     foreach (var path in paths)
     {
-        if (await RecommendAsync(path) is not { } rec)
+        if (await new FileGameDataSource(path).TryGetAsync(cts.Token) is not { } game)
+            continue;
+        // One advisor for the whole replay, as in the app, so the chosen build and its swap carry over between snapshots.
+        advisor ??= await AdvisorForAsync(game);
+        if (advisor.RecommendOnce(game) is not { } rec)
             continue;
 
         planner.Update(rec);
@@ -339,7 +344,13 @@ async Task<BuildRecommendation?> RecommendAsync(string path, IReadOnlyList<Augme
 {
     var game = await new FileGameDataSource(path).TryGetAsync(cts.Token)
         ?? throw new InvalidOperationException($"{path} does not contain a playable game.");
-    var advisor = new BuildAdvisor(new FileGameDataSource(path), data) { Augments = augments ?? [] };
+    return (await AdvisorForAsync(game, augments)).RecommendOnce(game);
+}
+
+// An advisor with the champion's builds loaded: Blitz's in League Classic, op.gg's elsewhere.
+async Task<BuildAdvisor> AdvisorForAsync(AllGameData game, IReadOnlyList<AugmentInfo>? augments = null)
+{
+    var advisor = new BuildAdvisor(new FileGameDataSource("unused.json"), data) { Augments = augments ?? [] };
 
     // League Classic: Blitz's builds with the classic items.
     if (!args.Contains("--no-meta") && GameAnalyzer.Analyze(game, data) is { Mode: GameMode.LeagueClassic } classic)
@@ -365,7 +376,7 @@ async Task<BuildRecommendation?> RecommendAsync(string path, IReadOnlyList<Augme
             Console.WriteLine($"op.gg didn't answer ({ex.Message}), so the build comes from item scores alone.");
         }
     }
-    return advisor.RecommendOnce(game);
+    return advisor;
 }
 
 RuneAdvisor RuneAdvisorFor() => new(new RuleRuneSource(data.Runes), new OpggRuneSource(data.Runes, opgg));

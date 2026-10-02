@@ -461,8 +461,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
         // Six slots: what you own fills some, boots take one, and the plan only lists what fits in the rest.
         var finished = me.Items.Where(i => i.Kind is ItemKind.Legendary or ItemKind.Boots).ToList();
         OwnedItems = finished.Select(i => new OwnedItemRow(i.Name, data.ItemIconUrl(i.Id))).ToList();
-        var bootsSlot = finished.Any(i => i.Kind == ItemKind.Boots) || rec.Boots is not null ? 1 : 0;
-        var slotsLeft = Math.Max(0, 6 - finished.Count(i => i.Kind == ItemKind.Legendary) - bootsSlot);
+        var slotsLeft = rec.SlotsLeft;
         var planned = _planner.Upcoming.Take(slotsLeft).Select(s => s.Item.Id).ToList();
         // A full build lists what's worth selling instead: the new item, with the one it replaces as its first tag.
         Items = rec.IsFull

@@ -106,6 +106,23 @@ public class MetaBuildsTests
     }
 
     [Fact]
+    public void Engine_KeepsLastTimesSwap_WhileItStillBeatsTheItemItReplaced()
+    {
+        // One healer is enough to keep Wound Blade once it's in, but not enough to bring it in: a swap that only just
+        // cleared the margin flipped back and forth with every kill, and each flip was a pivot to accept.
+        var build = new MetaBuild(Archetype.Bruiser,
+            [Static.Items.Get(TestData.Cleaver)!, Static.Items.Get(TestData.Plate)!, Static.Items.Get(TestData.Cloak)!],
+            [Static.Items.Get(TestData.Heart)!], 1000, 0.52);
+        var engine = new RecommendationEngine(Static);
+        var oneHealer = GameAnalyzer.Analyze(Game([("Garen", [])], [("Soraka", []), ("Aatrox", []), ("Zed", [])]), Static)! with { MetaBuilds = [build] };
+        var noHealer = GameAnalyzer.Analyze(Game([("Garen", [])], [("Zed", []), ("Aatrox", []), ("Caitlyn", [])]), Static)! with { MetaBuilds = [build] };
+
+        Assert.Null(engine.Recommend(oneHealer).Meta!.SwapIn);
+        Assert.Equal(TestData.WoundBlade, engine.Recommend(oneHealer with { KeepSwapIn = TestData.WoundBlade }).Meta!.SwapIn?.Id);
+        Assert.Null(engine.Recommend(noHealer with { KeepSwapIn = TestData.WoundBlade }).Meta!.SwapIn); // no healing left to answer
+    }
+
+    [Fact]
     public void Planner_KeepsTheBuildsBuyOrder_OverItemScores()
     {
         var game = Game([("Annie", [])], [("Garen", []), ("Braum", []), ("Ornn", [])]);

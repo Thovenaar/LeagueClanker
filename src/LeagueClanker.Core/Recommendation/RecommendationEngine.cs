@@ -57,6 +57,11 @@ public sealed record BuildRecommendation(
     /// <summary>All six slots hold finished items, boots included.</summary>
     public bool IsFull => Game.Me.Items.Count(i => i.Kind is ItemKind.Legendary or ItemKind.Boots) >= FullBuild;
 
+    /// <summary>Slots left for legendaries: six, minus the ones you own, minus one for boots if you have or will buy them.</summary>
+    public int SlotsLeft =>
+        Math.Max(0, FullBuild - Game.Me.Items.Count(i => i.Kind == ItemKind.Legendary)
+            - (Game.Me.Items.Any(i => i.Kind == ItemKind.Boots) || Boots is not null ? 1 : 0));
+
     /// <summary>With a full build: items worth selling for a clearly better one, best first. Empty otherwise.</summary>
     public IReadOnlyList<ItemSwap> Swaps { get; init; } = [];
 
@@ -165,13 +170,21 @@ public sealed class RecommendationEngine(StaticGameData data, IReadOnlyList<IBui
             // Never swap out an item you've started: you'd rather finish it (the planner puts it first anyway).
             bool Started(ItemInfo item) => item.TotalGold > 0
                 && 1 - (double)BuyAdvisor.RemainingCost(item, owned, data.Items) / item.TotalGold >= BuildPlanner.StartedShare;
-            if (build.Where(s => !core.Contains(s.Item.Id) && !Started(s.Item)).MinBy(Points) is { } weakest
-                && pool.Where(s => build.All(b => b.Item.Id != s.Item.Id) && s.Reasons.Any(r => r.Points >= BuildPlanner.MinReasonPoints)).MaxBy(Points) is { } better
-                && Points(better) >= Points(weakest) + SwapMargin)
+            if (build.Where(s => !core.Contains(s.Item.Id) && !Started(s.Item)).MinBy(Points) is { } weakest)
             {
-                build[build.IndexOf(weakest)] = better;
-                var why = better.Reasons.First().Situation.Description;
-                meta = choice with { Swap = $"{better.Item.Name} instead of {weakest.Item.Name}: {char.ToLowerInvariant(why[0])}{why[1..]}", SwapIn = better.Item };
+                var options = pool.Where(s => build.All(b => b.Item.Id != s.Item.Id)).ToList();
+                var best = options.Where(s => s.Reasons.Any(r => r.Points >= BuildPlanner.MinReasonPoints)).MaxBy(Points);
+                // Last time's swap needs only to stay ahead of the item it replaced, unless something clearly better came up.
+                var kept = options.FirstOrDefault(s => s.Item.Id == game.KeepSwapIn && Points(s) > Points(weakest));
+                var better = kept is not null && (best is null || Points(best) < Points(kept) + SwapMargin) ? kept
+                    : best is not null && Points(best) >= Points(weakest) + SwapMargin ? best
+                    : null;
+                if (better is not null)
+                {
+                    build[build.IndexOf(weakest)] = better;
+                    var why = better.Reasons.FirstOrDefault()?.Situation.Description ?? "It still fits this game better";
+                    meta = choice with { Swap = $"{better.Item.Name} instead of {weakest.Item.Name}: {char.ToLowerInvariant(why[0])}{why[1..]}", SwapIn = better.Item };
+                }
             }
             ranked = [.. build, .. ranked.Where(s => build.All(b => b.Item.Id != s.Item.Id))];
 

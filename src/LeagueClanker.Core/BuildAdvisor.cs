@@ -34,6 +34,7 @@ public sealed class BuildAdvisor(IGameDataSource source, StaticGameData data)
     public IReadOnlyList<MetaBuild> MetaBuilds { get; set; } = [];
 
     private string? _keepMeta;
+    private int? _keepSwapIn;
 
     // Gold changes a little every second; buying advice only needs to follow it in steps.
     private const int GoldStep = 50;
@@ -94,15 +95,16 @@ public sealed class BuildAdvisor(IGameDataSource source, StaticGameData data)
     private BuildRecommendation Recommend(AllGameData game, GameAnalysis analysis, IReadOnlyList<AugmentInfo> augments, Archetype? playstyle,
         IReadOnlySet<int> popular, IReadOnlyList<MetaBuild> metaBuilds)
     {
-        var withMeta = analysis with { MetaBuilds = metaBuilds, ChosenPlaystyle = playstyle, KeepMeta = _keepMeta };
+        var withMeta = analysis with { MetaBuilds = metaBuilds, ChosenPlaystyle = playstyle, KeepMeta = _keepMeta, KeepSwapIn = _keepSwapIn };
         var rec = _engine.Recommend(withMeta);
         if (playstyle is null && rec.Meta is { } meta && meta.Build.Style != analysis.Me.Archetype
             && GameAnalyzer.Analyze(game, data, augments, meta.Build.Style, popular) is { } restyled)
         {
-            var again = _engine.Recommend(restyled with { MetaBuilds = metaBuilds, KeepMeta = _keepMeta, ForcedMeta = meta.Build.Key });
+            var again = _engine.Recommend(restyled with { MetaBuilds = metaBuilds, KeepMeta = _keepMeta, KeepSwapIn = _keepSwapIn, ForcedMeta = meta.Build.Key });
             rec = again with { Meta = again.Meta is { } m ? meta with { Swap = m.Swap, SwapIn = m.SwapIn } : meta };
         }
         _keepMeta = rec.Meta?.Build.Key;
+        _keepSwapIn = rec.Meta?.SwapIn?.Id;
         return rec;
     }
 

@@ -196,12 +196,12 @@ Every player gets a full stat block in `StatBlock.cs`: AD, AP, attack speed, cri
 
 `BuildPlanner.cs` holds the build you accepted and compares every new ranking against it. It only suggests a pivot when all of these hold:
 
-- An item enters your next 3 purchases.
+- An item enters your next 3 purchases, or fewer when that's all the slots you have left. A swap further down wouldn't change anything you see.
 - That item has a real in-game reason worth at least 0.5 points, so score noise from kills or levels doesn't count.
 - You haven't declined that item this game.
 - The swap scores at least 0.5 points better than what it replaces.
 
-Accepting swaps just those items. Declining remembers them for the rest of the game. "Switch anyway" adopts the latest ranking whenever you want. Buying items from your build never counts as a pivot, and a new game or champion starts a fresh build.
+The suggestion is worked out as the plan you'd get, and says exactly what changes: "Swap Rabadon's Deathcap for Void Staff" when an item leaves, or "Buy Blade of the Ruined King before Wit's End" when an item you planned moves up past one you've started. If accepting wouldn't change what you see, there's no suggestion. Accepting moves just those items, and the rest of your plan keeps its order. Declining remembers them for the rest of the game. "Switch anyway" adopts the latest ranking whenever you want. Buying items from your build never counts as a pivot, and a new game or champion starts a fresh build.
 
 Your next three purchases keep the order of the latest ranking, so a new augment can move your third item to first without asking. Moving a later item into those three does need a pivot.
 
@@ -260,7 +260,7 @@ Scoring every item on its own gave builds that looked random: full AP Katarina i
 1. **Styles.** Cores with at least 50 games are grouped by the playstyle their items belong to: on-hit, AP, crit, bruiser, tank and so on, at most four. Each style gets its most played core, plus up to three later items that players of that style finish with. Stormsurge is popular on Katarina, but it isn't an on-hit item, so the on-hit build doesn't get it.
 2. **Choosing.** Each style scores its win rate (0.2 points per percentage point above or below 50%, trusted by sample size: games divided by games plus 200), how well its items answer this game's situations (the same rules as below: tanks, healing, damage split, but not op.gg's popular items, which would count the same data twice), 1 point for each item of it you already own, and 0.5 for the build chosen last time so close builds don't swap back and forth.
 3. **Your playstyle follows.** The chosen build's style becomes your playstyle, in game and in champ select, so runes and augment advice match it. You don't need to pick on-hit by hand. A playstyle you pick yourself stays, and limits the choice to builds of that kind.
-4. **One swap at most.** A later item (never the first three) is swapped when another item answers this game at least 1 point better, with a real reason, like anti-heal against healers. The window says so: "For this game: Chempunk Chainsword instead of Terminus: enemy has heavy healing".
+4. **One swap at most.** A later item (never the first three) is swapped when another item answers this game at least 1 point better, with a real reason, like anti-heal against healers. The window says so: "For this game: Chempunk Chainsword instead of Terminus: enemy has heavy healing". Once in, the swap stays while it still beats the item it replaced, and only a clearly better one (1 point more) takes its place. Without that, a swap near the margin came and went with every kill, and each change was a pivot to accept.
 
 The list keeps the build's order, which is the order players buy it in; only an item you've started moves up. The window shows which build it follows and why: "Build: op.gg's on-hit build (56.8% win rate over 444 games), over the AP burst build (43.7% over 522 games)." When the chosen build changes mid-game, it's a pivot you accept, like any other. Pivots only bring in the build's own items or its swap: once most of it is bought, other items fill the list, and trading one filler for another isn't worth asking about. A pivot you accepted isn't suggested again, and the swap never removes an item you've started. Without op.gg's data (Arena, League Classic, a rare pick, op.gg down, or the setting off), items are scored one by one as before.
 

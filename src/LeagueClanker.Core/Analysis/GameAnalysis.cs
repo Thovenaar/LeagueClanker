@@ -140,6 +140,12 @@ public sealed record GameAnalysis(PlayerProfile Me, TeamProfile Allies, TeamProf
     /// <summary>The meta build chosen on the previous update, which gets a small nudge to stay.</summary>
     public string? KeepMeta { get; init; }
 
+    /// <summary>
+    /// The item the last recommendation swapped into the build. It stays while it still beats the item it replaced, so a
+    /// swap that only just cleared the margin doesn't come and go with every kill.
+    /// </summary>
+    public int? KeepSwapIn { get; init; }
+
     /// <summary>A meta build already chosen for this update, when the game is analyzed again as that build's playstyle.</summary>
     public string? ForcedMeta { get; init; }
 
