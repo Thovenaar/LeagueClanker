@@ -188,6 +188,49 @@ public class HistoryTests
         Assert.Null(GameAnalyzer.Analyze(game, TestData.Static)!.Result);
     }
 
+    [Fact]
+    public void MatchHistory_ReadsTheCardsYouPickedInTheNewestGame()
+    {
+        // Trimmed from lol-match-history/v1/products/lol/current-summoner/matches: an ARAM: Mayhem game as Varus (110).
+        const string list = """
+            {"games": {"games": [
+              {"gameId": 1, "gameMode": "KIWI", "gameDuration": 996, "participants": [{"championId": 110,
+                "stats": {"win": false, "playerAugment1": 1225, "playerAugment2": 1328, "playerAugment3": 1402, "playerAugment4": 2018, "playerAugment5": 0, "playerAugment6": 0}}]},
+              {"gameId": 2, "gameMode": "KIWI", "gameDuration": 1100, "participants": [{"championId": 29, "stats": {"playerAugment1": 9}}]}
+            ]}}
+            """;
+        var varus = new GameRecap(Now, "Varus", "Varus", 110, GameMode.AramMayhem, Archetype.OnHit, Position.None, 1000, false, [], [], [], null);
+
+        var picked = MatchHistory.NewestAugments(list)!;
+
+        Assert.Equal([1225, 1328, 1402, 2018], picked.Ids);
+        Assert.True(picked.Matches(varus));
+        Assert.False(picked.Matches(varus with { ChampionKey = 29 }));
+        Assert.False(picked.Matches(varus with { DurationSeconds = 1400 })); // a different game
+        Assert.Null(MatchHistory.NewestAugments("""{"games": {"games": [{"gameMode": "CLASSIC", "participants": [{"championId": 1, "stats": {}}]}]}}"""));
+    }
+
+    [Fact]
+    public void AugmentIds_AreNamedFromCommunityDragon()
+    {
+        var names = Augments.AugmentTranslations.ById("""[{"id": 1081, "nameTRA": "Tap Dancer"}, {"id": 1170, "nameTRA": " Scoped Weapons "}, {"id": 7, "nameTRA": ""}]""");
+
+        Assert.Equal("Tap Dancer", names[1081]);
+        Assert.Equal("Scoped Weapons", names[1170]);
+        Assert.False(names.ContainsKey(7));
+    }
+
+    [Fact]
+    public void Recorder_KeepsTheCardsYouMarked()
+    {
+        var recorder = new GameRecorder();
+        var rec = Recommend(minutes: 20, result: "Win", items: []);
+        var marksmage = new Augments.AugmentInfo { Name = "Marksmage", Tier = Augments.AugmentTier.Gold, Description = "" };
+        recorder.Observe(rec with { Game = rec.Game with { Augments = [marksmage] } });
+
+        Assert.Equal(["Marksmage"], recorder.Finish(Now)!.Augments);
+    }
+
     private static BuildRecommendation Recommend(int minutes, string? result, int[] items)
     {
         var game = TestData.Game(allies: [("Garen", items)], enemies: [("Annie", [])]);

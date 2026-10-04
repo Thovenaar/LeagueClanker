@@ -7,7 +7,11 @@ using Windows.Storage;
 
 namespace LeagueClanker.Vision;
 
-public sealed record ScanResult(IReadOnlyList<DetectedAugment> Offer, IReadOnlyList<TextLine> Lines, string? Problem = null);
+public sealed record ScanResult(IReadOnlyList<DetectedAugment> Offer, IReadOnlyList<TextLine> Lines, string? Problem = null)
+{
+    /// <summary>Where the offered cards are on screen, to tell which one you click. Null without an offer.</summary>
+    public OfferLayout? Layout { get; init; }
+}
 
 /// <summary>
 /// Reads the augment offer off the screen: capture the game, keep the middle (where the cards are, away from
@@ -67,6 +71,9 @@ public sealed class AugmentScreenReader
             return new ScanResult([], [], "Windows text recognition isn't available. Add an OCR language in Windows settings.");
 
         var area = image.Crop(CropLeft, CropTop, CropRight, CropBottom);
+        var origin = area.Origin;
+        OfferLayout? Layout(IReadOnlyList<DetectedAugment> offer) => offer.Count == 0 ? null
+            : new OfferLayout(offer.Select(d => new CardSpot(d.Augment, origin.X + d.X, origin.Y + d.Y)).ToList(), image.Height);
         var scale = 1.0;
         while (Math.Max(area.Width, area.Height) > OcrEngine.MaxImageDimension)
         {
@@ -81,12 +88,12 @@ public sealed class AugmentScreenReader
         var contrast = await ReadAsync(area.HighContrast(), scale);
         var contrastOffer = AugmentTextMatcher.FindOffer(contrast, _catalog);
         if (contrastOffer.Count == AugmentTextMatcher.OfferSize)
-            return new ScanResult(contrastOffer, contrast, problem);
+            return new ScanResult(contrastOffer, contrast, problem) { Layout = Layout(contrastOffer) };
         var plain = await ReadAsync(area, scale);
         var plainOffer = AugmentTextMatcher.FindOffer(plain, _catalog);
         return plainOffer.Count > contrastOffer.Count
-            ? new ScanResult(plainOffer, plain, problem)
-            : new ScanResult(contrastOffer, contrast, problem);
+            ? new ScanResult(plainOffer, plain, problem) { Layout = Layout(plainOffer) }
+            : new ScanResult(contrastOffer, contrast, problem) { Layout = Layout(contrastOffer) };
     }
 
     private async Task<IReadOnlyList<TextLine>> ReadAsync(ScreenImage area, double scale)

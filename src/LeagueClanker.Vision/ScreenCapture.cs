@@ -93,9 +93,24 @@ public static class ScreenCapture
     /// <summary>The game's client area on screen, or null when the game isn't running or is minimized.</summary>
     public static PixelRect? FindLeagueWindow()
     {
-        var handle = Process.GetProcessesByName(LeagueProcessName).Select(p => p.MainWindowHandle).FirstOrDefault(h => h != IntPtr.Zero);
+        var handle = LeagueWindow();
         return handle == IntPtr.Zero ? null : ClientArea(handle);
     }
+
+    /// <summary>The game is the window you're using, so a click is a click in the game and not in our window.</summary>
+    public static bool LeagueIsInFront() => LeagueWindow() is var handle && handle != IntPtr.Zero && GetForegroundWindow() == handle;
+
+    /// <summary>
+    /// Where the mouse is, in the same physical pixels as the captures. Asks Windows for the position; nothing is
+    /// hooked and the game isn't touched.
+    /// </summary>
+    public static (int X, int Y)? CursorPosition() => InPhysicalPixels(() => GetCursorPos(out var p) ? (p.X, p.Y) : ((int, int)?)null);
+
+    /// <summary>Whether the left mouse button is held down right now.</summary>
+    public static bool LeftButtonDown() => (GetAsyncKeyState(LeftButton) & 0x8000) != 0;
+
+    private static IntPtr LeagueWindow() =>
+        Process.GetProcessesByName(LeagueProcessName).Select(p => p.MainWindowHandle).FirstOrDefault(h => h != IntPtr.Zero);
 
     public static PixelRect? WindowArea(IntPtr handle) => InPhysicalPixels(() =>
         GetWindowRect(handle, out var r) ? new PixelRect(r.Left, r.Top, r.Right - r.Left, r.Bottom - r.Top) : (PixelRect?)null);
@@ -153,6 +168,7 @@ public static class ScreenCapture
         }
     }
 
+    private const int LeftButton = 0x01;
     private const int SrcCopy = 0x00CC0020;
     private const int CaptureBlt = 0x40000000;
     private static readonly IntPtr PerMonitorAwareV2 = new(-4);
@@ -184,6 +200,9 @@ public static class ScreenCapture
     [DllImport("user32.dll")] private static extern bool GetClientRect(IntPtr hWnd, out Rect rect);
     [DllImport("user32.dll")] private static extern bool ClientToScreen(IntPtr hWnd, ref Point point);
     [DllImport("user32.dll")] private static extern bool IsIconic(IntPtr hWnd);
+    [DllImport("user32.dll")] private static extern IntPtr GetForegroundWindow();
+    [DllImport("user32.dll")] private static extern bool GetCursorPos(out Point point);
+    [DllImport("user32.dll")] private static extern short GetAsyncKeyState(int key);
     [DllImport("user32.dll")] private static extern IntPtr GetDC(IntPtr hWnd);
     [DllImport("user32.dll")] private static extern int ReleaseDC(IntPtr hWnd, IntPtr dc);
     [DllImport("gdi32.dll")] private static extern IntPtr CreateCompatibleDC(IntPtr dc);

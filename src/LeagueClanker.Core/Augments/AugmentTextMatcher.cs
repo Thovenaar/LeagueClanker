@@ -4,10 +4,38 @@ namespace LeagueClanker.Core.Augments;
 public sealed record TextLine(string Text, double X, double Y, double Width, double Height)
 {
     public double CenterX => X + Width / 2;
+    public double CenterY => Y + Height / 2;
     public double Bottom => Y + Height;
 }
 
-public sealed record DetectedAugment(AugmentInfo Augment, double Confidence, double X);
+/// <param name="X">The middle of the card's name, in pixels of the image that was read.</param>
+/// <param name="Y">The middle of the card's name, in pixels of the image that was read.</param>
+public sealed record DetectedAugment(AugmentInfo Augment, double Confidence, double X, double Y = 0);
+
+/// <summary>An offered card's name on screen, in screen pixels.</summary>
+public sealed record CardSpot(AugmentInfo Augment, double X, double Y);
+
+/// <summary>
+/// Where the offered cards are on screen, to tell which card a click landed on. Measured on a 1440p offer: a card
+/// reaches from 23% of the screen height above its name to 26% below it, and the reroll buttons start right under
+/// that, so they never count. Sideways a card fills most of the gap to the next one.
+/// </summary>
+public sealed record OfferLayout(IReadOnlyList<CardSpot> Cards, double ScreenHeight)
+{
+    private const double Above = 0.22, Below = 0.24, Sideways = 0.42;
+
+    // The gap between cards when only one name was read: 19% of a 16:9 screen's width.
+    private const double LoneCardGap = 0.34;
+
+    public AugmentInfo? CardAt(double x, double y)
+    {
+        var gap = Cards.Count > 1
+            ? Cards.Zip(Cards.Skip(1)).Select(p => Math.Abs(p.Second.X - p.First.X)).Min()
+            : ScreenHeight * LoneCardGap;
+        return Cards.FirstOrDefault(c =>
+            Math.Abs(x - c.X) <= gap * Sideways && y >= c.Y - ScreenHeight * Above && y <= c.Y + ScreenHeight * Below)?.Augment;
+    }
+}
 
 /// <summary>
 /// Finds the offered augment cards in text read from the screen. OCR gets letters wrong and wraps long
@@ -21,14 +49,16 @@ public static class AugmentTextMatcher
 
     public static IReadOnlyList<DetectedAugment> FindOffer(IReadOnlyList<TextLine> lines, AugmentCatalog catalog)
     {
-        // English names always, plus the client's language when it isn't English.
+        // English names always, plus the client's language when it isn't English. A quest card shows its name without
+        // the "Quest:" the wiki puts in front: "Wooglet's Witchcap" on screen is "Quest: Wooglet's Witchcap".
         var augments = catalog.Offerable
-            .SelectMany(a => a.LocalNames.Prepend(a.Name).Select(name => (Augment: a, Name: name, Key: AugmentCatalog.Key(name))))
+            .SelectMany(a => a.LocalNames.Prepend(a.Name).SelectMany(name => a.IsQuest && name.IndexOf(':') is > 0 and var colon ? [name, name[(colon + 1)..]] : new[] { name })
+                .Select(name => (Augment: a, Name: name.Trim(), Key: AugmentCatalog.Key(name))))
             .Where(a => a.Key.Length > 0)
             .ToList();
         var matches = new Dictionary<AugmentInfo, DetectedAugment>();
 
-        foreach (var (text, x) in Candidates(lines))
+        foreach (var (text, x, y) in Candidates(lines))
         {
             var key = AugmentCatalog.Key(text);
             if (key.Length < 2 || (key.Length < 3 && key.All(char.IsAscii)))
@@ -45,7 +75,7 @@ public static class AugmentTextMatcher
                 continue;
 
             if (!matches.TryGetValue(best.Augment, out var existing) || existing.Confidence < best.Score)
-                matches[best.Augment] = new DetectedAugment(best.Augment, best.Score, x);
+                matches[best.Augment] = new DetectedAugment(best.Augment, best.Score, x, y);
         }
 
         // All cards in one offer share a tier; stray matches elsewhere on screen usually don't.
@@ -70,10 +100,10 @@ public static class AugmentTextMatcher
     }
 
     /// <summary>Every line, plus each line joined with the line right below it (long names wrap).</summary>
-    private static IEnumerable<(string Text, double X)> Candidates(IReadOnlyList<TextLine> lines)
+    private static IEnumerable<(string Text, double X, double Y)> Candidates(IReadOnlyList<TextLine> lines)
     {
         foreach (var line in lines)
-            yield return (line.Text, line.CenterX);
+            yield return (line.Text, line.CenterX, line.CenterY);
 
         foreach (var upper in lines)
         {
@@ -82,7 +112,7 @@ public static class AugmentTextMatcher
                 var gap = lower.Y - upper.Bottom;
                 var aligned = Math.Abs(lower.CenterX - upper.CenterX) < Math.Max(upper.Width, lower.Width) * 0.6;
                 if (lower != upper && gap >= -upper.Height * 0.3 && gap < upper.Height * 1.2 && aligned)
-                    yield return ($"{upper.Text} {lower.Text}", (upper.CenterX + lower.CenterX) / 2);
+                    yield return ($"{upper.Text} {lower.Text}", (upper.CenterX + lower.CenterX) / 2, (upper.CenterY + lower.CenterY) / 2);
             }
         }
     }

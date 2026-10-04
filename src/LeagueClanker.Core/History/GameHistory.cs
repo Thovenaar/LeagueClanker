@@ -19,6 +19,12 @@ public sealed record GameRecap(
 {
     /// <summary>Your finished items that LeagueClanker had in its build at some point.</summary>
     public int AdvisedAndBuilt => FinalItems.Count(AdvisedItems.Contains);
+
+    /// <summary>The augments you picked: the ones you marked in the app, replaced by the match history's once it has the game.</summary>
+    public IReadOnlyList<string> Augments { get; init; } = [];
+
+    /// <summary><see cref="Augments"/> come from the match history, so they're the cards you really took.</summary>
+    public bool AugmentsFromHistory { get; init; }
 }
 
 /// <summary>
@@ -55,7 +61,10 @@ public sealed class GameRecorder
             now, rec.Game.Me.Champion.Id, rec.Game.Me.Name, rec.Game.Me.Champion.Key, rec.Game.Mode, rec.Game.Me.Archetype, rec.Game.Me.Position,
             rec.Game.GameTimeSeconds, rec.Game.Result,
             rec.Game.Me.Items.Where(i => i.Kind is ItemKind.Legendary or ItemKind.Boots).Select(i => i.Id).ToList(),
-            _advised.ToList(), _pivots.ToList(), _laneOpponent);
+            _advised.ToList(), _pivots.ToList(), _laneOpponent)
+        {
+            Augments = rec.Game.Augments.Select(a => a.Name).ToList(),
+        };
         Clear();
         return recap;
     }

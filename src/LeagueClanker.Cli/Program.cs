@@ -269,6 +269,13 @@ if (args is ["--scan", var source, ..])
     Console.WriteLine(scan.Offer.Count == 0
         ? "No augment offer found."
         : $"Offer: {string.Join(", ", scan.Offer.Select(d => $"{d.Augment.Name} ({d.Augment.Tier}, {d.Confidence:P0})"))}");
+    // --click x,y: which card a click there would pick, in screen pixels (the screenshot's pixels for a file).
+    if (scan.Layout is { } layout)
+    {
+        Console.WriteLine($"Cards on screen: {string.Join(", ", layout.Cards.Select(c => $"{c.Augment.Name} at ({c.X:0},{c.Y:0})"))}");
+        if (Option("--click")?.Split(',') is [var cx, var cy])
+            Console.WriteLine($"A click at ({cx},{cy}) picks: {layout.CardAt(double.Parse(cx), double.Parse(cy))?.Name ?? "nothing"}");
+    }
     return;
 }
 

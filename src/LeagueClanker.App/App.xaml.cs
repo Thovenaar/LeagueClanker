@@ -75,6 +75,8 @@ public partial class App : Application
                     readers[set] = new AugmentScreenReader(augments);
                 }
             _ = RunScannerAsync(viewModel.Augments, () => readers.GetValueOrDefault(viewModel.Augments.CurrentSet), scanImage);
+            if (scanImage is null)
+                _ = WatchClicksAsync(viewModel.Augments);
 
             // Once the League client says it runs in another language, read the cards in that language.
             var readerLocale = "en_US";
@@ -115,6 +117,8 @@ public partial class App : Application
                 _historyStale = true;
                 if (recap.Win is null)
                     _ = FillInResultAsync(viewModel, recaps, recap);
+                if (recap.Mode.HasAugments() && !recap.AugmentsFromHistory && gamesDemo is null)
+                    _ = FillInAugmentsAsync(viewModel, recaps, recap);
             };
 
             // op.gg's data for your champion: popular items for the build, starting items at the start.
@@ -232,13 +236,53 @@ public partial class App : Application
             await Task.Delay(TimeSpan.FromSeconds(3), _cts.Token);
             if (_client is not { } client || await client.GetEndOfGameAsync(_cts.Token) is not { } result || !result.Matches(recap))
                 continue;
-            var updated = recap with { Win = result.Win };
-            recaps.Replace(recap, updated);
+            var current = Current(recaps, recap);
+            var updated = current with { Win = result.Win };
+            recaps.Replace(current, updated);
             viewModel.UpdateRecap(updated);
             Log.Write($"Result from the end-of-game screen: {(result.Win ? "win" : "loss")}");
             return;
         }
     }
+
+    /// <summary>
+    /// The cards you really picked, from the match history: the app only knows the ones you marked. The game shows up
+    /// there a little after it ends, so ask for up to two minutes.
+    /// </summary>
+    private async Task FillInAugmentsAsync(MainViewModel viewModel, RecapStore recaps, GameRecap recap)
+    {
+        if (!_fillingAugments.Add(recap.Played))
+            return; // already asking for this game
+        try
+        {
+            var names = await new AugmentDataClient().LoadNamesByIdAsync(_cts.Token);
+            for (var attempt = 0; attempt < 24; attempt++)
+            {
+                await Task.Delay(TimeSpan.FromSeconds(5), _cts.Token);
+                if (_client is not { } client || await client.GetLastGameAugmentsAsync(_cts.Token) is not { } picked || !picked.Matches(recap))
+                    continue;
+                var current = Current(recaps, recap);
+                var updated = current with { Augments = picked.Ids.Select(id => names.GetValueOrDefault(id, $"card {id}")).ToList(), AugmentsFromHistory = true };
+                recaps.Replace(current, updated);
+                viewModel.UpdateRecap(updated);
+                Log.Write($"Picked cards from the match history: {string.Join(", ", updated.Augments)}");
+                return;
+            }
+        }
+        catch (Exception ex) when (ex is HttpRequestException or System.Text.Json.JsonException or IOException)
+        {
+            Log.Error("Reading the picked cards from the match history", ex);
+        }
+        finally
+        {
+            _fillingAugments.Remove(recap.Played);
+        }
+    }
+
+    private readonly HashSet<DateTime> _fillingAugments = [];
+
+    // Two fill-ins can update the same recap; each starts from what's stored now so neither undoes the other.
+    private static GameRecap Current(RecapStore recaps, GameRecap recap) => recaps.Games.FirstOrDefault(g => g.Played == recap.Played) ?? recap;
     private Func<string, Task>? _useClientLocale;
 
     private async Task UseClientLocaleAsync(LeagueClientApi client)
@@ -422,7 +466,7 @@ public partial class App : Application
                 var scan = imagePath is null
                     ? await Task.Run(() => reader.ScanScreenAsync(exclude: ScreenCapture.WindowArea(ownWindow)))
                     : await Task.Run(() => reader.ScanFileAsync(imagePath));
-                picker.OnRequestedScan(scan.Offer.Select(d => d.Augment).ToList(), scan.Problem);
+                picker.OnRequestedScan(scan.Offer.Select(d => d.Augment).ToList(), scan.Problem, scan.Layout);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
@@ -441,7 +485,7 @@ public partial class App : Application
                     var scan = imagePath is null
                         ? await Task.Run(() => reader.ScanScreenAsync(exclude: ScreenCapture.WindowArea(ownWindow)))
                         : await Task.Run(() => reader.ScanFileAsync(imagePath));
-                    picker.OnScan(scan.Offer.Select(d => d.Augment).ToList(), scan.Problem);
+                    picker.OnScan(scan.Offer.Select(d => d.Augment).ToList(), scan.Problem, scan.Layout);
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException)
                 {
@@ -454,6 +498,37 @@ public partial class App : Application
         {
         }
     }
+
+    /// <summary>
+    /// While an offer read from the screen is up, notes where you click in the game: the card under the mouse when
+    /// the cards close is the one you took. It asks Windows for the button state and cursor position every 30 ms;
+    /// nothing is hooked and the game isn't touched.
+    /// </summary>
+    private async Task WatchClicksAsync(AugmentPickerViewModel picker)
+    {
+        using var timer = new PeriodicTimer(ClickPollInterval);
+        var wasDown = false;
+        try
+        {
+            while (await timer.WaitForNextTickAsync(_cts.Token))
+            {
+                if (picker.ClickLayout is null)
+                {
+                    wasDown = false;
+                    continue;
+                }
+                var down = ScreenCapture.LeftButtonDown();
+                if (down && !wasDown && ScreenCapture.LeagueIsInFront() && ScreenCapture.CursorPosition() is { } at)
+                    picker.NoteClick(at.X, at.Y);
+                wasDown = down;
+            }
+        }
+        catch (OperationCanceledException)
+        {
+        }
+    }
+
+    private static readonly TimeSpan ClickPollInterval = TimeSpan.FromMilliseconds(30);
 
     protected override void OnExit(ExitEventArgs e)
     {

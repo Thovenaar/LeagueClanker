@@ -30,6 +30,10 @@ public sealed class AugmentDataClient(HttpClient? http = null, string? cacheDire
     /// <summary>
     /// Card names in the client's language ("de_DE"), keyed by English name. Empty for English, so nothing changes there.
     /// </summary>
+    /// <summary>Augment id to English name (Community Dragon), to name the cards in the match history.</summary>
+    public async Task<IReadOnlyDictionary<int, string>> LoadNamesByIdAsync(CancellationToken ct = default) =>
+        AugmentTranslations.ById(await GetCachedAsync(AugmentTranslations.Url("en_US"), "cherry-augments.default.json", ct));
+
     public async Task<IReadOnlyDictionary<string, IReadOnlyList<string>>> LoadLocalNamesAsync(string locale, CancellationToken ct = default)
     {
         if (AugmentTranslations.IsEnglish(locale))

@@ -40,6 +40,10 @@ public sealed class AugmentPickerViewModel : INotifyPropertyChanged
     private int _level;
     private string? _lastDetected;
     private List<AugmentInfo> _lastDetectedCards = [];
+
+    // Where the cards read from the screen are, and the card you last clicked while they were up.
+    private OfferLayout? _layout;
+    private AugmentInfo? _clicked;
     // Rerolls spent on the slot each offered card sits in, the card with the golden reroll, and rerolls
     // pressed by hand whose replacement card hasn't been typed yet.
     private readonly Dictionary<AugmentInfo, int> _rerollsUsed = [];
@@ -162,6 +166,8 @@ public sealed class AugmentPickerViewModel : INotifyPropertyChanged
         _picked.Clear();
         _lastDetected = null;
         _lastDetectedCards = [];
+        _layout = null;
+        _clicked = null;
         ClearRerolls();
         _offerFromScreen = false;
         OfferOnScreen = false;
@@ -208,6 +214,7 @@ public sealed class AugmentPickerViewModel : INotifyPropertyChanged
     {
         if (Find(name) is not { } augment || _picked.Count >= MaxPicked)
             return;
+        _clicked = null;
         _picked.Add(augment);
         _offer.Clear();
         ClearRerolls();
@@ -265,19 +272,31 @@ public sealed class AugmentPickerViewModel : INotifyPropertyChanged
     }
 
     /// <summary>Result of a scan you asked for. Says so when nothing was found, instead of waiting quietly.</summary>
-    public void OnRequestedScan(IReadOnlyList<AugmentInfo> detected, string? problem)
+    public void OnRequestedScan(IReadOnlyList<AugmentInfo> detected, string? problem, OfferLayout? layout = null)
     {
         if (detected.Count >= 2)
         {
             _lastDetected = null; // show it even if the same cards were read before
-            OnScan(detected, problem);
+            OnScan(detected, problem, layout);
         }
         else
             Status = problem ?? "No cards found on your screen. Open the offer in game, or type the cards.";
     }
 
-    public void OnScan(IReadOnlyList<AugmentInfo> detected, string? problem = null)
+    /// <summary>The cards on screen while an offer read from it is up, so clicks can be matched to them. Null otherwise.</summary>
+    public OfferLayout? ClickLayout => OfferOnScreen ? _layout : null;
+
+    /// <summary>You clicked in the game while the offer was up: a click on a card is the card you took.</summary>
+    public void NoteClick(double x, double y)
     {
+        if (ClickLayout?.CardAt(x, y) is { } card && _offer.Contains(card))
+            _clicked = card;
+    }
+
+    public void OnScan(IReadOnlyList<AugmentInfo> detected, string? problem = null, OfferLayout? layout = null)
+    {
+        if (detected.Count >= 2 && layout is not null)
+            _layout = layout;
         if (problem != _scanProblem)
         {
             _scanProblem = problem;
@@ -301,6 +320,7 @@ public sealed class AugmentPickerViewModel : INotifyPropertyChanged
 
             _lastDetected = key;
             _lastDetectedCards = detected.ToList();
+            _clicked = null; // a click on a card closes the offer; one on a card that's still there was something else
             _offer.Clear();
             _offer.AddRange(detected.Where(a => !_picked.Contains(a)));
             _offerFromScreen = true;
@@ -311,7 +331,13 @@ public sealed class AugmentPickerViewModel : INotifyPropertyChanged
         }
         else if (detected.Count == 0 && _offerFromScreen && _offer.Count > 0 && ++_scansWithoutOffer == 2)
         {
-            // We can't see which card was clicked, only that the cards are gone.
+            // The cards are gone. The card you clicked while they were up is the one you took.
+            if (_clicked is { } clicked && _offer.Contains(clicked))
+            {
+                Pick(clicked.Name);
+                Status = $"You took {clicked.Name}: read from your click. Wrong card? Remove it under Picked and press the right one.";
+                return;
+            }
             OfferOnScreen = false;
             Status = "The offer closed. Which card did you take? Press \"I picked this\" on it.";
         }

@@ -8,8 +8,32 @@ namespace LeagueClanker.Core.History;
 /// detail call has all ten players, which is what finds your lane opponent. Riot doesn't document the shape, so the
 /// parser skips what it doesn't recognize rather than failing.
 /// </summary>
+/// <summary>The cards you picked in an ARAM: Mayhem or Arena game, by id, from your row in the match history.</summary>
+public sealed record GameAugments(int ChampionKey, double DurationSeconds, IReadOnlyList<int> Ids)
+{
+    /// <summary>The game the recap is about: same champion, and the same length give or take two minutes.</summary>
+    public bool Matches(GameRecap recap) => ChampionKey == recap.ChampionKey && Math.Abs(DurationSeconds - recap.DurationSeconds) < 120;
+}
+
 public static class MatchHistory
 {
+    /// <summary>
+    /// The cards picked in the newest game of a list response, from your row's playerAugment1-6. Null when that game
+    /// has none: a mode without augments, or not in the history yet.
+    /// </summary>
+    public static GameAugments? NewestAugments(string json)
+    {
+        var game = (JsonNode.Parse(json)?["games"]?["games"] as JsonArray)?.FirstOrDefault();
+        if (game?["participants"] is not JsonArray { Count: 1 } participants || participants[0] is not { } me || me["championId"] is null)
+            return null;
+        var ids = Enumerable.Range(1, 6)
+            .Select(i => me["stats"]?[$"playerAugment{i}"]?.GetValue<int>() ?? 0)
+            .Where(id => id > 0)
+            .ToList();
+        return ids.Count == 0 ? null
+            : new GameAugments(ChampionCatalog.NormalizeKey(me["championId"]!.GetValue<int>()), game["gameDuration"]?.GetValue<double>() ?? 0, ids);
+    }
+
     /// <summary>Summoner's Rift games, League Classic included, from a list or detail response. Other modes are skipped.</summary>
     /// <param name="puuid">Your account id, to find your row among ten. With only one row, that row is you.</param>
     public static IReadOnlyList<PlayedGame> Parse(string json, string? puuid)

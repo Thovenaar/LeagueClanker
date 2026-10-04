@@ -424,6 +424,13 @@ public sealed class LeagueClientApi : IClientSource, IRunePageStore, IChampSelec
         return doc is null ? null : History.EndOfGame.Parse(doc.RootElement.GetRawText());
     }
 
+    /// <summary>The cards picked in your newest game, from the match history. Null until the game shows up there.</summary>
+    public async Task<History.GameAugments?> GetLastGameAugmentsAsync(CancellationToken ct)
+    {
+        using var doc = await GetOrNullAsync<JsonDocument>("lol-match-history/v1/products/lol/current-summoner/matches?begIndex=0&endIndex=0", ct);
+        return doc is null ? null : History.MatchHistory.NewestAugments(doc.RootElement.GetRawText());
+    }
+
     /// <summary>The client's language, like "de_DE". Null when the client doesn't say.</summary>
     public async Task<string?> GetLocaleAsync(CancellationToken ct) =>
         (await GetOrNullAsync<RegionLocale>("riotclient/region-locale", ct))?.Locale;

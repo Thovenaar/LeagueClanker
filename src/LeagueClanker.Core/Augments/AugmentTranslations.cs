@@ -31,6 +31,10 @@ public static class AugmentTranslations
             .ToDictionary(g => g.Key, g => (IReadOnlyList<string>)g.Select(n => local[n.Id]).Where(name => name.Length > 0).Distinct().ToList());
     }
 
+    /// <summary>Augment id to English name, for the ids the match history lists.</summary>
+    public static IReadOnlyDictionary<int, string> ById(string englishJson) =>
+        Names(englishJson).Where(n => n.Name.Length > 0).GroupBy(n => n.Id).ToDictionary(g => g.Key, g => g.First().Name);
+
     private static IEnumerable<(int Id, string Name)> Names(string json)
     {
         using var doc = JsonDocument.Parse(json);

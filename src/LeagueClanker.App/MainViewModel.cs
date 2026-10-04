@@ -299,6 +299,8 @@ public sealed class MainViewModel : INotifyPropertyChanged
             lines.Add($"{recap.Position.DisplayName()} vs {lane.Name}.");
         if (recap.FinalItems.Count > 0)
             lines.Add($"You built {string.Join(", ", recap.FinalItems.Select(Name))}. {recap.AdvisedAndBuilt} of {recap.FinalItems.Count} were in LeagueClanker's build.");
+        if (recap.Augments.Count > 0)
+            lines.Add($"Cards: {string.Join(", ", recap.Augments)}.");
         if (recap.Pivots.Count > 0)
         {
             var taken = recap.Pivots.Count(p => p.Accepted);
