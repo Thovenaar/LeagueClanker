@@ -14,6 +14,9 @@ public static class AugmentRules
     private const double PayoffImpact = 1.2;
     private const double ScalingImpact = 0.8;
     private const double UpgradeImpact = 2.0;
+
+    /// <summary>A stat that turns into damage on every attack (Marksmage: 75% AP) reshapes a build as much as an upgrade card.</summary>
+    private const double AttackScalingImpact = 2.0;
     private const double AnswerThreshold = 0.8;
 
     private const AugmentTrigger ScalingTriggers =
@@ -71,10 +74,25 @@ public static class AugmentRules
                     : $"Your {augment.Name} augment gives attack speed, which on-hit items multiply";
             var impact = feeds.Any(f => (f.Trigger & ScalingTriggers) == 0) ? PayoffImpact : ScalingImpact;
 
+            // Marksmage: attacks deal damage from your AP. The AP is the payoff and attack speed only makes it land more
+            // often, so Kraken Slayer (attack speed, no AP) does nothing for it and Rabadon's Deathcap does a lot.
+            var attacks = feeds.FirstOrDefault(f => f.Trigger == AugmentTrigger.Attacks);
+            var stat = feeds.FirstOrDefault(f => f.Trigger is AugmentTrigger.AbilityPower or AugmentTrigger.AttackDamage or AugmentTrigger.MaxHealth);
+            if (attacks.Feeds is not null && stat.Feeds is not null)
+            {
+                feeds = feeds.Where(f => f.Trigger != attacks.Trigger && f.Trigger != stat.Trigger).ToList();
+                impact = AttackScalingImpact;
+                description = $"Your {augment.Name} augment turns {stat.Describe} into damage on every attack";
+            }
+
             yield return new Situation(augment.Name, description, impact, item =>
                 feeds.Sum(f => f.Feeds(item))
+                + (attacks.Feeds is not null && stat.Feeds is not null ? stat.Feeds(item) * (0.5 + 0.5 * Math.Min(1, attacks.Feeds(item))) : 0)
                 + (boostsOnHit && item.Tags.Contains("OnHit") ? 0.5 : 0)
-                + (boostsCritDamage ? 0.8 * item.Normalized(Stat.CritDamage) : 0));
+                + (boostsCritDamage ? 0.8 * item.Normalized(Stat.CritDamage) : 0))
+            {
+                Stacks = attacks.Feeds is not null && stat.Feeds is not null,
+            };
         }
     }
 

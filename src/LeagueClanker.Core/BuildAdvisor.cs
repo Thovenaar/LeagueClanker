@@ -101,7 +101,7 @@ public sealed class BuildAdvisor(IGameDataSource source, StaticGameData data)
             && GameAnalyzer.Analyze(game, data, augments, meta.Build.Style, popular) is { } restyled)
         {
             var again = _engine.Recommend(restyled with { MetaBuilds = metaBuilds, KeepMeta = _keepMeta, KeepSwapIn = _keepSwapIn, ForcedMeta = meta.Build.Key });
-            rec = again with { Meta = again.Meta is { } m ? meta with { Swap = m.Swap, SwapIn = m.SwapIn } : meta };
+            rec = again with { Meta = again.Meta is { } m ? meta with { Swap = m.Swap, SwapIn = m.SwapIn, AugmentSwapIns = m.AugmentSwapIns } : meta };
         }
         _keepMeta = rec.Meta?.Build.Key;
         _keepSwapIn = rec.Meta?.SwapIn?.Id;

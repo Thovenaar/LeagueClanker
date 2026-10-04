@@ -11,6 +11,12 @@ namespace LeagueClanker.Core.Recommendation;
 public sealed record Situation(string Label, string Description, double Impact, Func<ItemInfo, double> Match)
 {
     public double Score(ItemInfo item) => Impact * Match(item);
+
+    /// <summary>
+    /// More of it keeps paying off, so items you own or plan don't make the next one worth less. One magic resist item
+    /// goes a long way against an AP team, but Marksmage turns every point of AP into damage.
+    /// </summary>
+    public bool Stacks { get; init; }
 }
 
 public interface IBuildRule

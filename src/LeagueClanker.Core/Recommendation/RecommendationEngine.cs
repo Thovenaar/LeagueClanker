@@ -91,6 +91,12 @@ public sealed class RecommendationEngine(StaticGameData data, IReadOnlyList<IBui
 
     private const int MaxSwaps = 3;
 
+    /// <summary>Items a card you picked can swap out of an op.gg build, core included.</summary>
+    private const int MaxAugmentSwaps = 2;
+
+    /// <summary>An item feeds a picked card when that card's situation gives it this many points.</summary>
+    private const double AugmentFeedPoints = 0.5;
+
     // These grow during the game (Heartsteel's health, Rod of Ages' stats, a Tear's mana) and selling throws that away.
     private static readonly HashSet<string> GrowingItems = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -124,13 +130,17 @@ public sealed class RecommendationEngine(StaticGameData data, IReadOnlyList<IBui
         bool Available(ItemInfo item) => !ownedIds.Contains(item.Id) && !item.Passives.Any(ownedPassives.Contains);
 
         // A situation you've already answered with a finished item matters less for the next purchase.
-        Dictionary<Situation, double> WeightsWith(IReadOnlyList<ItemInfo> have) => situations.ToDictionary(s => s, s =>
+        Dictionary<Situation, double> WeightsWith(IReadOnlyList<ItemInfo> have) => situations.ToDictionary(s => s, s => s.Stacks ? 1.0 :
             have.Aggregate(1.0, (weight, item) => s.Score(item) >= ScoredItem.MinReasonPoints ? weight * OwnedDecay : weight)
             * game.Augments.Aggregate(1.0, (weight, augment) => AugmentRules.Answers(augment, s) ? weight * OwnedDecay : weight));
         var weights = WeightsWith(finished);
 
         var mine = AugmentRules.WithAugmentStats(game.Me.Stats, game.Augments);
-        bool Fits(ItemInfo item) => (!item.IsJungleItem || game.Me.HasSmite) && profile.BaseScore(item, mine) >= profile.MinFit;
+        // An item that pays off on a card you picked fits, even if your playstyle alone wouldn't buy it: Rabadon's
+        // Deathcap for a Marksmage Kai'Sa.
+        var cards = situations.Where(s => game.Augments.Any(a => a.Name == s.Label)).ToList();
+        bool Fits(ItemInfo item) => (!item.IsJungleItem || game.Me.HasSmite)
+            && (profile.BaseScore(item, mine) >= profile.MinFit || cards.Sum(c => c.Score(item)) >= AugmentFeedPoints);
         var candidates = data.Items.LegendariesFor(game.Mode).Where(i => Available(i) && Fits(i)).ToList();
         var boots = owned.Any(i => i.IsBoots && !ItemCatalog.BasicBootsIds.Contains(i.Id))
             ? []
@@ -146,7 +156,7 @@ public sealed class RecommendationEngine(StaticGameData data, IReadOnlyList<IBui
             var best = candidates.Select(i => Score(i, profile, mine, situations, weights)).MaxBy(s => s.Total)!;
             ranked.Add(best);
             candidates.Remove(best.Item);
-            foreach (var reason in best.Reasons)
+            foreach (var reason in best.Reasons.Where(r => !r.Situation.Stacks))
                 weights[reason.Situation] *= RepeatDecay;
         }
 
@@ -170,9 +180,44 @@ public sealed class RecommendationEngine(StaticGameData data, IReadOnlyList<IBui
             // Never swap out an item you've started: you'd rather finish it (the planner puts it first anyway).
             bool Started(ItemInfo item) => item.TotalGold > 0
                 && 1 - (double)BuyAdvisor.RemainingCost(item, owned, data.Items) / item.TotalGold >= BuildPlanner.StartedShare;
-            if (build.Where(s => !core.Contains(s.Item.Id) && !Started(s.Item)).MinBy(Points) is { } weakest)
+
+            // A card you picked changes the build more than an enemy does, and for the rest of the game: up to two items
+            // you haven't started that do nothing for it make way for items that pay off on it, core items included.
+            // Your build's own items that feed the card come first, then the new ones. Marksmage Kai'Sa: Guinsoo's,
+            // Nashor's and Rabadon's instead of Kraken Slayer first.
+            var picked = cards;
+            var swaps = new List<string>();
+            var augmentSwapIns = new List<ScoredItem>();
+            if (picked.Count > 0)
             {
-                var options = pool.Where(s => build.All(b => b.Item.Id != s.Item.Id)).ToList();
+                double ForCards(ScoredItem s) => picked.Sum(s.PointsFor);
+                var useless = build.Where(s => ForCards(s) < AugmentFeedPoints / 2 && !Started(s.Item)).ToList();
+                var options = ranked.Where(s => build.All(b => b.Item.Id != s.Item.Id) && ForCards(s) >= AugmentFeedPoints)
+                    .OrderByDescending(ForCards).ToList();
+                foreach (var gone in useless)
+                {
+                    // Unique passives don't stack: no second Spellblade item next to Lich Bane.
+                    var taken = Passives(build.Where(b => b != gone).Concat(augmentSwapIns));
+                    var better = options.FirstOrDefault(s => !augmentSwapIns.Contains(s) && !s.Item.Passives.Any(taken.Contains));
+                    if (better is null || Points(better) < Points(gone) + SwapMargin || augmentSwapIns.Count == MaxAugmentSwaps)
+                        break;
+                    build.Remove(gone);
+                    augmentSwapIns.Add(better);
+                    var why = better.Reasons.First(r => picked.Contains(r.Situation)).Situation.Description;
+                    swaps.Add($"{better.Item.Name} instead of {gone.Item.Name}: {char.ToLowerInvariant(why[0])}{why[1..]}");
+                }
+                if (augmentSwapIns.Count > 0)
+                {
+                    var feeders = build.Where(s => ForCards(s) >= AugmentFeedPoints).ToList();
+                    build = [.. feeders, .. augmentSwapIns, .. build.Except(feeders)];
+                }
+            }
+
+            ScoredItem? enemySwap = null;
+            if (build.Where(s => !core.Contains(s.Item.Id) && !augmentSwapIns.Contains(s) && !Started(s.Item)).MinBy(Points) is { } weakest)
+            {
+                var taken = Passives(build.Where(b => b != weakest));
+                var options = pool.Where(s => build.All(b => b.Item.Id != s.Item.Id) && !s.Item.Passives.Any(taken.Contains)).ToList();
                 var best = options.Where(s => s.Reasons.Any(r => r.Points >= BuildPlanner.MinReasonPoints)).MaxBy(Points);
                 // Last time's swap needs only to stay ahead of the item it replaced, unless something clearly better came up.
                 var kept = options.FirstOrDefault(s => s.Item.Id == game.KeepSwapIn && Points(s) > Points(weakest));
@@ -182,10 +227,13 @@ public sealed class RecommendationEngine(StaticGameData data, IReadOnlyList<IBui
                 if (better is not null)
                 {
                     build[build.IndexOf(weakest)] = better;
+                    enemySwap = better;
                     var why = better.Reasons.FirstOrDefault()?.Situation.Description ?? "It still fits this game better";
-                    meta = choice with { Swap = $"{better.Item.Name} instead of {weakest.Item.Name}: {char.ToLowerInvariant(why[0])}{why[1..]}", SwapIn = better.Item };
+                    swaps.Add($"{better.Item.Name} instead of {weakest.Item.Name}: {char.ToLowerInvariant(why[0])}{why[1..]}");
                 }
             }
+            if (swaps.Count > 0)
+                meta = choice with { Swap = string.Join("; ", swaps), SwapIn = enemySwap?.Item, AugmentSwapIns = augmentSwapIns.Select(s => s.Item).ToList() };
             ranked = [.. build, .. ranked.Where(s => build.All(b => b.Item.Id != s.Item.Id))];
 
             // The build's boots, unless the game has a real reason for others (Mercury's against heavy crowd control).
@@ -222,6 +270,9 @@ public sealed class RecommendationEngine(StaticGameData data, IReadOnlyList<IBui
             Swaps = finished.Count >= BuildRecommendation.FullBuild ? FindSwaps() : [],
         };
     }
+
+    private static HashSet<string> Passives(IEnumerable<ScoredItem> items) =>
+        items.SelectMany(s => s.Item.Passives).ToHashSet(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>Not an item that grew during the game, or one a Mayhem augment upgrades.</summary>
     private static bool Sellable(ItemInfo item, GameAnalysis game) =>

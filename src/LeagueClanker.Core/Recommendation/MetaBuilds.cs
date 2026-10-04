@@ -50,11 +50,15 @@ public sealed record MetaChoice(MetaBuild Build, double Score, string? Because, 
 {
     public string? Swap { get; init; }
 
-    /// <summary>The item swapped into the build, or null.</summary>
+    /// <summary>The item swapped into the build for this game's enemies, or null.</summary>
     public ItemInfo? SwapIn { get; init; }
 
-    /// <summary>Items that belong to this game's build: the meta build's items and the swap.</summary>
-    public bool Includes(ItemInfo item) => Build.Items.Any(i => i.Id == item.Id) || SwapIn?.Id == item.Id;
+    /// <summary>Items swapped in for augments you picked: "Rabadon's Deathcap instead of Kraken Slayer" for Marksmage.</summary>
+    public IReadOnlyList<ItemInfo> AugmentSwapIns { get; init; } = [];
+
+    /// <summary>Items that belong to this game's build: the meta build's items and the swaps.</summary>
+    public bool Includes(ItemInfo item) =>
+        Build.Items.Any(i => i.Id == item.Id) || SwapIn?.Id == item.Id || AugmentSwapIns.Any(i => i.Id == item.Id);
 
     /// <summary>"op.gg's on-hit build (57.5% win rate over 348 games), over the AP build: enemy has 3 tanks (...)."</summary>
     public string Text

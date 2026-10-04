@@ -1,5 +1,6 @@
 using System.Text.Json;
 using LeagueClanker.Core.Analysis;
+using LeagueClanker.Core.Augments;
 using LeagueClanker.Core.LiveClient;
 using LeagueClanker.Core.Opgg;
 using LeagueClanker.Core.Recommendation;
@@ -120,6 +121,40 @@ public class MetaBuildsTests
         Assert.Null(engine.Recommend(oneHealer).Meta!.SwapIn);
         Assert.Equal(TestData.WoundBlade, engine.Recommend(oneHealer with { KeepSwapIn = TestData.WoundBlade }).Meta!.SwapIn?.Id);
         Assert.Null(engine.Recommend(noHealer with { KeepSwapIn = TestData.WoundBlade }).Meta!.SwapIn); // no healing left to answer
+    }
+
+    // Mayhem's Marksmage: "Basic attacks deal bonus physical damage equal to 75% AP."
+    private static readonly AugmentInfo Marksmage = new()
+    {
+        Name = "Marksmage", Tier = AugmentTier.Gold, Description = "",
+        Effects = AugmentEffect.Damage, Triggers = AugmentTrigger.Attacks | AugmentTrigger.AbilityPower,
+    };
+
+    [Fact]
+    public void Marksmage_PaysOffOnAp_NotOnAttackSpeedAlone()
+    {
+        var game = GameAnalyzer.Analyze(Game([("Annie", [])], [("Garen", [])]), Data, augments: [Marksmage])!;
+
+        var card = AugmentRules.Evaluate(game).Single();
+
+        Assert.Equal(0, card.Score(Data.Items.Get(Kraken)!)); // attack speed and on-hit, but no AP
+        Assert.True(card.Score(Data.Items.Get(Nashors)!) > card.Score(Data.Items.Get(Rabadon)!) * 0.9);
+        Assert.True(card.Score(Data.Items.Get(Rabadon)!) > 1);
+        Assert.True(card.Stacks); // every point of AP keeps paying off
+    }
+
+    [Fact]
+    public void APickedCard_CanSwapCoreItems_ThatDoNothingForIt()
+    {
+        // Kai'Sa took Marksmage and the app still said Kraken Slayer first.
+        var game = Game([("Annie", [])], [("Garen", []), ("Braum", []), ("Ornn", [])]);
+        var advisor = new BuildAdvisor(new FileGameDataSource("unused.json"), Data) { MetaBuilds = Builds, Augments = [Marksmage] };
+
+        var rec = advisor.RecommendOnce(game)!;
+
+        Assert.DoesNotContain(rec.Items.Take(3), i => i.Item.Id is Kraken or Botrk);
+        Assert.True(rec.Items[0].Item.Stat(Stat.AbilityPower) > 0);
+        Assert.Contains(rec.Items.Take(3), i => i.Item.Id == Rabadon);
     }
 
     [Fact]

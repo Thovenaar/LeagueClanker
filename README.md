@@ -374,11 +374,13 @@ Picked augments also shape the item advice. `AugmentRules` turns each picked car
 > Your Critical Rhythm augment pays off on crits, so I suggest Infinity Edge, but Phantom Dancer is also ok.
 
 - A card that pays off on something (attacks, crits, abilities, health, shields) boosts the items that feed it.
+- A card that turns a stat into damage on every attack counts that stat, with attack speed only making it land more often. Marksmage ("basic attacks deal bonus physical damage equal to 75% AP") gives Rabadon's Deathcap and Nashor's Tooth a lot and Kraken Slayer nothing. More of that stat keeps paying off, so owning AP items doesn't make the next one worth less.
+- With an op.gg build, a card you picked can swap up to two items you haven't bought or started that do nothing for it, core items included, for items that pay off on it, each at least a point better. The build's own items that feed the card come first, then the new ones. A Marksmage Kai'Sa goes Guinsoo's Rageblade, Nashor's Tooth, Statikk Shiv, Lich Bane, Rabadon's Deathcap instead of starting with Kraken Slayer. A second item with the same unique passive (two Spellblade items) is never swapped in.
 - "Upgrade X" cards push X, and quest cards push the items the quest asks for.
 - Crit chance and attack speed from cards count toward the caps, so crit chance on items is worth less once cards bring you close to 100%.
 - A card that already answers a threat lowers that threat's weight, the same as owning an item for it. A magic resist card against an AP team makes more magic resist items less urgent.
 
-To try it from the CLI, add the cards you picked to a snapshot:
+The app only knows the cards you mark in the Augments tab: click *I picked this* on the card you took, or *Picked* next to a card you typed in. To try it from the CLI, add the cards you picked to a snapshot:
 
 ```bash
 dotnet run --project src/LeagueClanker.Cli -- samples/mayhem/jinx-level7.json --picked "It's Critical;Critical Rhythm"
