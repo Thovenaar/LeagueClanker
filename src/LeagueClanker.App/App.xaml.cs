@@ -108,6 +108,9 @@ public partial class App : Application
             viewModel.UseRecaps(recaps, data);
             if (recaps.Games.FirstOrDefault() is { Win: null } unfinished)
                 _ = FillInResultAsync(viewModel, recaps, unfinished); // the client still shows that game's end screen
+            if (gamesDemo is null && recaps.Games.FirstOrDefault() is { AugmentsFromHistory: false } last && last.Mode.HasAugments()
+                && DateTime.Now - last.Played < TimeSpan.FromMinutes(10))
+                _ = FillInAugmentsAsync(viewModel, recaps, last); // started right after a game: its cards are in the match history by now
             void RefreshStats() => viewModel.SetStats(PersonalStats.Combine(recaps.Games, _matchHistory, data.Champions));
             RefreshStats();
             _refreshStats = RefreshStats;
