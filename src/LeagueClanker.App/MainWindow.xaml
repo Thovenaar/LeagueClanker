@@ -396,62 +396,150 @@
             <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="12,0,12,0"
                           Visibility="{Binding ShowFullLive, Converter={StaticResource BoolToVisibility}}">
                 <StackPanel>
-                    <DockPanel Margin="0,2,0,8">
-                        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Bottom">
+                    <DockPanel Margin="0,6,0,8">
+                        <Border DockPanel.Dock="Left" Width="44" Height="44" CornerRadius="8" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1"
+                                Margin="0,0,10,0" VerticalAlignment="Center" ClipToBounds="True">
+                            <Image Source="{Binding ChampionIconUrl, TargetNullValue={x:Null}}" Stretch="UniformToFill" />
+                        </Border>
+                        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
                             <RadioButton Style="{StaticResource TabButton}" Content="Build" GroupName="Tabs" IsChecked="{Binding IsBuildTab}" />
                             <RadioButton Style="{StaticResource TabButton}" Content="Augments" GroupName="Tabs" IsChecked="{Binding IsAugmentsTab}"
                                          Visibility="{Binding HasAugments, Converter={StaticResource BoolToVisibility}}" />
                             <RadioButton Style="{StaticResource TabButton}" Content="Players" GroupName="Tabs" IsChecked="{Binding IsPlayersTab}" Margin="0" />
                         </StackPanel>
-                        <TextBlock Text="{Binding ChampionLine}" FontSize="16" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" Margin="0,0,12,0" />
+                        <StackPanel VerticalAlignment="Center" Margin="0,0,10,0">
+                            <TextBlock Text="{Binding ChampionLine}" FontSize="17" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                            <!-- How you play this champion. Changing it rebuilds the item list. -->
+                            <WrapPanel>
+                                <TextBlock Text="Playing as" Foreground="{StaticResource MutedBrush}" FontSize="11" />
+                                <Button Style="{StaticResource LinkButton}" Content="{Binding PlaystyleLabel}" Margin="4,0,0,0" Click="OnPlaystyleMenu"
+                                        ToolTip="Change how you play this champion, e.g. AP instead of AD" AutomationProperties.Name="Change playstyle" />
+                                <TextBlock Text="{Binding CardsText}" Foreground="{StaticResource MutedBrush}" FontSize="11" />
+                            </WrapPanel>
+                        </StackPanel>
                     </DockPanel>
-
-                    <!-- How you play this champion. Changing it rebuilds the item list. -->
-                    <StackPanel Orientation="Horizontal" Margin="0,-6,0,4">
-                        <TextBlock Text="Playing as" Foreground="{StaticResource MutedBrush}" FontSize="11" />
-                        <Button Style="{StaticResource LinkButton}" Content="{Binding PlaystyleLabel}" Margin="5,0,0,0" Click="OnPlaystyleMenu"
-                                ToolTip="Change how you play this champion, e.g. AP instead of AD" AutomationProperties.Name="Change playstyle" />
-                    </StackPanel>
-                    <TextBlock Text="{Binding BuildSource}" Foreground="{StaticResource MutedBrush}" FontSize="11" TextWrapping="Wrap" Margin="0,0,0,6"
-                               Visibility="{Binding BuildSource, Converter={StaticResource HasContent}}" />
-                    <TextBlock Text="{Binding MatchupLine}" Foreground="{StaticResource MutedBrush}" FontSize="11" TextTrimming="CharacterEllipsis" Margin="0,0,0,8"
+                    <TextBlock Text="{Binding MatchupLine}" Foreground="{StaticResource MutedBrush}" FontSize="11" TextTrimming="CharacterEllipsis" Margin="0,0,0,6"
                                Visibility="{Binding MatchupLine, Converter={StaticResource HasContent}}" ToolTip="Your lane matchup on op.gg, all ranks" />
-                    <TextBlock Text="{Binding MatchupNote}" Foreground="{StaticResource AccentBrush}" FontSize="11" TextWrapping="Wrap" Margin="0,-4,0,8"
+                    <TextBlock Text="{Binding MatchupNote}" Foreground="{StaticResource AccentBrush}" FontSize="11" TextWrapping="Wrap" Margin="0,-2,0,6"
                                Visibility="{Binding MatchupNote, Converter={StaticResource HasContent}}" />
-                    <Border Height="4" Visibility="{Binding MatchupLine, Converter={StaticResource HasContent}, ConverterParameter=invert}" />
-
-                    <!-- Enemy damage split bar -->
-                    <TextBlock Text="{Binding DamageSummary}" Foreground="{StaticResource MutedBrush}" FontSize="11" Margin="0,0,0,4" />
-                    <Grid Height="6">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="{Binding AdShare}" />
-                            <ColumnDefinition Width="{Binding ApShare}" />
-                        </Grid.ColumnDefinitions>
-                        <Border Grid.Column="0" Background="{StaticResource AdBrush}" CornerRadius="3,0,0,3" />
-                        <Border Grid.Column="1" Background="{StaticResource ApBrush}" CornerRadius="0,3,3,0" />
-                    </Grid>
 
                     <!-- ===== Build tab ===== -->
                     <StackPanel Visibility="{Binding IsBuildTab, Converter={StaticResource BoolToVisibility}}">
 
-                        <!-- Pivot suggestion: accept or keep your build -->
-                        <Border Visibility="{Binding HasPivot, Converter={StaticResource BoolToVisibility}}"
-                                BorderBrush="{StaticResource AccentBrush}" BorderThickness="1" CornerRadius="6"
-                                Background="#1FC8AA6E" Padding="10,8" Margin="0,12,0,0">
+                        <!-- Start of the game (Summoner's Rift, first two minutes) -->
+                        <Border Background="{StaticResource CardBrush}" CornerRadius="6" Padding="10,7" Margin="0,4,0,0"
+                                Visibility="{Binding StartText, Converter={StaticResource HasContent}}">
                             <StackPanel>
-                                <TextBlock Text="PIVOT SUGGESTED" Foreground="{StaticResource AccentBrush}" FontSize="10" FontWeight="Bold" />
-                                <TextBlock Text="{Binding PivotSummary}" FontWeight="SemiBold" FontSize="13" TextWrapping="Wrap" Margin="0,3,0,4" />
-                                <ItemsControl ItemsSource="{Binding PivotReasons}">
+                                <TextBlock Text="START OF THE GAME" Foreground="{StaticResource AccentBrush}" FontSize="10" FontWeight="Bold" />
+                                <TextBlock Text="{Binding StartText}" FontSize="12" TextWrapping="Wrap" Margin="0,2,0,0" />
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Your six slots: what you own, then the plan in buy order, boots included -->
+                        <DockPanel Margin="0,10,0,6">
+                            <TextBlock DockPanel.Dock="Right" Text="{Binding SlotsSummary}" Foreground="{StaticResource MutedBrush}" FontSize="11" VerticalAlignment="Bottom" />
+                            <TextBlock Text="{Binding SlotsHeader}" Foreground="{StaticResource AccentBrush}" FontSize="10" FontWeight="Bold" VerticalAlignment="Bottom" />
+                        </DockPanel>
+                        <ItemsControl ItemsSource="{Binding Slots}" Margin="-4,0,-4,0">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate><UniformGrid Columns="3" /></ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate DataType="{x:Type local:SlotRow}">
+                                    <Grid Margin="4" MinHeight="122" ToolTip="{Binding Name}">
+                                        <Border x:Name="Box" Background="{StaticResource CardBrush}" CornerRadius="8" />
+                                        <Rectangle x:Name="Outline" RadiusX="8" RadiusY="8" Stroke="{StaticResource BorderBrush}" StrokeThickness="1" />
+                                        <StackPanel Margin="6,10,6,8">
+                                            <Grid Height="48" HorizontalAlignment="Center">
+                                                <Image x:Name="Icon" Source="{Binding IconUrl, TargetNullValue={x:Null}}" Width="48" Height="48" />
+                                                <StackPanel x:Name="SwitchIcons" Orientation="Horizontal" VerticalAlignment="Center" Visibility="Collapsed">
+                                                    <Image Source="{Binding OldIconUrl, TargetNullValue={x:Null}}" Width="28" Height="28" Opacity="0.4" />
+                                                    <TextBlock Text="&#x2192;" Foreground="{StaticResource AccentBrush}" FontWeight="Bold" Margin="3,0" VerticalAlignment="Center" />
+                                                    <Border BorderBrush="{StaticResource AccentBrush}" BorderThickness="1" CornerRadius="5">
+                                                        <Image Source="{Binding IconUrl, TargetNullValue={x:Null}}" Width="38" Height="38" />
+                                                    </Border>
+                                                </StackPanel>
+                                            </Grid>
+                                            <TextBlock x:Name="NameText" Text="{Binding Name}" FontSize="11" TextAlignment="Center" TextWrapping="Wrap"
+                                                       MaxHeight="30" TextTrimming="CharacterEllipsis" Margin="0,5,0,0" />
+                                            <TextBlock x:Name="OldNameText" Text="{Binding OldName}" FontSize="10" TextAlignment="Center" Foreground="{StaticResource MutedBrush}"
+                                                       TextDecorations="Strikethrough" Visibility="Collapsed" />
+                                            <Border BorderBrush="#80C8AA6E" BorderThickness="1" CornerRadius="3" Padding="4,0" Margin="0,4,0,0" HorizontalAlignment="Center"
+                                                    Visibility="{Binding Tag, Converter={StaticResource HasContent}}">
+                                                <TextBlock Text="{Binding Tag}" Foreground="{StaticResource AccentBrush}" FontSize="10" TextTrimming="CharacterEllipsis" />
+                                            </Border>
+                                            <Grid x:Name="Progress" Height="4" Margin="0,6,0,0" Visibility="Collapsed">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="{Binding ProgressDone}" />
+                                                    <ColumnDefinition Width="{Binding ProgressLeft}" />
+                                                </Grid.ColumnDefinitions>
+                                                <Border Grid.ColumnSpan="2" Background="{StaticResource BorderBrush}" CornerRadius="2" />
+                                                <Border Background="{StaticResource AccentBrush}" CornerRadius="2" />
+                                            </Grid>
+                                            <TextBlock Text="{Binding Price}" Foreground="{StaticResource MutedBrush}" FontSize="10" TextAlignment="Center" Margin="0,4,0,0"
+                                                       Visibility="{Binding Price, Converter={StaticResource HasContent}}" />
+                                        </StackPanel>
+                                        <Border x:Name="Badge" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="6,6,0,0" CornerRadius="8" Padding="6,0"
+                                                Background="{StaticResource BorderBrush}">
+                                            <TextBlock x:Name="BadgeText" Text="{Binding Number}" FontSize="10" FontWeight="Bold" />
+                                        </Border>
+                                    </Grid>
+                                    <DataTemplate.Triggers>
+                                        <DataTrigger Binding="{Binding Number}" Value="0">
+                                            <Setter TargetName="Badge" Property="Visibility" Value="Collapsed" />
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding Kind}" Value="Next">
+                                            <Setter TargetName="Box" Property="Background" Value="#FF1E2129" />
+                                            <Setter TargetName="Outline" Property="Stroke" Value="{StaticResource AccentBrush}" />
+                                            <Setter TargetName="Outline" Property="StrokeThickness" Value="2" />
+                                            <Setter TargetName="Badge" Property="Background" Value="{StaticResource AccentBrush}" />
+                                            <Setter TargetName="BadgeText" Property="Foreground" Value="{StaticResource PanelBrush}" />
+                                            <Setter TargetName="NameText" Property="FontWeight" Value="SemiBold" />
+                                            <Setter TargetName="Progress" Property="Visibility" Value="Visible" />
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding Kind}" Value="Planned">
+                                            <Setter TargetName="Box" Property="Background" Value="#FF12171D" />
+                                            <Setter TargetName="Outline" Property="StrokeDashArray" Value="4 3" />
+                                            <Setter TargetName="Icon" Property="Opacity" Value="0.6" />
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding Kind}" Value="Switch">
+                                            <Setter TargetName="Box" Property="Background" Value="#FF1C1A14" />
+                                            <Setter TargetName="Outline" Property="Stroke" Value="{StaticResource AccentBrush}" />
+                                            <Setter TargetName="Outline" Property="StrokeDashArray" Value="4 3" />
+                                            <Setter TargetName="Icon" Property="Visibility" Value="Collapsed" />
+                                            <Setter TargetName="SwitchIcons" Property="Visibility" Value="Visible" />
+                                            <Setter TargetName="OldNameText" Property="Visibility" Value="Visible" />
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding Kind}" Value="Empty">
+                                            <Setter TargetName="Box" Property="Background" Value="Transparent" />
+                                            <Setter TargetName="Outline" Property="StrokeDashArray" Value="4 3" />
+                                            <Setter TargetName="NameText" Property="Foreground" Value="{StaticResource MutedBrush}" />
+                                        </DataTrigger>
+                                    </DataTemplate.Triggers>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+
+                        <!-- A suggested switch: accept or keep your build -->
+                        <Border Visibility="{Binding HasPivot, Converter={StaticResource BoolToVisibility}}"
+                                BorderBrush="{StaticResource AccentBrush}" BorderThickness="1" CornerRadius="8"
+                                Background="#FF1C1A14" Padding="12,10" Margin="0,10,0,0">
+                            <StackPanel>
+                                <TextBlock Text="{Binding PivotHeader}" Foreground="{StaticResource AccentBrush}" FontSize="10" FontWeight="Bold" />
+                                <TextBlock Text="{Binding PivotTitle}" FontWeight="SemiBold" FontSize="14" TextWrapping="Wrap" Margin="0,4,0,4" />
+                                <ItemsControl ItemsSource="{Binding PivotNotes}">
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate>
-                                            <TextBlock Text="{Binding}" FontSize="11" TextWrapping="Wrap" Foreground="{StaticResource MutedBrush}" />
+                                            <TextBlock Text="{Binding}" FontSize="12" TextWrapping="Wrap" Foreground="#FFB9C1CA" />
                                         </DataTemplate>
                                     </ItemsControl.ItemTemplate>
                                 </ItemsControl>
-                                <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
-                                    <Button Style="{StaticResource PrimaryButton}" Content="Switch build" Click="OnAcceptPivot" />
-                                    <Button Style="{StaticResource SecondaryButton}" Content="Keep mine" Click="OnDeclinePivot" Margin="8,0,0,0" />
-                                </StackPanel>
+                                <UniformGrid Columns="2" Margin="0,10,0,0">
+                                    <Button Style="{StaticResource PrimaryButton}" Content="{Binding PivotAccept}" Click="OnAcceptPivot" Margin="0,0,4,0"
+                                            AutomationProperties.Name="Switch build" />
+                                    <Button Style="{StaticResource SecondaryButton}" Content="{Binding PivotDecline}" Click="OnDeclinePivot" Margin="4,0,0,0"
+                                            AutomationProperties.Name="Keep mine" />
+                                </UniformGrid>
                             </StackPanel>
                         </Border>
 
@@ -461,22 +549,35 @@
                             <TextBlock Text="{Binding SwitchHint}" Foreground="{StaticResource MutedBrush}" FontSize="11" TextWrapping="Wrap" Margin="0,0,8,0" />
                         </DockPanel>
 
-                        <!-- Start of the game, and what your gold buys right now -->
-                        <Border Background="{StaticResource CardBrush}" CornerRadius="6" Padding="10,7" Margin="0,12,0,0"
-                                Visibility="{Binding StartText, Converter={StaticResource HasContent}}">
+                        <!-- Full build: what your gold buys after a sale, and the items worth selling -->
+                        <Border Background="{StaticResource CardBrush}" CornerRadius="6" Padding="10,7" Margin="0,10,0,0"
+                                Visibility="{Binding ShowSellAdvice, Converter={StaticResource BoolToVisibility}}">
                             <StackPanel>
-                                <TextBlock Text="START OF THE GAME" Foreground="{StaticResource AccentBrush}" FontSize="10" FontWeight="Bold" />
-                                <TextBlock Text="{Binding StartText}" FontSize="12" TextWrapping="Wrap" Margin="0,2,0,0" />
-                            </StackPanel>
-                        </Border>
-                        <Border Background="{StaticResource CardBrush}" CornerRadius="6" Padding="10,7" Margin="0,8,0,0"
-                                Visibility="{Binding BuyText, Converter={StaticResource HasContent}}">
-                            <StackPanel>
-                                <TextBlock Text="BUY NOW" Foreground="{StaticResource AccentBrush}" FontSize="10" FontWeight="Bold" />
+                                <TextBlock Text="SELL FOR SOMETHING BETTER" Foreground="{StaticResource AccentBrush}" FontSize="10" FontWeight="Bold" />
                                 <TextBlock Text="{Binding BuyText}" FontSize="12" TextWrapping="Wrap" Margin="0,2,0,0" />
                             </StackPanel>
                         </Border>
-                        <ItemsControl ItemsSource="{Binding Tips}" Margin="0,6,0,0">
+                        <ItemsControl ItemsSource="{Binding Items}" Margin="0,8,0,0" Visibility="{Binding ShowSwaps, Converter={StaticResource BoolToVisibility}}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate DataType="{x:Type local:ItemRow}">
+                                    <Border Background="{StaticResource CardBrush}" CornerRadius="6" Padding="8,4" Margin="0,0,0,4">
+                                        <DockPanel>
+                                            <TextBlock DockPanel.Dock="Left" Text="{Binding Rank}" Foreground="{StaticResource AccentBrush}" FontWeight="Bold" VerticalAlignment="Center" Width="18" />
+                                            <Image DockPanel.Dock="Left" Source="{Binding IconUrl}" Width="30" Height="30" Margin="0,0,10,0" />
+                                            <StackPanel VerticalAlignment="Center">
+                                                <DockPanel>
+                                                    <TextBlock DockPanel.Dock="Right" Text="{Binding Gold, StringFormat={}{0}g}" Foreground="{StaticResource MutedBrush}" FontSize="11" />
+                                                    <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                                </DockPanel>
+                                                <TextBlock Text="{Binding ReasonText}" Foreground="{StaticResource AccentBrush}" FontSize="10" TextWrapping="Wrap" />
+                                            </StackPanel>
+                                        </DockPanel>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+
+                        <ItemsControl ItemsSource="{Binding Tips}" Margin="0,8,0,0">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
                                     <DockPanel Margin="0,0,0,3">
@@ -487,113 +588,125 @@
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
 
-                        <StackPanel Visibility="{Binding OwnedItems, Converter={StaticResource HasContent}}">
-                            <TextBlock Style="{StaticResource SectionHeader}" Text="YOU HAVE" />
-                            <ItemsControl ItemsSource="{Binding OwnedItems}">
-                                <ItemsControl.ItemsPanel>
-                                    <ItemsPanelTemplate>
-                                        <WrapPanel />
-                                    </ItemsPanelTemplate>
-                                </ItemsControl.ItemsPanel>
+                        <!-- The cards you picked and what they do to the build -->
+                        <StackPanel Visibility="{Binding CardNotes, Converter={StaticResource HasContent}}">
+                            <TextBlock Style="{StaticResource SectionHeader}" Text="YOUR CARDS" />
+                            <ItemsControl ItemsSource="{Binding CardNotes}">
                                 <ItemsControl.ItemTemplate>
-                                    <DataTemplate DataType="{x:Type local:OwnedItemRow}">
-                                        <Image Source="{Binding IconUrl}" Width="30" Height="30" Margin="0,0,4,4" ToolTip="{Binding Name}"
-                                               AutomationProperties.Name="{Binding Name}" />
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
-                        </StackPanel>
-
-                        <TextBlock Style="{StaticResource SectionHeader}" Text="{Binding BuildHeader}" />
-                        <ItemsControl ItemsSource="{Binding Items}">
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate DataType="{x:Type local:ItemRow}">
-                                    <Border Background="{StaticResource CardBrush}" CornerRadius="6" Padding="8,4" Margin="0,0,0,4">
-                                        <Grid>
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="22" />
-                                                <ColumnDefinition Width="Auto" />
-                                                <ColumnDefinition Width="*" />
-                                            </Grid.ColumnDefinitions>
-                                            <TextBlock Text="{Binding Rank}" Foreground="{StaticResource AccentBrush}" FontWeight="Bold" VerticalAlignment="Center" />
-                                            <Image Grid.Column="1" Source="{Binding IconUrl}" Width="30" Height="30" Margin="0,0,10,0" />
-                                            <StackPanel Grid.Column="2" VerticalAlignment="Center">
-                                                <DockPanel>
-                                                    <TextBlock DockPanel.Dock="Right" Text="{Binding Gold, StringFormat={}{0}g}" Foreground="{StaticResource MutedBrush}" FontSize="11" VerticalAlignment="Center" />
-                                                    <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
-                                                </DockPanel>
-                                                <ItemsControl ItemsSource="{Binding Reasons}" Margin="0,2,0,0">
-                                                    <ItemsControl.ItemsPanel>
-                                                        <ItemsPanelTemplate>
-                                                            <WrapPanel />
-                                                        </ItemsPanelTemplate>
-                                                    </ItemsControl.ItemsPanel>
-                                                    <ItemsControl.ItemTemplate>
-                                                        <DataTemplate>
-                                                            <Border BorderBrush="{StaticResource AccentBrush}" BorderThickness="1" CornerRadius="3" Padding="5,0" Margin="0,0,4,0">
-                                                                <TextBlock Text="{Binding}" Foreground="{StaticResource AccentBrush}" FontSize="10" />
-                                                            </Border>
-                                                        </DataTemplate>
-                                                    </ItemsControl.ItemTemplate>
-                                                </ItemsControl>
-                                            </StackPanel>
-                                        </Grid>
-                                    </Border>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-
-                        <!-- Other ways to go: tankier, more AP, an answer to the enemy -->
-                        <StackPanel Visibility="{Binding Alternatives, Converter={StaticResource HasContent}}">
-                            <TextBlock Style="{StaticResource SectionHeader}" Text="OR GO ANOTHER WAY" />
-                            <ItemsControl ItemsSource="{Binding Alternatives}">
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate DataType="{x:Type local:AlternativeRow}">
-                                        <DockPanel Margin="0,0,0,4">
-                                            <Image DockPanel.Dock="Left" Source="{Binding IconUrl}" Width="22" Height="22" Margin="0,0,8,0" />
-                                            <TextBlock DockPanel.Dock="Right" Text="{Binding Gold, StringFormat={}{0}g}" Foreground="{StaticResource MutedBrush}" FontSize="11"
-                                                       VerticalAlignment="Center" />
-                                            <TextBlock FontSize="11" VerticalAlignment="Center" TextTrimming="CharacterEllipsis">
-                                                <Run Text="{Binding Direction, Mode=OneWay}" Foreground="{StaticResource AccentBrush}" /><Run Text=": " /><Run Text="{Binding Name, Mode=OneWay}" />
-                                            </TextBlock>
+                                    <DataTemplate DataType="{x:Type local:CardNote}">
+                                        <DockPanel Margin="0,0,0,6">
+                                            <Border DockPanel.Dock="Left" BorderBrush="{StaticResource GoldBrush}" BorderThickness="1" CornerRadius="4" Padding="7,1"
+                                                    Margin="0,0,8,0" VerticalAlignment="Top">
+                                                <TextBlock Text="{Binding Name}" Foreground="{StaticResource GoldBrush}" FontSize="11" FontWeight="SemiBold" />
+                                            </Border>
+                                            <TextBlock Text="{Binding Text}" Foreground="#FFB9C1CA" FontSize="12" TextWrapping="Wrap" />
                                         </DockPanel>
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
                         </StackPanel>
 
-                        <!-- Boots, only while you haven't bought tier 2 boots -->
-                        <StackPanel DataContext="{Binding Boots}">
-                            <StackPanel.Style>
-                                <Style TargetType="StackPanel">
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding}" Value="{x:Null}">
-                                            <Setter Property="Visibility" Value="Collapsed" />
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </StackPanel.Style>
-                            <TextBlock Style="{StaticResource SectionHeader}" Text="BOOTS" />
-                            <Border Background="{StaticResource CardBrush}" CornerRadius="6" Padding="8,4">
-                                <StackPanel Orientation="Horizontal">
-                                    <Image Source="{Binding IconUrl}" Width="30" Height="30" Margin="22,0,10,0" />
-                                    <TextBlock Text="{Binding Name}" FontWeight="SemiBold" VerticalAlignment="Center" />
-                                    <TextBlock Text="{Binding Gold, StringFormat={}  {0}g}" Foreground="{StaticResource MutedBrush}" FontSize="11" VerticalAlignment="Center" />
-                                </StackPanel>
-                            </Border>
+                        <!-- Enemy damage split -->
+                        <DockPanel Margin="0,12,0,4">
+                            <TextBlock DockPanel.Dock="Right" Text="{Binding DamageSplit}" FontSize="11" />
+                            <TextBlock Text="Enemy damage" Foreground="{StaticResource MutedBrush}" FontSize="11" />
+                        </DockPanel>
+                        <Grid Height="6">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="{Binding AdShare}" />
+                                <ColumnDefinition Width="{Binding ApShare}" />
+                            </Grid.ColumnDefinitions>
+                            <Border Grid.Column="0" Background="{StaticResource AdBrush}" CornerRadius="3,0,0,3" />
+                            <Border Grid.Column="1" Background="{StaticResource ApBrush}" CornerRadius="0,3,3,0" />
+                        </Grid>
+
+                        <!-- Other ways to go: tankier, more AP, an answer to the enemy -->
+                        <StackPanel Visibility="{Binding Alternatives, Converter={StaticResource HasContent}}">
+                            <TextBlock Style="{StaticResource SectionHeader}" Text="OR GO ANOTHER WAY" />
+                            <ItemsControl ItemsSource="{Binding Alternatives}" Margin="-4,0,-4,0">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate><UniformGrid Columns="3" /></ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate DataType="{x:Type local:AlternativeRow}">
+                                        <Border Background="{StaticResource CardBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="8"
+                                                Padding="7" Margin="4" ToolTip="{Binding Gold, StringFormat={}{0}g}">
+                                            <DockPanel>
+                                                <Image DockPanel.Dock="Left" Source="{Binding IconUrl}" Width="28" Height="28" Margin="0,0,7,0" VerticalAlignment="Center" />
+                                                <StackPanel VerticalAlignment="Center">
+                                                    <TextBlock Text="{Binding Direction}" Foreground="{StaticResource MutedBrush}" FontSize="10" />
+                                                    <TextBlock Text="{Binding Name}" FontSize="11" TextWrapping="Wrap" />
+                                                </StackPanel>
+                                            </DockPanel>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
                         </StackPanel>
 
-                        <TextBlock Style="{StaticResource SectionHeader}" Text="WHY" />
-                        <ItemsControl ItemsSource="{Binding Advice}" Margin="0,0,0,8">
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate>
-                                    <DockPanel Margin="0,0,0,6">
-                                        <TextBlock DockPanel.Dock="Left" Text="•" Foreground="{StaticResource AccentBrush}" Margin="0,0,6,0" />
-                                        <TextBlock Text="{Binding}" TextWrapping="Wrap" FontSize="12" />
-                                    </DockPanel>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
+                        <!-- Why this build: folded away, the slots carry the main reasons -->
+                        <Border BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,1,0,0" Margin="0,12,0,8">
+                            <StackPanel>
+                                <ToggleButton IsChecked="{Binding WhyOpen}" Cursor="Hand" AutomationProperties.Name="Why this build">
+                                    <ToggleButton.Template>
+                                        <ControlTemplate TargetType="ToggleButton">
+                                            <Border Background="Transparent" Padding="0,10,0,8">
+                                                <DockPanel>
+                                                    <TextBlock x:Name="Chevron" DockPanel.Dock="Right" Text="&#x25BE;" Foreground="{StaticResource MutedBrush}" Margin="8,0,0,0" />
+                                                    <TextBlock DockPanel.Dock="Right" Text="{Binding WhyHint}" Foreground="{StaticResource MutedBrush}" FontSize="11" />
+                                                    <TextBlock Text="WHY THIS BUILD" Foreground="{StaticResource AccentBrush}" FontSize="10" FontWeight="Bold" VerticalAlignment="Center" />
+                                                </DockPanel>
+                                            </Border>
+                                            <ControlTemplate.Triggers>
+                                                <Trigger Property="IsChecked" Value="True">
+                                                    <Setter TargetName="Chevron" Property="Text" Value="&#x25B4;" />
+                                                </Trigger>
+                                            </ControlTemplate.Triggers>
+                                        </ControlTemplate>
+                                    </ToggleButton.Template>
+                                </ToggleButton>
+                                <StackPanel Visibility="{Binding WhyOpen, Converter={StaticResource BoolToVisibility}}">
+                                    <ItemsControl ItemsSource="{Binding MetaBars}" Margin="0,0,0,6">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate DataType="{x:Type local:MetaBar}">
+                                                <Grid Margin="0,0,0,5">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="70" />
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="130" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBlock x:Name="BarName" Text="{Binding Name}" FontSize="11" Foreground="{StaticResource MutedBrush}" TextTrimming="CharacterEllipsis" />
+                                                    <Grid Grid.Column="1" Height="6" VerticalAlignment="Center">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="{Binding Filled}" />
+                                                            <ColumnDefinition Width="{Binding Empty}" />
+                                                        </Grid.ColumnDefinitions>
+                                                        <Border Grid.ColumnSpan="2" Background="{StaticResource BorderBrush}" CornerRadius="3" />
+                                                        <Border x:Name="BarFill" Background="#FF5A6673" CornerRadius="3" />
+                                                    </Grid>
+                                                    <TextBlock Grid.Column="2" Text="{Binding Text}" FontSize="11" Foreground="{StaticResource MutedBrush}" TextAlignment="Right" />
+                                                </Grid>
+                                                <DataTemplate.Triggers>
+                                                    <DataTrigger Binding="{Binding Chosen}" Value="True">
+                                                        <Setter TargetName="BarFill" Property="Background" Value="{StaticResource AccentBrush}" />
+                                                        <Setter TargetName="BarName" Property="Foreground" Value="{StaticResource TextBrush}" />
+                                                    </DataTrigger>
+                                                </DataTemplate.Triggers>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                    <TextBlock Text="{Binding BuildSource}" Foreground="#FFB9C1CA" FontSize="12" TextWrapping="Wrap" Margin="0,0,0,8"
+                                               Visibility="{Binding BuildSource, Converter={StaticResource HasContent}}" />
+                                    <ItemsControl ItemsSource="{Binding Advice}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <TextBlock Text="{Binding}" TextWrapping="Wrap" FontSize="12" Foreground="#FFB9C1CA" Margin="0,0,0,6" />
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
                     </StackPanel>
 
                     <!-- ===== Augments tab (ARAM: Mayhem) ===== -->

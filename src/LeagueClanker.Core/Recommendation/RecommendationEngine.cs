@@ -57,10 +57,17 @@ public sealed record BuildRecommendation(
     /// <summary>All six slots hold finished items, boots included.</summary>
     public bool IsFull => Game.Me.Items.Count(i => i.Kind is ItemKind.Legendary or ItemKind.Boots) >= FullBuild;
 
-    /// <summary>Slots left for legendaries: six, minus the ones you own, minus one for boots if you have or will buy them.</summary>
-    public int SlotsLeft =>
-        Math.Max(0, FullBuild - Game.Me.Items.Count(i => i.Kind == ItemKind.Legendary)
-            - (Game.Me.Items.Any(i => i.Kind == ItemKind.Boots) || Boots is not null ? 1 : 0));
+    /// <summary>Slots still open: six, minus the finished items and boots you own. <see cref="BuyOrder"/> fills them.</summary>
+    public int SlotsLeft => Math.Max(0, FullBuild - Game.Me.Items.Count(i => i.Kind is ItemKind.Legendary or ItemKind.Boots));
+
+    /// <summary>
+    /// What to buy, in order: the ranked items with your boots among them. Boots take one of the six slots, so they're
+    /// part of the order: after your first item, or next when you have one already.
+    /// </summary>
+    public IReadOnlyList<ScoredItem> BuyOrder => Boots is not { } boots ? Ranked : [.. Ranked.Take(BootsIndex), boots, .. Ranked.Skip(BootsIndex)];
+
+    /// <summary>Where the boots go in <see cref="BuyOrder"/>, or -1 without boots to buy.</summary>
+    public int BootsIndex => Boots is null ? -1 : Math.Min(Ranked.Count, Game.Me.Items.Any(i => i.Kind == ItemKind.Legendary) ? 0 : 1);
 
     /// <summary>With a full build: items worth selling for a clearly better one, best first. Empty otherwise.</summary>
     public IReadOnlyList<ItemSwap> Swaps { get; init; } = [];
@@ -68,7 +75,7 @@ public sealed record BuildRecommendation(
     /// <summary>The op.gg build this recommendation follows, or null when it comes from item scores alone.</summary>
     public MetaChoice? Meta { get; init; }
 
-    public ScoredItem? Find(int itemId) => Ranked.FirstOrDefault(s => s.Item.Id == itemId);
+    public ScoredItem? Find(int itemId) => Ranked.FirstOrDefault(s => s.Item.Id == itemId) ?? (Boots?.Item.Id == itemId ? Boots : null);
 
     public string DamageSummary =>
         $"Enemy damage: {BuildRules.Percent(Game.Enemies.PhysicalShare)} AD / {BuildRules.Percent(Game.Enemies.MagicShare)} AP";

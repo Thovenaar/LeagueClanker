@@ -14,9 +14,29 @@ using LeagueClanker.Core.StaticData;
 
 namespace LeagueClanker.App;
 
-public sealed record ItemRow(int Rank, string Name, int Gold, string IconUrl, IReadOnlyList<string> Reasons);
+public sealed record ItemRow(int Rank, string Name, int Gold, string IconUrl, IReadOnlyList<string> Reasons)
+{
+    public string ReasonText => string.Join(" · ", Reasons);
+}
 
-public sealed record OwnedItemRow(string Name, string IconUrl);
+/// <summary>One of your six item slots. <see cref="Kind"/> is Owned, Next, Planned, Switch (a suggested swap on this slot) or Empty.</summary>
+/// <param name="Number">Its place in the buy order, or 0 for an item you own.</param>
+/// <param name="Tag">The strongest reason for it: "Marksmage +1.8".</param>
+public sealed record SlotRow(int Number, string Kind, string Name, string IconUrl, string Tag, string Price)
+{
+    public string? OldName { get; init; }
+    public string? OldIconUrl { get; init; }
+
+    /// <summary>How much of the next item you've bought, as the two parts of its progress bar.</summary>
+    public GridLength ProgressDone { get; init; } = new(0, GridUnitType.Star);
+    public GridLength ProgressLeft { get; init; } = new(1, GridUnitType.Star);
+}
+
+/// <summary>A card you picked and what it does to your build.</summary>
+public sealed record CardNote(string Name, string Text);
+
+/// <summary>An op.gg build's win rate, as a bar in "Why this build".</summary>
+public sealed record MetaBar(string Name, string Text, GridLength Filled, GridLength Empty, bool Chosen);
 
 /// <param name="Direction">"Tankier", "More AP", "Vs tanks": which way this item takes your build.</param>
 public sealed record AlternativeRow(string Direction, string Name, int Gold, string IconUrl);
@@ -49,10 +69,9 @@ public sealed class MainViewModel : INotifyPropertyChanged
     private GridLength _adShare = new(1, GridUnitType.Star);
     private GridLength _apShare = new(1, GridUnitType.Star);
     private IReadOnlyList<ItemRow> _items = [];
-    private IReadOnlyList<OwnedItemRow> _ownedItems = [];
+    private IReadOnlyList<SlotRow> _slots = [];
     private IReadOnlyList<AlternativeRow> _alternatives = [];
     private string _buildHeader = "YOUR BUILD · MOST IMPORTANT FIRST";
-    private ItemRow? _boots;
     private IReadOnlyList<string> _advice = [];
     private string _footer = "";
     private bool _hasPivot;
@@ -80,18 +99,61 @@ public sealed class MainViewModel : INotifyPropertyChanged
     public bool IsLive { get => _isLive; private set => Set(ref _isLive, value); }
     public string ChampionLine { get => _championLine; private set => Set(ref _championLine, value); }
     public string DamageSummary { get => _damageSummary; private set => Set(ref _damageSummary, value); }
+
+    private string _damageSplit = "";
+
+    /// <summary>"64% AD · 36% AP"</summary>
+    public string DamageSplit { get => _damageSplit; private set => Set(ref _damageSplit, value); }
     public GridLength AdShare { get => _adShare; private set => Set(ref _adShare, value); }
     public GridLength ApShare { get => _apShare; private set => Set(ref _apShare, value); }
     public IReadOnlyList<ItemRow> Items { get => _items; private set => Set(ref _items, value); }
 
     /// <summary>Your finished items and boots, in inventory order.</summary>
-    public IReadOnlyList<OwnedItemRow> OwnedItems { get => _ownedItems; private set => Set(ref _ownedItems, value); }
+    /// <summary>Your six item slots: what you own, then the plan in buy order with boots in it.</summary>
+    public IReadOnlyList<SlotRow> Slots { get => _slots; private set => Set(ref _slots, value); }
+
+    private string _slotsHeader = "";
+    private string _slotsSummary = "";
+    private string _championIconUrl = "";
+    private string _cardsText = "";
+    private IReadOnlyList<CardNote> _cardNotes = [];
+    private string _pivotHeader = "";
+    private string _pivotTitle = "";
+    private string _pivotAccept = "";
+    private string _pivotDecline = "";
+    private bool _whyOpen;
+    private string _whyHint = "";
+    private IReadOnlyList<MetaBar> _metaBars = [];
+    private bool _showSwaps;
+    private bool _showSellAdvice;
+
+    public string SlotsHeader { get => _slotsHeader; private set => Set(ref _slotsHeader, value); }
+    public string SlotsSummary { get => _slotsSummary; private set => Set(ref _slotsSummary, value); }
+    public string ChampionIconUrl { get => _championIconUrl; private set => Set(ref _championIconUrl, value); }
+
+    /// <summary>" · card: Marksmage" after your playstyle.</summary>
+    public string CardsText { get => _cardsText; private set => Set(ref _cardsText, value); }
+    public IReadOnlyList<CardNote> CardNotes { get => _cardNotes; private set => Set(ref _cardNotes, value); }
+
+    /// <summary>"SLOT 4 · SWITCH SUGGESTED · +1.2"</summary>
+    public string PivotHeader { get => _pivotHeader; private set => Set(ref _pivotHeader, value); }
+    public string PivotTitle { get => _pivotTitle; private set => Set(ref _pivotTitle, value); }
+    public string PivotAccept { get => _pivotAccept; private set => Set(ref _pivotAccept, value); }
+    public string PivotDecline { get => _pivotDecline; private set => Set(ref _pivotDecline, value); }
+
+    /// <summary>"Why this build" is folded open. Closed by default: the slots already carry the main reasons.</summary>
+    public bool WhyOpen { get => _whyOpen; set => Set(ref _whyOpen, value); }
+    public string WhyHint { get => _whyHint; private set => Set(ref _whyHint, value); }
+    public IReadOnlyList<MetaBar> MetaBars { get => _metaBars; private set => Set(ref _metaBars, value); }
+
+    /// <summary>With a full build: the items worth selling, and what your gold buys after a sale.</summary>
+    public bool ShowSwaps { get => _showSwaps; private set => Set(ref _showSwaps, value); }
+    public bool ShowSellAdvice { get => _showSellAdvice; private set => Set(ref _showSellAdvice, value); }
 
     public string BuildHeader { get => _buildHeader; private set => Set(ref _buildHeader, value); }
 
     /// <summary>Other ways to go than your plan: the best item per direction it doesn't cover.</summary>
     public IReadOnlyList<AlternativeRow> Alternatives { get => _alternatives; private set => Set(ref _alternatives, value); }
-    public ItemRow? Boots { get => _boots; private set => Set(ref _boots, value); }
     public IReadOnlyList<string> Advice { get => _advice; private set => Set(ref _advice, value); }
     public string Footer { get => _footer; set => Set(ref _footer, value); }
 
@@ -458,13 +520,23 @@ public sealed class MainViewModel : INotifyPropertyChanged
             LiveChampionChanged?.Invoke(this, rec.Game);
         }
         DamageSummary = rec.DamageSummary;
+        DamageSplit = $"{BuildRules.Percent(rec.Game.Enemies.PhysicalShare)} AD · {BuildRules.Percent(rec.Game.Enemies.MagicShare)} AP";
         AdShare = new GridLength(rec.Game.Enemies.PhysicalShare, GridUnitType.Star);
         ApShare = new GridLength(rec.Game.Enemies.MagicShare, GridUnitType.Star);
-        // Six slots: what you own fills some, boots take one, and the plan only lists what fits in the rest.
+        // Six slots: what you own fills some, and the plan in buy order, boots included, fills the rest.
         var finished = me.Items.Where(i => i.Kind is ItemKind.Legendary or ItemKind.Boots).ToList();
-        OwnedItems = finished.Select(i => new OwnedItemRow(i.Name, data.ItemIconUrl(i.Id))).ToList();
         var slotsLeft = rec.SlotsLeft;
-        var planned = _planner.Upcoming.Take(slotsLeft).Select(s => s.Item.Id).ToList();
+        var plan = _planner.Upcoming.ToList();
+        // An item a switch brings in shows on the slot it changes, not a second time further down.
+        if (_planner.PendingPivot is { Drop.Count: > 0 } switching)
+        {
+            var adds = switching.Add.Select(a => a.Id).ToHashSet();
+            var at = plan.FindIndex(u => switching.Drop.Any(d => d.Id == u.Item.Id));
+            if (at >= 0)
+                plan = plan.Where((u, i) => i <= at || !adds.Contains(u.Item.Id)).ToList();
+        }
+        var upcoming = plan.Take(slotsLeft).ToList();
+        var planned = upcoming.Select(s => s.Item.Id).Concat(_planner.PendingPivot?.Add.Select(a => a.Id) ?? []).ToList();
         // A full build lists what's worth selling instead: the new item, with the one it replaces as its first tag.
         Items = rec.IsFull
             ? rec.Swaps.Select((s, i) => ToRow(s.Buy, i + 1, data) with { Reasons = [$"sell {s.Sell.Item.Name}", .. ToRow(s.Buy, 0, data).Reasons] }).ToList()
@@ -476,7 +548,6 @@ public sealed class MainViewModel : INotifyPropertyChanged
             : finished.Count == 0 ? "YOUR BUILD · MOST IMPORTANT FIRST"
             : $"STILL TO BUY · {slotsLeft} SLOT{(slotsLeft == 1 ? "" : "S")} LEFT";
         Raise(nameof(NextItem));
-        Boots = rec.Boots is { } boots ? ToRow(boots, 0, data) : null;
         Advice = rec.Advice.Count > 0
             ? rec.Advice.Select(a => a.Text).ToList()
             : ["Nothing unusual about this game, so follow your standard build."];
@@ -485,6 +556,29 @@ public sealed class MainViewModel : INotifyPropertyChanged
         HasPivot = pivot is not null;
         PivotSummary = pivot?.Summary ?? "";
         PivotReasons = pivot?.Reasons.Select(r => $"Because {char.ToLowerInvariant(r[0])}{r[1..]}").ToList() ?? [];
+
+        Slots = BuildSlots(rec, finished, upcoming, pivot, data);
+        SlotsHeader = !rec.IsFull ? "YOUR SIX SLOTS · IN BUY ORDER" : rec.Swaps.Count > 0 ? "YOUR BUILD IS FULL · WORTH SELLING ONE" : "YOUR BUILD IS FULL";
+        SlotsSummary = rec.IsFull ? "" : $"{finished.Count} filled · {slotsLeft} to go";
+        ShowSwaps = rec.IsFull && rec.Swaps.Count > 0;
+        ChampionIconUrl = data.ChampionIconUrl(me.Champion.Id);
+        var cards = rec.Game.Augments;
+        CardsText = cards.Count == 0 ? "" : $" · {(cards.Count == 1 ? "card" : "cards")}: {string.Join(", ", cards.Select(a => a.Name))}";
+        CardNotes = cards.Select(a => new CardNote(a.Name, rec.Situations.FirstOrDefault(s => s.Label == a.Name)?.Description is { } d ? $"{d}." : "")).ToList();
+
+        // The switch card names the slot it changes and says what it would do.
+        var slotNumber = pivot is null ? -1 : pivot.Drop.Concat(pivot.Later).Select(d => upcoming.FindIndex(u => u.Item.Id == d.Id)).FirstOrDefault(i => i >= 0, -1);
+        PivotHeader = pivot is null ? "" : $"{(slotNumber >= 0 ? $"SLOT {slotNumber + 1} · " : "")}SWITCH SUGGESTED · +{pivot.Gain:0.0}";
+        PivotTitle = pivot?.Title ?? "";
+        PivotAccept = pivot is { Add.Count: 1 } ? $"Switch to {pivot.Add[0].Name}" : "Switch build";
+        PivotDecline = pivot is { Drop.Count: > 0 } ? $"Keep {pivot.Drop[0].Name}" : "Keep my build";
+        PivotNotes = pivot?.Reasons.Select(r => r.EndsWith(" (new)", StringComparison.Ordinal) ? $"{r[..^6]}. New since you took this build." : $"{r}.").ToList() ?? [];
+
+        MetaBars = rec.Meta is { } chosen
+            ? new[] { (chosen.Build, true) }.Concat(chosen.Others.Take(2).Select(o => (o.Build, false)))
+                .Where(b => b.Item1.HasStats).Select(b => ToBar(b.Item1, b.Item2)).ToList()
+            : [];
+        WhyHint = $"{Advice.Count + (BuildSource.Length > 0 ? 1 : 0)} reasons";
         if (pivot is not null && pivot.Summary != _lastPivotSummary)
             Chime(); // You're playing, not watching this window: make new suggestions noticeable.
         _lastPivotSummary = pivot?.Summary;
@@ -512,6 +606,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
 
         var me = rec.Game.Me;
         BuyText = BuyAdvisor.ForBuild(rec, _planner.Upcoming.FirstOrDefault()?.Item, _gold, data.Items)?.Text ?? "";
+        ShowSellAdvice = rec.IsFull && BuyText.Length > 0;
         Tips = LateGameAdvisor.Advise(rec, _gold, data.Items);
 
         var starting = rec.Game.Mode == GameMode.SummonersRift && rec.Game.GameTimeSeconds < 120 && me.Items.Count == 0;
@@ -560,6 +655,58 @@ public sealed class MainViewModel : INotifyPropertyChanged
         _tab = tab;
         foreach (var name in new[] { nameof(IsBuildTab), nameof(IsAugmentsTab), nameof(IsPlayersTab) })
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
+    }
+
+    private IReadOnlyList<string> _pivotNotes = [];
+
+    /// <summary>The switch's reasons as sentences: "Enemy has 3 tanks (...). New since you took this build."</summary>
+    public IReadOnlyList<string> PivotNotes { get => _pivotNotes; private set => Set(ref _pivotNotes, value); }
+
+    private static List<SlotRow> BuildSlots(BuildRecommendation rec, List<ItemInfo> finished, List<ScoredItem> upcoming, Pivot? pivot, StaticGameData data)
+    {
+        var slots = finished.Select(i => new SlotRow(0, "Owned", i.Name, data.ItemIconUrl(i.Id), "", "Owned")).ToList();
+        for (var i = 0; i < upcoming.Count; i++)
+        {
+            var item = upcoming[i].Item;
+            // A suggested switch shows on the slot it changes.
+            var dropAt = pivot?.Drop.ToList().FindIndex(d => d.Id == item.Id) ?? -1;
+            if (pivot is not null && dropAt >= 0 && (pivot.Add.ElementAtOrDefault(dropAt) ?? pivot.Add.FirstOrDefault()) is { } replacement)
+            {
+                slots.Add(new SlotRow(i + 1, "Switch", $"{replacement.Name}?", data.ItemIconUrl(replacement.Id),
+                    rec.Find(replacement.Id) is { } scored ? Tag(scored) : "", $"{item.TotalGold:N0}g → {replacement.TotalGold:N0}g")
+                {
+                    OldName = item.Name, OldIconUrl = data.ItemIconUrl(item.Id),
+                });
+                continue;
+            }
+            if (i > 0)
+            {
+                slots.Add(new SlotRow(i + 1, "Planned", item.Name, data.ItemIconUrl(item.Id), Tag(upcoming[i]), $"{item.TotalGold:N0}g"));
+                continue;
+            }
+            var done = item.TotalGold <= 0 ? 0 : Math.Clamp(1 - (double)BuyAdvisor.RemainingCost(item, rec.Game.Me.Items, data.Items) / item.TotalGold, 0, 1);
+            slots.Add(new SlotRow(1, "Next", item.Name, data.ItemIconUrl(item.Id), Tag(upcoming[i]), "")
+            {
+                ProgressDone = new(done, GridUnitType.Star), ProgressLeft = new(1 - done, GridUnitType.Star),
+            });
+        }
+        while (slots.Count < BuildRecommendation.FullBuild)
+            slots.Add(new SlotRow(0, "Empty", "Empty", "", "", ""));
+        return slots;
+    }
+
+    // The strongest reason, with its points, or else what the item's passive gives you.
+    private static string Tag(ScoredItem item) =>
+        item.Reasons.FirstOrDefault() is { } reason ? $"{reason.Situation.Label} +{reason.Points:0.0}"
+        : item.Effects.FirstOrDefault() is { } effect ? effect[(effect.IndexOf(": ", StringComparison.Ordinal) + 1)..].Trim() // "Magical Opus: +95 AP" is "+95 AP"
+        : "";
+
+    private static MetaBar ToBar(MetaBuild build, bool chosen)
+    {
+        // 40% to 60% fills the bar: that's where builds differ.
+        var filled = Math.Clamp((build.WinRate - 0.40) / 0.20, 0.05, 1.0);
+        var name = $"{char.ToUpperInvariant(build.Style.DisplayName()[0])}{build.Style.DisplayName()[1..]}";
+        return new MetaBar(name, $"{build.WinRate:P1} · {build.Games:N0} games", new(filled, GridUnitType.Star), new(1 - filled, GridUnitType.Star), chosen);
     }
 
     private static ItemRow ToRow(ScoredItem item, int rank, StaticGameData data) =>

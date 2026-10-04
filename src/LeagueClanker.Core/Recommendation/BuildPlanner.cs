@@ -21,6 +21,11 @@ public sealed record Pivot(IReadOnlyList<ItemInfo> Add, IReadOnlyList<ItemInfo> 
         : Later.Count > 0 ? $"Buy {Names(Add)} before {Names(Later)}"
         : $"Add {Names(Add)} to your next items";
 
+    /// <summary>The switch card's heading: "Void Staff instead of Lich Bane".</summary>
+    public string Title => Drop.Count > 0 ? $"{Names(Add)} instead of {Names(Drop)}"
+        : Later.Count > 0 ? $"{Names(Add)} before {Names(Later)}"
+        : $"Add {Names(Add)}";
+
     private static string Names(IEnumerable<ItemInfo> items) => string.Join(" + ", items.Select(i => i.Name));
 }
 
@@ -137,7 +142,7 @@ public sealed class BuildPlanner
 
     private void Adopt(BuildRecommendation recommendation)
     {
-        _plan = FinishStartedFirst(recommendation.Ranked.Take(PlanLength).Select(s => s.Item).ToList(), recommendation);
+        _plan = FinishStartedFirst(recommendation.BuyOrder.Take(PlanLength).Select(s => s.Item).ToList(), recommendation);
         Upcoming = _plan.Select(i => recommendation.Find(i.Id)!).ToList();
         _planSituations = recommendation.Situations.Select(s => s.Label).ToHashSet();
         PendingPivot = null;
@@ -150,12 +155,13 @@ public sealed class BuildPlanner
         // Bought items and items that stopped being candidates (e.g. a unique passive you now have) leave quietly.
         _plan = _plan.Where(i => latest.Find(i.Id) is not null).ToList();
 
-        // Top up from the latest ranking when the plan runs short. Extending the plan isn't a pivot.
-        foreach (var next in latest.Ranked.Select(s => s.Item))
+        // Top up from the latest ranking when the plan runs short. Extending the plan isn't a pivot, and other boots
+        // than the ones you planned are a pivot, not a second pair.
+        foreach (var next in latest.BuyOrder.Select(s => s.Item))
         {
             if (_plan.Count >= PlanLength)
                 break;
-            if (_plan.All(i => i.Id != next.Id))
+            if (_plan.All(i => i.Id != next.Id) && !(next.IsBoots && _plan.Any(i => i.IsBoots)))
                 _plan.Add(next);
         }
 
@@ -166,8 +172,16 @@ public sealed class BuildPlanner
         var score = latest.Meta is null
             ? latest.Ranked.ToDictionary(s => s.Item.Id, s => s.Total)
             : latest.Ranked.Select((s, index) => (s.Item.Id, Score: -index * 10.0)).ToDictionary(x => x.Id, x => x.Score);
+        // Boots keep their place in the order (after the first item) instead of competing on score with the legendaries.
         var near = Near(latest);
-        _plan = [.. Reorder(_plan.Take(near).ToList(), score), .. Reorder(_plan.Skip(near).ToList(), score)];
+        var boots = _plan.FirstOrDefault(i => i.IsBoots);
+        var items = _plan.Where(i => !i.IsBoots).ToList();
+        var bootsAt = boots is null ? -1 : Math.Max(0, latest.BootsIndex);
+        var nearItems = boots is not null && bootsAt < near ? near - 1 : near;
+        items = [.. Reorder(items.Take(nearItems).ToList(), score), .. Reorder(items.Skip(nearItems).ToList(), score)];
+        if (boots is not null)
+            items.Insert(Math.Min(bootsAt, items.Count), boots);
+        _plan = items;
 
         _plan = FinishStartedFirst(_plan, latest);
         Upcoming = _plan.Select(i => latest.Find(i.Id)!).ToList();
@@ -211,7 +225,7 @@ public sealed class BuildPlanner
         var near = Near(latest);
         var planNext = Upcoming.Take(near).ToList();
         // Compare with the latest ranking in the order the plan uses: an item you've started goes first in both.
-        var latestNext = FinishStartedFirst(latest.Ranked.Select(s => s.Item).ToList(), latest)
+        var latestNext = FinishStartedFirst(latest.BuyOrder.Select(s => s.Item).ToList(), latest)
             .Take(near)
             .Select(i => latest.Find(i.Id)!)
             .ToList();
@@ -226,7 +240,7 @@ public sealed class BuildPlanner
         // items: once most of it is bought, filler items fill the next slots, and swapping between fillers isn't worth asking.
         var fresh = added
             .Where(s => !_declined.Contains(s.Item.Id) && s.Reasons.Any(r => r.Points >= MinReasonPoints))
-            .Where(s => latest.Meta is not { } meta || meta.Includes(s.Item))
+            .Where(s => latest.Meta is not { } meta || meta.Includes(s.Item) || s.Item.IsBoots)
             .ToList();
         if (fresh.Count == 0)
             return null;
@@ -245,7 +259,7 @@ public sealed class BuildPlanner
         // only moved it up one place, so accepting looked like it did nothing; now it says what it pushes back.
         // Only the pivot's own items move: the new ones join your next purchases in the latest ranking's order, what
         // no longer fits there goes right behind them, and the rest of your plan keeps its order.
-        var rank = latest.Ranked.Select((s, index) => (s.Item.Id, index)).ToDictionary(x => x.Id, x => x.index);
+        var rank = latest.BuyOrder.Select((s, index) => (s.Item.Id, index)).ToDictionary(x => x.Id, x => x.index);
         var freshIds = fresh.Select(s => s.Item.Id).ToHashSet();
         var next = planNext.Select(s => s.Item)
             .Where(i => dropped.All(d => d.Item.Id != i.Id))

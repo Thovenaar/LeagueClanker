@@ -22,7 +22,35 @@ public class BuildPlannerTests
         planner.Update(rec);
 
         Assert.Null(planner.PendingPivot);
-        Assert.Equal(rec.Items.Select(i => i.Item.Id), planner.Upcoming.Select(i => i.Item.Id));
+        Assert.Equal(rec.BuyOrder.Take(BuildPlanner.PlanLength).Select(i => i.Item.Id), planner.Upcoming.Select(i => i.Item.Id));
+    }
+
+    [Fact]
+    public void Boots_ArePartOfTheBuyOrder_AfterTheFirstItem()
+    {
+        var fresh = Garen(AdTeam);
+        var withItem = Garen(AdTeam, owned: TestData.Cleaver);
+
+        Assert.Equal(TestData.ArmorBoots, fresh.BuyOrder[1].Item.Id); // after the first item
+        Assert.Equal(TestData.ArmorBoots, withItem.BuyOrder[0].Item.Id); // next, once you have one
+        Assert.Equal(6, fresh.SlotsLeft);
+        Assert.Equal(5, withItem.SlotsLeft);
+        Assert.Equal(4, Garen(AdTeam, owned: [TestData.Cleaver, TestData.ArmorBoots]).SlotsLeft);
+    }
+
+    [Fact]
+    public void Boots_KeepTheirPlace_AndOtherBootsAreAPivot()
+    {
+        var planner = new BuildPlanner();
+        planner.Update(Garen(AdTeam));
+        Assert.Equal(TestData.ArmorBoots, planner.Upcoming[1].Item.Id);
+
+        planner.Update(Garen(ApTeam));
+        planner.Accept();
+
+        var boots = planner.Upcoming.Where(i => i.Item.IsBoots).ToList();
+        Assert.Equal(TestData.MagicBoots, Assert.Single(boots).Item.Id); // swapped, not a second pair
+        Assert.Equal(1, planner.Upcoming.ToList().FindIndex(i => i.Item.IsBoots));
     }
 
     [Fact]
@@ -37,6 +65,7 @@ public class BuildPlannerTests
         Assert.Contains(pivot.Add, i => i.Id is TestData.Cloak or TestData.Veil);
         Assert.Contains(pivot.Reasons, r => r.Contains("AP") && r.EndsWith("(new)"));
         Assert.StartsWith("Swap ", pivot.Summary);
+        Assert.Contains(" instead of ", pivot.Title);
     }
 
     [Fact]
@@ -222,6 +251,7 @@ public class BuildPlannerTests
 
         var pivot = planner.PendingPivot!;
         Assert.Equal("Buy Blade of The Ruined King before Wit's End", pivot.Summary); // Wit's End is started, so it stays
+        Assert.Equal("Blade of The Ruined King before Wit's End", pivot.Title);
         planner.Accept();
         Assert.Equal([Nashors, Rage, Botrk], planner.Upcoming.Take(3).Select(i => i.Item.Id).Order());
         Assert.Contains(planner.Upcoming, i => i.Item.Id == Wits); // pushed back, not dropped
