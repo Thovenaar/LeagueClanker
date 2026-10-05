@@ -47,6 +47,14 @@ public partial class MainWindow : Window
 
     private void OnPickOption(object sender, RoutedEventArgs e) => ViewModel.Augments.Pick(CardName(sender));
 
+    private void OnSelectCard(object sender, RoutedEventArgs e) => ViewModel.Augments.SelectCard(CardName(sender));
+
+    private void OnSelectGame(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement { DataContext: GameRow game })
+            ViewModel.SelectRecap(game.Played);
+    }
+
     // Mouse, keyboard and accessibility tools all toggle IsChecked. A freshly built row also sets it from
     // the view model, which matches the row already and is ignored.
     private void OnGoldenChanged(object sender, RoutedEventArgs e)

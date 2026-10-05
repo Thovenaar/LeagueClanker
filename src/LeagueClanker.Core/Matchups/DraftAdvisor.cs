@@ -4,7 +4,14 @@ using LeagueClanker.Core.StaticData;
 
 namespace LeagueClanker.Core.Matchups;
 
-public sealed record BanSuggestion(ChampionInfo Champion, string Reason);
+public sealed record BanSuggestion(ChampionInfo Champion, string Reason)
+{
+    /// <summary>Your win rate against it when it's a threat to your champion, 0-1. Null for a strong pick in your role.</summary>
+    public double? YouWin { get; init; }
+
+    /// <summary>"Tier 1" for a strong pick in your role. Null for a threat to your champion.</summary>
+    public string? Tier { get; init; }
+}
 
 /// <param name="Me">Your pick or hover. Null before either.</param>
 public sealed record DraftRequest(ChampionInfo? Me, bool IsLocked, Position Position, GameMode Mode, IReadOnlyList<ChampionInfo> Allies, IReadOnlyList<ChampionInfo> Enemies)
@@ -26,6 +33,9 @@ public sealed record DraftReport(IReadOnlyList<BanSuggestion> Bans, IReadOnlyLis
 {
     /// <summary>"Enemy so far: 70% AP, 2 tanks, heavy crowd control". Null before they have two picks.</summary>
     public string? EnemySummary { get; init; }
+
+    /// <summary>Your team's share of magic damage so far, 0-1, for the damage bar. Null before it has two picks.</summary>
+    public double? TeamMagicShare { get; init; }
 
     public string? Note { get; init; }
 }
@@ -74,6 +84,7 @@ public sealed class DraftAdvisor(IMatchupData data, ChampionCatalog champions)
         return new DraftReport(bans, warnings, fill, fill.Count == 0 ? null : FillHeader(gap))
         {
             EnemySummary = Summary(request.Enemies),
+            TeamMagicShare = team.Count < 2 ? null : MagicShare(team.Select(c => (c, ArchetypeClassifier.Classify(c))).ToList()),
             Note = note,
         };
     }
@@ -92,7 +103,7 @@ public sealed class DraftAdvisor(IMatchupData data, ChampionCatalog champions)
                     .Where(m => m.Games >= MatchupAdvisor.MinMatchupGames && m.WinRate <= TeamLosesTo && Available(m.OpponentKey))
                     .OrderBy(m => m.WinRate)
                     .Select(m => champions.GetByKey(m.OpponentKey) is { } c
-                        ? new BanSuggestion(c, $"Beats {me.Name}: you win {m.WinRate:P1} over {m.Games:N0} games.")
+                        ? new BanSuggestion(c, $"Beats {me.Name}: you win {m.WinRate:P1} over {m.Games:N0} games.") { YouWin = m.WinRate }
                         : null)
                     .OfType<BanSuggestion>()
                     .Take(MaxSuggestions)
@@ -111,7 +122,7 @@ public sealed class DraftAdvisor(IMatchupData data, ChampionCatalog champions)
             .Where(c => Available(c.Key))
             .Take(MaxSuggestions)
             .Select(c => champions.GetByKey(c.Key) is { } champion
-                ? new BanSuggestion(champion, $"Tier {c.Stats.Tier} in {role}: {c.Stats.WinRate:P1} win rate, banned in {c.Stats.BanRate:P0} of games.")
+                ? new BanSuggestion(champion, $"Tier {c.Stats.Tier} in {role}: {c.Stats.WinRate:P1} win rate, banned in {c.Stats.BanRate:P0} of games.") { Tier = $"Tier {c.Stats.Tier}" }
                 : null)
             .OfType<BanSuggestion>()
             .ToList();

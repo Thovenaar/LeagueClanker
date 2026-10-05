@@ -2,6 +2,7 @@ using System.ComponentModel;
 using System.Media;
 using System.Runtime.CompilerServices;
 using System.Windows;
+using System.Windows.Media;
 using LeagueClanker.Core;
 using LeagueClanker.Core.Analysis;
 using LeagueClanker.Core.History;
@@ -45,7 +46,39 @@ public sealed record ChampionStatRow(string Name, string IconUrl, string Record,
 
 public sealed record PlayerRow(
     string Name, string IconUrl, int Level, bool IsMe, string Note,
-    double AttackDamage, double AbilityPower, double Armor, double MagicResist, double Health, double AttackSpeed, double CritChance);
+    double AttackDamage, double AbilityPower, double Armor, double MagicResist, double Health, double AttackSpeed, double CritChance)
+{
+    // Each stat cell's background: deeper when the number is high for this lobby.
+    public Brush AdHeat { get; init; } = Brushes.Transparent;
+    public Brush ApHeat { get; init; } = Brushes.Transparent;
+    public Brush ArmorHeat { get; init; } = Brushes.Transparent;
+    public Brush MrHeat { get; init; } = Brushes.Transparent;
+    public Brush HpHeat { get; init; } = Brushes.Transparent;
+
+    /// <summary>One line on why this enemy matters: "Most AP on their team: 436". Empty for your team.</summary>
+    public string Threat { get; init; } = "";
+
+    /// <summary>Their damage split (AD, then AP) and toughness against the lobby, for the threat cards' bars.</summary>
+    public GridLength DamageAd { get; init; } = new(1, GridUnitType.Star);
+    public GridLength DamageAp { get; init; } = new(1, GridUnitType.Star);
+    public GridLength Tough { get; init; } = new(1, GridUnitType.Star);
+    public GridLength NotTough { get; init; } = new(1, GridUnitType.Star);
+}
+
+/// <summary>A game in "your games": the result, champion, lane or mode, and how much of the build you followed.</summary>
+public sealed record GameRow(DateTime Played, string Result, bool? Win, string ChampionName, string IconUrl, string Detail, string Built)
+{
+    public bool IsSelected { get; init; }
+}
+
+/// <summary>An item you finished a game with, marked when it was in LeagueClanker's build. Empty for an unused slot.</summary>
+public sealed record FinalSlot(string Name, string IconUrl, bool Advised)
+{
+    public bool IsEmpty => Name.Length == 0;
+}
+
+/// <summary>A pivot in a recap: when, whether you took it, and what it was.</summary>
+public sealed record PivotLine(string Time, bool Took, string Text);
 
 public enum Tab
 {
@@ -348,10 +381,78 @@ public sealed class MainViewModel : INotifyPropertyChanged
         GamePlayed?.Invoke(this, recap);
     }
 
+    private IReadOnlyList<GameRow> _recentGames = [];
+    private string _recapResult = "";
+    private string _recapOutcome = "";
+    private string _recapChampionIcon = "";
+    private string _recapChampion = "";
+    private string _recapPlaystyle = "";
+    private string _recapDetail = "";
+    private IReadOnlyList<FinalSlot> _recapSlots = [];
+    private string _recapBuilt = "";
+    private IReadOnlyList<PivotLine> _recapPivots = [];
+    private string _recapCards = "";
+    private string _gamesSummary = "";
+
+    /// <summary>Your recent games, newest first. Clicking one shows it in the recap card.</summary>
+    public IReadOnlyList<GameRow> RecentGames { get => _recentGames; private set => Set(ref _recentGames, value); }
+
+    /// <summary>"VICTORY", "DEFEAT" or "GAME OVER" on the recap card, with "win" or "loss" for its color.</summary>
+    public string RecapResult { get => _recapResult; private set => Set(ref _recapResult, value); }
+    public string RecapOutcome { get => _recapOutcome; private set => Set(ref _recapOutcome, value); }
+    public string RecapChampionIcon { get => _recapChampionIcon; private set => Set(ref _recapChampionIcon, value); }
+    public string RecapChampion { get => _recapChampion; private set => Set(ref _recapChampion, value); }
+    public string RecapPlaystyle { get => _recapPlaystyle; private set => Set(ref _recapPlaystyle, value); }
+
+    /// <summary>"31:24 · Top vs Darius"</summary>
+    public string RecapDetail { get => _recapDetail; private set => Set(ref _recapDetail, value); }
+    public IReadOnlyList<FinalSlot> RecapSlots { get => _recapSlots; private set => Set(ref _recapSlots, value); }
+
+    /// <summary>"4 of your 5 items were in LeagueClanker's build."</summary>
+    public string RecapBuilt { get => _recapBuilt; private set => Set(ref _recapBuilt, value); }
+    public IReadOnlyList<PivotLine> RecapPivots { get => _recapPivots; private set => Set(ref _recapPivots, value); }
+    public string RecapCards { get => _recapCards; private set => Set(ref _recapCards, value); }
+
+    /// <summary>"7 wins, 3 losses" over the listed games.</summary>
+    public string GamesSummary { get => _gamesSummary; private set => Set(ref _gamesSummary, value); }
+
+    /// <summary>Show another of your games in the recap card.</summary>
+    public void SelectRecap(DateTime played)
+    {
+        if (Recaps?.Games.FirstOrDefault(g => g.Played == played) is { } recap)
+            ShowRecap(recap);
+    }
+
+    private const int ListedGames = 8;
+
+    private string Lane(GameRecap recap, StaticGameData data) =>
+        recap.LaneOpponent is { } opponent && data.Champions.Get(opponent) is { } lane
+            ? $"{recap.Position.DisplayName()} vs {lane.Name}"
+            : recap.Mode.DisplayName();
+
     private void ShowRecap(GameRecap recap)
     {
         if (_data is not { } data)
             return;
+        var length = TimeSpan.FromSeconds(recap.DurationSeconds).ToString(@"mm\:ss");
+        RecapResult = recap.Win switch { true => "VICTORY", false => "DEFEAT", null => "GAME OVER" };
+        RecapOutcome = recap.Win switch { true => "win", false => "loss", null => "" };
+        RecapChampionIcon = data.ChampionIconUrl(recap.ChampionId);
+        RecapChampion = recap.ChampionName;
+        RecapPlaystyle = $"{char.ToUpperInvariant(recap.Playstyle.InText()[0])}{recap.Playstyle.InText()[1..]}";
+        RecapDetail = $"{length} · {Lane(recap, data)}";
+        RecapSlots = recap.FinalItems.Select(id => new FinalSlot(data.Items.Get(id)?.Name ?? id.ToString(), data.ItemIconUrl(id), recap.AdvisedItems.Contains(id)))
+            .Concat(Enumerable.Repeat(new FinalSlot("", "", false), Math.Max(0, BuildRecommendation.FullBuild - recap.FinalItems.Count)))
+            .Take(BuildRecommendation.FullBuild).ToList();
+        RecapBuilt = recap.FinalItems.Count == 0 ? "" : $"{recap.AdvisedAndBuilt} of your {recap.FinalItems.Count} items were in LeagueClanker's build.";
+        RecapPivots = recap.Pivots.Select(p => new PivotLine(TimeSpan.FromSeconds(p.GameTime).ToString(@"mm\:ss"), p.Accepted, p.Summary)).ToList();
+        RecapCards = recap.Augments.Count == 0 ? "" : $"Cards: {string.Join(", ", recap.Augments)}";
+        var games = Recaps?.Games.Take(ListedGames).ToList() ?? [recap];
+        RecentGames = games.Select(g => new GameRow(g.Played, g.Win switch { true => "Victory", false => "Defeat", null => "Game over" }, g.Win, g.ChampionName,
+                data.ChampionIconUrl(g.ChampionId), $"{Lane(g, data)} · {TimeSpan.FromSeconds(g.DurationSeconds):mm\\:ss}",
+                g.FinalItems.Count == 0 ? "" : $"{g.AdvisedAndBuilt} of {g.FinalItems.Count}") { IsSelected = g.Played == recap.Played })
+            .ToList();
+        GamesSummary = $"{games.Count(g => g.Win == true)} wins, {games.Count(g => g.Win == false)} losses";
         string Name(int id) => data.Items.Get(id)?.Name ?? id.ToString();
         var result = recap.Win switch { true => "Victory", false => "Defeat", null => "Game over" };
         LastGameTitle = $"{result} \u00b7 {recap.ChampionName} ({recap.Playstyle.InText()}) \u00b7 {TimeSpan.FromSeconds(recap.DurationSeconds):mm\\:ss}";
@@ -374,6 +475,11 @@ public sealed class MainViewModel : INotifyPropertyChanged
     }
 
     public string BuyText { get => _buyText; private set => Set(ref _buyText, value); }
+
+    private string _nextItemLeft = "";
+
+    /// <summary>"2,200g left": what the shop still charges for the next item, counting the parts you own.</summary>
+    public string NextItemLeft { get => _nextItemLeft; private set => Set(ref _nextItemLeft, value); }
 
     /// <summary>Full-build tips: swaps, elixirs, control wards.</summary>
     public IReadOnlyList<string> Tips { get => _tips; private set => Set(ref _tips, value); }
@@ -586,8 +692,10 @@ public sealed class MainViewModel : INotifyPropertyChanged
         ShowSwitchHint = pivot is null && _planner.CanSwitch;
         SwitchHint = $"Latest ranking prefers {string.Join(", ", _planner.LatestDifferences.Select(i => i.Name))} next.";
 
-        Team = new[] { me }.Concat(rec.Game.Allies.Players).Select(p => ToRow(p, p == me, data)).ToList();
-        Enemies = rec.Game.Enemies.Players.Select(p => ToRow(p, false, data)).ToList();
+        var team = new[] { me }.Concat(rec.Game.Allies.Players).Select(p => ToRow(p, p == me, data)).ToList();
+        // Most dangerous first: the most damage, AD and AP together.
+        var enemies = rec.Game.Enemies.Players.Select(p => ToRow(p, false, data)).OrderByDescending(r => r.AttackDamage + r.AbilityPower).ToList();
+        (Team, Enemies) = InLobby(team, enemies, rec.Game.Enemies.Players.Where(p => p.IsTanky).Select(p => p.Name).ToHashSet());
 
         HasAugments = rec.Game.Mode.HasAugments();
         if (HasAugments)
@@ -606,6 +714,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
 
         var me = rec.Game.Me;
         BuyText = BuyAdvisor.ForBuild(rec, _planner.Upcoming.FirstOrDefault()?.Item, _gold, data.Items)?.Text ?? "";
+        NextItemLeft = _planner.Upcoming.FirstOrDefault() is { } next ? $"{BuyAdvisor.RemainingCost(next.Item, me.Items, data.Items):N0}g left" : "";
         ShowSellAdvice = rec.IsFull && BuyText.Length > 0;
         Tips = LateGameAdvisor.Advise(rec, _gold, data.Items);
 
@@ -711,6 +820,44 @@ public sealed class MainViewModel : INotifyPropertyChanged
 
     private static ItemRow ToRow(ScoredItem item, int rank, StaticGameData data) =>
         new(rank, item.Item.Name, item.Item.TotalGold, data.ItemIconUrl(item.Item.Id), [.. item.Reasons.Select(r => r.Situation.Label), .. item.Effects]);
+
+    /// <summary>Heat for each stat cell against the whole lobby, and for enemies the line on why they matter.</summary>
+    private static (List<PlayerRow> Team, List<PlayerRow> Enemies) InLobby(List<PlayerRow> team, List<PlayerRow> enemies, HashSet<string> tanks)
+    {
+        var all = team.Concat(enemies).ToList();
+        double Max(Func<PlayerRow, double> stat) => Math.Max(1, all.Max(stat));
+        var (ad, ap, armor, mr, hp) = (Max(r => r.AttackDamage), Max(r => r.AbilityPower), Max(r => r.Armor), Max(r => r.MagicResist), Max(r => r.Health));
+        static Brush Heat(double value, double max, byte r, byte g, byte b)
+        {
+            var brush = new SolidColorBrush(Color.FromArgb((byte)(255 * (0.08 + 0.5 * Math.Clamp(value / max, 0, 1))), r, g, b));
+            brush.Freeze();
+            return brush;
+        }
+        PlayerRow Shade(PlayerRow row)
+        {
+            var damage = row.AttackDamage + row.AbilityPower;
+            var tough = Math.Clamp(0.5 * row.Health / hp + 0.5 * (row.Armor + row.MagicResist) / Math.Max(1, all.Max(r => r.Armor + r.MagicResist)), 0, 1);
+            return row with
+            {
+                AdHeat = Heat(row.AttackDamage, ad, 217, 83, 79),
+                ApHeat = Heat(row.AbilityPower, ap, 79, 143, 217),
+                ArmorHeat = Heat(row.Armor, armor, 200, 170, 110),
+                MrHeat = Heat(row.MagicResist, mr, 200, 170, 110),
+                HpHeat = Heat(row.Health, hp, 200, 170, 110),
+                DamageAd = new(damage == 0 ? 1 : row.AttackDamage, GridUnitType.Star),
+                DamageAp = new(damage == 0 ? 1 : row.AbilityPower, GridUnitType.Star),
+                Tough = new(tough, GridUnitType.Star),
+                NotTough = new(1 - tough, GridUnitType.Star),
+            };
+        }
+        string Threat(PlayerRow row) =>
+            tanks.Contains(row.Name) ? $"Their tank: {row.Armor:0} armor, {row.MagicResist:0} magic resist"
+            : row.AbilityPower >= 100 && row.AbilityPower == enemies.Max(e => e.AbilityPower) ? $"Most AP on their team: {row.AbilityPower:0}"
+            : row.AttackDamage == enemies.Max(e => e.AttackDamage) ? $"Most AD on their team: {row.AttackDamage:0}"
+            : row.AttackSpeed == enemies.Max(e => e.AttackSpeed) ? $"Fastest attacks: {row.AttackSpeed:0.00} per second"
+            : $"{row.AttackDamage:0} AD · {row.AbilityPower:0} AP";
+        return (team.Select(Shade).ToList(), enemies.Select(r => Shade(r) with { Threat = Threat(r) }).ToList());
+    }
 
     private static PlayerRow ToRow(PlayerProfile p, bool isMe, StaticGameData data)
     {

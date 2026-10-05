@@ -14,7 +14,22 @@ public sealed record AugmentRow(string Name, string Tier, string Description);
 /// <param name="CanBeGolden">The card still has its reroll, so it can be the one with the golden reroll.</param>
 public sealed record AugmentOptionRow(
     int Rank, string Name, string Tier, string Description, string Badge, bool BadgeFilled, bool CanReroll,
-    bool CanBeGolden, bool IsGolden, string Scores, string RerollNote, IReadOnlyList<string> Reasons, string Combos);
+    bool CanBeGolden, bool IsGolden, string Scores, string RerollNote, IReadOnlyList<string> Reasons, string Combos)
+{
+    /// <summary>1 to 5: how well the card fits right now, as a bar. The exact scores are in <see cref="Scores"/>.</summary>
+    public int Strength { get; init; }
+
+    /// <summary>"Strong fit", "Good fit", "Okay", "Weak fit", "Poor fit".</summary>
+    public string FitWord { get; init; } = "";
+
+    /// <summary>The bar's five segments, lit up to <see cref="Strength"/>.</summary>
+    public IReadOnlyList<bool> Segments => Enumerable.Range(0, 5).Select(i => i < Strength).ToList();
+
+    public bool IsSelected { get; init; }
+
+    /// <summary>"TAKE CRITICAL RHYTHM" for the best card, the card's name otherwise.</summary>
+    public string Heading => Rank == 1 ? $"TAKE {Name.ToUpperInvariant()}" : Name.ToUpperInvariant();
+}
 
 /// <summary>
 /// Augment offers for ARAM: Mayhem, ranked. Offers are read from the screen when possible (<see cref="OnScan"/>);
@@ -88,7 +103,42 @@ public sealed class AugmentPickerViewModel : INotifyPropertyChanged
     public IReadOnlyList<AugmentRow> Suggestions { get => _suggestions; private set => Set(ref _suggestions, value); }
     public IReadOnlyList<AugmentRow> Offer { get => _offerRows; private set => Set(ref _offerRows, value); }
     public IReadOnlyList<AugmentRow> Picked { get => _pickedRows; private set => Set(ref _pickedRows, value); }
-    public IReadOnlyList<AugmentOptionRow> Ranked { get => _ranked; private set => Set(ref _ranked, value); }
+    public IReadOnlyList<AugmentOptionRow> Ranked { get => _ranked; private set { Set(ref _ranked, value); ShowCards(); } }
+
+    private IReadOnlyList<AugmentOptionRow> _cards = [];
+    private AugmentOptionRow? _selectedCard;
+    private string? _selectedName;
+
+    /// <summary>The offered cards as tiles, in the order they sit on screen, the selected one marked.</summary>
+    public IReadOnlyList<AugmentOptionRow> Cards { get => _cards; private set => Set(ref _cards, value); }
+
+    /// <summary>The card whose reasons and buttons show under the tiles: the best one until you click another.</summary>
+    public AugmentOptionRow? SelectedCard { get => _selectedCard; private set => Set(ref _selectedCard, value); }
+
+    public void SelectCard(string name)
+    {
+        _selectedName = name;
+        ShowCards();
+    }
+
+    private void ShowCards()
+    {
+        var selected = Ranked.Any(r => r.Name == _selectedName) ? _selectedName : Ranked.FirstOrDefault()?.Name;
+        var onScreen = _offer.Select(a => a.Name).ToList();
+        Cards = Ranked.OrderBy(r => onScreen.IndexOf(r.Name) is var i and >= 0 ? i : int.MaxValue)
+            .Select(r => r with { IsSelected = r.Name == selected }).ToList();
+        SelectedCard = Cards.FirstOrDefault(r => r.IsSelected);
+    }
+
+    // How well a card fits right now, from its score: 6.1 is a strong fit, 1.7 weak, 0.3 poor.
+    private static (int Strength, string Word) Fit(double now) => now switch
+    {
+        >= 5 => (5, "Strong fit"),
+        >= 3.5 => (4, "Good fit"),
+        >= 2 => (3, "Okay"),
+        >= 0.8 => (2, "Weak fit"),
+        _ => (1, "Poor fit"),
+    };
     public string AdviceText { get => _adviceText; private set => Set(ref _adviceText, value); }
 
     /// <summary>Cards are on your screen right now. Compact mode shows the advice while this is true.</summary>
@@ -481,7 +531,11 @@ public sealed class AugmentPickerViewModel : INotifyPropertyChanged
                 $"now {o.Now:0.0} · with future picks {o.Expected:0.0}",
                 note,
                 o.Reasons.OrderByDescending(r => Math.Abs(r.Points)).Take(3).Select(r => (r.Points < 0 ? "− " : "+ ") + r.Text).ToList(),
-                o.Partners.Count > 0 ? $"Combos later: {string.Join(", ", o.Partners.Take(3))}" : "");
+                o.Partners.Count > 0 ? $"Combos later: {string.Join(", ", o.Partners.Take(3))}" : "")
+            {
+                Strength = Fit(o.Now).Strength,
+                FitWord = Fit(o.Now).Word,
+            };
         }).ToList();
         AdviceText = advice.Text;
         RerollText = advice.Reroll?.Text ?? "";

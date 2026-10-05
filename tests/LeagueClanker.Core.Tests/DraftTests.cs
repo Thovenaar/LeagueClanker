@@ -44,6 +44,8 @@ public class DraftTests
 
         Assert.Equal([Darius, Teemo], report.Bans.Select(b => b.Champion)); // 46% and 47%; Malphite is 52% for you, Vladimir is banned
         Assert.StartsWith("Beats Garen: you win 46.0%", report.Bans[0].Reason);
+        Assert.Equal(0.46, report.Bans[0].YouWin!.Value, 3); // for the ban tiles
+        Assert.Null(report.Bans[0].Tier);
     }
 
     [Fact]
@@ -55,6 +57,8 @@ public class DraftTests
 
         Assert.Equal([Malphite, Teemo, Vladimir, Garen], report.Bans.Select(b => b.Champion));
         Assert.Equal("Tier 1 in top: 51.5% win rate, banned in 16% of games.", report.Bans[0].Reason);
+        Assert.Equal("Tier 1", report.Bans[0].Tier);
+        Assert.Null(report.Bans[0].YouWin);
     }
 
     [Fact]
@@ -76,6 +80,7 @@ public class DraftTests
         var report = (await new DraftAdvisor(new FakeData(), Champions).AnalyzeAsync(request))!;
 
         Assert.Contains(report.Warnings, w => w.Contains("AD, so enemies only need armor"));
+        Assert.True(report.TeamMagicShare < 0.2, $"team AP {report.TeamMagicShare}"); // for the team damage bar
         Assert.Contains(report.Warnings, w => w.StartsWith("No frontline yet"));
         Assert.Equal("PICKS THAT ADD A FRONTLINE", report.FillHeader); // frontline matters more than damage type
         Assert.Equal([Darius, Malphite, Garen], report.FillPicks.Select(p => p.Champion));

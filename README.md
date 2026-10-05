@@ -34,11 +34,11 @@ Arena gets its own item shop, and Swiftplay's two lobby champions get runes and 
 |---|---|
 | ![Arena build](docs/screenshots/arena.png) | ![Swiftplay lobby](docs/screenshots/swiftplay.png) |
 
-For playing on one screen there's a compact mode, with just the next item, what to buy and the matchup:
+For playing on one screen there's a compact mode, with the next item, what to buy, the matchup and your six slots in a small strip:
 
 <img src="docs/screenshots/compact.png" alt="Compact mode" width="400">
 
-Between games it recaps the last one, with how much of LeagueClanker's build you followed, and shows your record per champion. In champ select your record against the enemy laner shows up next to the matchup:
+Between games it recaps your last game, with how much of LeagueClanker's build you followed. Your recent games are listed under it, and clicking one shows its recap. It also shows your record per champion. In champ select your record against the enemy laner shows up next to the matchup:
 
 <img src="docs/screenshots/history.png" alt="Last game recap and your champions" width="400">
 
@@ -170,7 +170,7 @@ Tick *dry run* (or add `-f dry_run=true`) to build and test without publishing. 
 
 During a game the app reads Riot's official Live Client Data API on localhost, and Data Dragon. It doesn't read game memory, inject into the client, send input, or draw inside the game. It's an ordinary window next to the game, so Vanguard has nothing to object to.
 
-In champ select it reads the League client's local API, the same one Porofessor, Blitz and Mobalytics use to import runes. The only things it changes are what *Apply* writes: your rune page, your summoner spells and an item set for the shop. With *Apply automatically* turned on in the settings, that happens when you lock in. Riot doesn't document that API, but it has tolerated rune importers for years.
+In champ select it reads the League client's local API, the same one Porofessor, Blitz and Mobalytics use to import runes. The only things it changes are what *Apply* writes: your rune page, your summoner spells and an item set for the shop. With *Apply when I lock in* turned on, next to the Apply button or in the settings, that happens when you lock in. Riot doesn't document that API, but it has tolerated rune importers for years.
 
 It also reads your own match history from that API, for your record per champion, and the client's language, to read augment cards in it. It only uses what the client shows you: picks as they lock in, your own role, mastery, champions and past games. It doesn't try to reveal what champ select hides, like player names in ranked or enemy picks in blind pick. That's what gets tools banned, while counters and matchup stats are what every approved app shows.
 
@@ -190,7 +190,10 @@ Everything that matters lives in `src/LeagueClanker.Core`.
 
 `Analysis/` turns each player into a profile. It estimates their archetype (mage, marksman, bruiser and so on), their AP/AD split, their threat from item gold and K/D, and how tanky, healing, shielding or CC-heavy they are. The AP/AD split starts from the champion and moves with what they buy, so an AP Kai'Sa counts as AP once she has the items.
 
-Every player gets a full stat block in `StatBlock.cs`: AD, AP, attack speed, crit, lethality, % penetration, ability haste (cooldown reduction in League Classic), life steal, omnivamp, spell vamp, armor, MR, health, move speed and range. Riot's API only exposes real stats for you, so yours come straight from the game, runes and buffs included. Percentage stats are the exception, because their units vary between game versions, so those still come from items. Everyone else's stats are base stats at their level, using League's growth curve, plus item stats. The Players tab shows all ten. Tankiness works the same way. Early on a tank champion is assumed to go tank. After about two items' worth of gold only what they bought counts, so an Ornn who built Liandry's and Sorcerer's Shoes stops counting as a tank. `samples/tanks-no-defense.json` shows that case. `ChampionKnowledge.cs` holds hand-kept lists of healers, shielders, true damage and heavy crowd control. `ChampionAbilities.cs` adds to them from the ability tooltips in Data Dragon's championFull.json, which mark healing, shields, true damage and statuses like stuns. It adds a champion when at least 2 abilities heal, 2 shield, 3 have hard crowd control (stuns, knock-ups, roots, suppression, charms, fears, taunts, sleeps, pulls) or 1 deals true damage to champions. The bar is high because the hand-kept lists already cover most champions, but new champions get picked up without a code change.
+Every player gets a full stat block in `StatBlock.cs`: AD, AP, attack speed, crit, lethality, % penetration, ability haste (cooldown reduction in League Classic), life steal, omnivamp, spell vamp, armor, MR, health, move speed and range. Riot's API only exposes real stats for you, so yours come straight from the game, runes and buffs included. Percentage stats are the exception, because their units vary between game versions, so those still come from items. Everyone else's stats are base stats at their level, using League's growth curve, plus item stats. The Players tab shows all ten, as a table where each stat is shaded against the highest in the lobby, or as a card per enemy with their damage split, how tough they are and why they matter ("Most AP on their team: 436", "Their tank"). Enemies come most dangerous first, by AD plus AP. Tankiness works the same way. Early on a tank champion is assumed to go tank. After about two items' worth of gold only what they bought counts, so an Ornn who built Liandry's and Sorcerer's Shoes stops counting as a tank. `samples/tanks-no-defense.json` shows that case. `ChampionKnowledge.cs` holds hand-kept lists of healers, shielders, true damage and heavy crowd control. `ChampionAbilities.cs` adds to them from the ability tooltips in Data Dragon's championFull.json, which mark healing, shields, true damage and statuses like stuns. It adds a champion when at least 2 abilities heal, 2 shield, 3 have hard crowd control (stuns, knock-ups, roots, suppression, charms, fears, taunts, sleeps, pulls) or 1 deals true damage to champions. The bar is high because the hand-kept lists already cover most champions, but new champions get picked up without a code change.
+
+<img src="docs/screenshots/players-cards.png" alt="Players tab as cards" width="400">
+
 
 `Recommendation/` scores every legendary item for you. The base score is what your archetype values in its stats, minus anything past a cap you've already hit: crit stops at 100% and attack speed at 2.5 per second. Each rule that fires adds a bonus to items that answer it. Ranking is greedy with diminishing returns. Once one MR item answers "enemy is AP", the next MR item gets half the bonus, and items you already own count the same way. Without this, one strong situation fills all six slots with the same kind of item.
 
@@ -219,8 +222,8 @@ op.gg's ranked data is read for all ranks. That's about four times the games of 
 
 ### Champ select: bans, team comp and notes
 
-- **Bans.** While your ban is still to come, it lists up to five champions to ban. With a champion in mind (your hover), these are the champions it loses to most, at 49% or less over at least 200 games. Without one, they're the strongest champions in your role by op.gg's tier. Banned champions and your teammates' hovers are left out.
-- **Team comp.** Once your team has picks (teammates count with their hover), it warns about gaps. It checks for no tank or bruiser in three or more picks, a team that's 80% or more one damage type, and no heavy crowd control in four or more picks. Before you lock in, it lists up to five champions in your role that fill the biggest gap, with a frontline first, then the other damage type, then crowd control. Champions you play come first. It also sums up the enemy picks so far: their AP share, tanks and crowd control.
+- **Bans.** While your ban is still to come, it lists up to five champions to ban. With a champion in mind (your hover), these are the champions it loses to most, at 49% or less over at least 200 games. Without one, they're the strongest champions in your role by op.gg's tier. Banned champions and your teammates' hovers are left out. Each shows as a tile with your win rate against it. Runes, spells and playstyle stay folded until you lock in.
+- **Team comp.** Once your team has picks (teammates count with their hover), a bar shows its damage split and it warns about gaps. It checks for no tank or bruiser in three or more picks, a team that's 80% or more one damage type, and no heavy crowd control in four or more picks. Before you lock in, it lists up to five champions in your role that fill the biggest gap, with a frontline first, then the other damage type, then crowd control. Champions you play come first. It also sums up the enemy picks so far: their AP share, tanks and crowd control.
 - **Notes.** Under your lane opponent there's a box for your own notes, like "Darius: don't trade at level 2". It saves as you type, in `%LOCALAPPDATA%\LeagueClanker\notes.json`. The note shows up again the next time you face that champion, in champ select and under the matchup line in game.
 
 `DraftAdvisor.cs` holds these thresholds. The damage split and crowd control come from champion classes, the hand-kept lists in `ChampionKnowledge.cs` and the ability tooltips, so they're estimates before anyone buys items.
@@ -247,7 +250,7 @@ When op.gg has no page for your playstyle (AD Thresh), or doesn't answer, you ge
 
 ### Champ select: spells, skill order and item set
 
-The same source decides the rest of what *Apply* writes. The settings choose which parts it writes.
+The same source decides the rest of what *Apply* writes. The checkboxes under *Apply will set*, also in the settings, choose which parts it writes.
 
 - **Summoner spells.** op.gg's most played pair for your champion and role. A pair has to fit the role: no Smite outside the jungle, always Smite in it. Without op.gg it's Flash plus a role spell: Smite in the jungle, Teleport top, Ignite mid, Heal for bottom marksmen, Exhaust for enchanters. ARAM gets Mark. Flash stays on the key you keep it on, and League Classic gets its own copies of the spells.
 - **Skill order.** Which ability to max first and the first six levels, from op.gg's most played order.
@@ -274,13 +277,13 @@ The list keeps the build's order, which is the order players buy it in; only an 
 - **Your six slots.** The Build tab shows your six item slots: what you own, then the plan in the order to buy it, numbered. The next item has a gold border and a bar for how much of it you've bought. Each planned slot carries its strongest reason ("Marksmage +1.8", "vs tanks +0.9") and its price. Boots are part of the order, since they take a slot: after your first item, or next when you already have one; with Boots of Speed bought they're a started item and come first. Other boots than the ones you planned (Mercury's against heavy crowd control) are a pivot like any other. A suggested pivot shows on the slot it changes (old icon → new icon), with a card under the slots: "Slot 4 · switch suggested · +1.2", the reasons, and *Switch to Void Staff* or *Keep Lich Bane*. Below come your Mayhem cards and what they do to the build, the enemy damage split, other directions, and *Why this build*, folded closed: op.gg's win rates for the builds it chose between, the build line, and every reason sentence.
 - **Other ways to go.** Under your plan, up to 3 alternatives each take the build a different way: an answer to the game ("Vs tanks: Void Staff") or a different kind of item ("Tankier: Zhonya's Hourglass", "More AP: Rabadon's Deathcap").
 - **Finishing what you started.** When you own parts worth at least a quarter of an item in your plan (`BuildPlanner.StartedShare`), that item comes next, and a pivot won't drop it. An item also needs to outscore the one ahead of it by 0.5 (`ReorderMargin`) to move ahead, so two close items don't swap places every time your stats change.
-- **Compact mode.** The ▭ button in the title bar shrinks the window to the next item, what to buy and the matchup. When augment cards are on screen, it shows which to take and which to reroll above that.
+- **Compact mode.** The ▭ button in the title bar shrinks the window to the next item, what to buy, the matchup and a strip of your six slots. When augment cards are on screen, it shows which to take and which to reroll above that.
 
 ### Between games: recap and your stats
 
 `History/` keeps track of the games you play. While a game runs, `GameRecorder` notes every item LeagueClanker put in your build and every pivot you took or turned down. When the game's API goes away, it writes a recap to `%LOCALAPPDATA%\LeagueClanker\games.json`, which keeps your last 200 games. Games under 5 minutes, like remakes and Practice Tool peeks, get no recap. The result comes from the game's end event. The game sometimes closes before that event reaches the app; then the app reads the result from the League client's end-of-game screen, matched by your champion and the game's length. Without either, the recap has no result and doesn't count toward your record.
 
-The recap says who you laned against, your final legendary items and boots, how many of them were in LeagueClanker's build, and each pivot with its time. It shows whenever you're not in champ select or a game.
+The recap says who you laned against, your final legendary items and boots, how many of them were in LeagueClanker's build, and each pivot with its time. Final items that were in the build get a check mark, and each pivot is marked *took* or *kept yours*. Under the recap, *Your games* lists your last 8 games with the result, lane, length and how many of your items were in the build. Click one to show its recap. It shows whenever you're not in champ select or a game.
 
 Your record per champion counts Summoner's Rift games only: normal, ranked, Swiftplay and League Classic. League Classic shows up in the match history as "JADE" on map 453, with champion ids from 60000 (60021 is Miss Fortune). It combines two sources. The recaps cover every game the app watched. When the League client is running, the app also reads your last 30 games from its match history (20 per request), with the full scoreboard of the 15 newest to find your lane opponent. A game in both counts once (the same champion, starting within 10 minutes). The window lists your 6 most played champions.
 
@@ -288,7 +291,7 @@ In champ select, counter picks you've played at least 3 times (`PersonalStats.Mi
 
 ### Settings, logs and snapshots
 
-The gear in the title bar opens the settings: the stats source, what *Apply* writes, *Apply automatically*, compact mode, following op.gg's builds, arammayhem.com's augment win rates, sounds, and the update check. Settings are saved in `%LOCALAPPDATA%\LeagueClanker\settings.json`.
+The gear in the title bar opens the settings: the stats source, what *Apply* writes, *Apply when you lock in*, compact mode, following op.gg's builds, arammayhem.com's augment win rates, sounds, and the update check. Settings are saved in `%LOCALAPPDATA%\LeagueClanker\settings.json`, along with whether the Players tab shows the table or cards.
 
 <img src="docs/screenshots/settings.png" alt="Settings" width="400">
 
@@ -368,6 +371,8 @@ A golden reroll comes from the Mayhem progression track. In Silver and Gold offe
 After you pick "Stats on Stats on Stats!", the next offer has two rerolls per card, and the advice says so.
 
 Each card also shows how often a reroll beats it. For example: "Keep Critical Rhythm. Reroll Recursion and Celestial Body: you won't take them, so a reroll can only help." Or: "Reroll Minionmancer and Celestial Body first. If All For You is still your best card after that, reroll it too: a reroll beats it 75% of the time."
+
+The Augments tab shows the offer as three tiles in the order they're on screen, each with its advice and how well it fits right now. The fit comes from the card's current score: Strong fit from 5, Good fit from 3.5, Okay from 2, Weak fit from 0.8, and Poor fit below that (`AugmentPickerViewModel.Fit`). Hover a tile for the exact scores. Click it for its reasons and the combos it sets up.
 
 Picked augments also shape the item advice. `AugmentRules` turns each picked card into a situation, just like the enemy-based rules, so it ranks items, labels them and explains itself:
 

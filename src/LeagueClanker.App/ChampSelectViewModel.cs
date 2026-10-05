@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.Windows;
 using System.Net.Http;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
@@ -22,7 +23,17 @@ public sealed record RuneRow(string Name, string IconUrl);
 
 public sealed record CounterRow(string Name, string IconUrl, string WinRate, string Games, bool YouPlayIt);
 
-public sealed record BanRow(string Name, string IconUrl, string Reason);
+public sealed record BanRow(string Name, string IconUrl, string Reason)
+{
+    /// <summary>"46.4%" (your win rate against it) or "Tier 1".</summary>
+    public string Stat { get; init; } = "";
+
+    /// <summary>"you win" under a win rate, empty under a tier.</summary>
+    public string StatLabel { get; init; } = "";
+
+    /// <summary>The ban to make: it beats your champion most.</summary>
+    public bool Best { get; init; }
+}
 
 public sealed record SlotOption(int Index, string Label, bool IsSelected);
 
@@ -195,6 +206,61 @@ public sealed class ChampSelectViewModel : INotifyPropertyChanged
 
     public bool HasTeamSection => TeamWarnings.Count > 0 || EnemySummary.Length > 0 || FillPicks.Count > 0;
 
+    /// <summary>The team card leads in the ban phase and while picks can still fill a gap; after that it moves into "good to know".</summary>
+    public bool ShowTeamCard => HasTeamSection && (IsBanPhase || FillPicks.Count > 0);
+
+    public bool ShowTeamNotes => HasTeamSection && !ShowTeamCard;
+
+    public string TeamHeader => TeamWarnings.Count > 0 ? "YOUR TEAM NEEDS" : "TEAM COMP";
+
+    /// <summary>Your ban is still to come: the screen leads with ban suggestions and folds the loadout away.</summary>
+    public bool IsBanPhase => Bans.Count > 0;
+
+    /// <summary>"Kayle. Beats Garen: you win 46.4% over 11,549 games."</summary>
+    public string BanCaption => Bans.FirstOrDefault() is { } ban ? $"{ban.Name}. {ban.Reason}" : "";
+
+    private GridLength _teamAdShare = new(1, GridUnitType.Star);
+    private GridLength _teamApShare = new(0, GridUnitType.Star);
+    private string _teamSplit = "";
+    private bool _loadoutOpen;
+    private bool _runesOpen = true;
+    private bool _playstyleOpen;
+    private bool _countersOpen;
+
+    public GridLength TeamAdShare { get => _teamAdShare; private set => Set(ref _teamAdShare, value); }
+    public GridLength TeamApShare { get => _teamApShare; private set => Set(ref _teamApShare, value); }
+
+    /// <summary>"88% AD · 12% AP" for your team so far. Empty before it has two picks.</summary>
+    public string TeamSplit { get => _teamSplit; private set => Set(ref _teamSplit, value); }
+
+    /// <summary>In the ban phase, the loadout (runes, spells, playstyle) is folded away until you open it.</summary>
+    public bool LoadoutOpen { get => _loadoutOpen; set { Set(ref _loadoutOpen, value); Raise(nameof(ShowLoadout)); } }
+
+    public bool ShowLoadout => HasChampion && (!IsBanPhase || LoadoutOpen);
+    public bool RunesOpen { get => _runesOpen; set => Set(ref _runesOpen, value); }
+    public bool PlaystyleOpen { get => _playstyleOpen; set => Set(ref _playstyleOpen, value); }
+    public bool CountersOpen { get => _countersOpen; set => Set(ref _countersOpen, value); }
+
+    /// <summary>"Conqueror · Precision + Sorcery"</summary>
+    public string RuneSummary =>
+        PrimaryRunes.Count == 0 ? "" : $"{PrimaryRunes[0].Name} · {TitleCase(PrimaryName)} + {TitleCase(SecondaryName)}";
+
+    public string KeystoneIconUrl => PrimaryRunes.FirstOrDefault()?.IconUrl ?? "";
+    public string SecondaryIconUrl => SecondaryRunes.FirstOrDefault()?.IconUrl ?? "";
+
+    /// <summary>"Marksman" or "Crit build": the playstyle row's summary.</summary>
+    public string PlaystyleText => Playstyles.FirstOrDefault(p => p.IsSelected)?.Label ?? "";
+
+    public string ItemSetText => $"\"LeagueClanker {ChampionName}\" in the shop · your own sets stay";
+
+    /// <summary>"Good picks vs Darius · Teemo 55.1% · Malphite 53.5% · 3 more"</summary>
+    public string CounterSummary => CounterPicks.Count == 0 || _opponent is null ? ""
+        : $"Good picks vs {_opponent.Name} · {string.Join(" · ", CounterPicks.Take(2).Select(c => $"{c.Name} {c.WinRate}"))}"
+          + (CounterPicks.Count > 2 ? $" · {CounterPicks.Count - 2} more" : "");
+
+    private static string TitleCase(string upper) =>
+        upper.Length == 0 ? "" : System.Globalization.CultureInfo.InvariantCulture.TextInfo.ToTitleCase(upper.ToLowerInvariant());
+
     public bool HasOpponent => _opponent is not null;
 
     /// <summary>Swiftplay: one chip per champion you picked in the lobby. Empty in champ select.</summary>
@@ -269,7 +335,7 @@ public sealed class ChampSelectViewModel : INotifyPropertyChanged
         if (!changed)
             return;
 
-        Raise(nameof(HasChampion));
+        Raise(nameof(HasChampion), nameof(ShowLoadout));
         _ = RecomputeMatchupAsync();
         _ = RecomputeDraftAsync();
         if (state.Champion is not { } champion || _services is null)
@@ -503,7 +569,16 @@ public sealed class ChampSelectViewModel : INotifyPropertyChanged
             return;
 
         var data = services.Data;
-        Bans = report?.Bans.Select(b => new BanRow(b.Champion.Name, data.ChampionIconUrl(b.Champion.Id), b.Reason)).ToList() ?? [];
+        Bans = report?.Bans.Select((b, i) => new BanRow(b.Champion.Name, data.ChampionIconUrl(b.Champion.Id), b.Reason)
+        {
+            Stat = b.YouWin is { } win ? $"{win:P1}" : b.Tier ?? "",
+            StatLabel = b.YouWin is null ? "" : "you win",
+            Best = i == 0,
+        }).ToList() ?? [];
+        var magic = report?.TeamMagicShare;
+        TeamAdShare = new GridLength(1 - (magic ?? 0), GridUnitType.Star);
+        TeamApShare = new GridLength(magic ?? 0, GridUnitType.Star);
+        TeamSplit = magic is { } m ? $"{1 - m:P0} AD · {m:P0} AP" : "";
         TeamWarnings = report?.Warnings ?? [];
         FillHeader = report?.FillHeader ?? "";
         FillPicks = report?.FillPicks
@@ -511,7 +586,7 @@ public sealed class ChampSelectViewModel : INotifyPropertyChanged
             .ToList() ?? [];
         EnemySummary = report?.EnemySummary ?? "";
         DraftNote = report?.Note ?? "";
-        Raise(nameof(HasTeamSection));
+        Raise(nameof(HasTeamSection), nameof(ShowTeamCard), nameof(ShowTeamNotes), nameof(TeamHeader));
     }
 
     private void ShowMatchup(MatchupReport? report, ChampSelectState state, StaticGameData data)
@@ -586,5 +661,23 @@ public sealed class ChampSelectViewModel : INotifyPropertyChanged
             return;
         field = value;
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
+        if (Derived.TryGetValue(name ?? "", out var derived))
+            Raise(derived);
     }
+
+    // Summaries built from other properties, raised whenever one of those changes.
+    private static readonly Dictionary<string, string[]> Derived = new()
+    {
+        [nameof(Bans)] = [nameof(IsBanPhase), nameof(BanCaption), nameof(ShowLoadout), nameof(ShowTeamCard), nameof(ShowTeamNotes)],
+        [nameof(FillPicks)] = [nameof(ShowTeamCard), nameof(ShowTeamNotes)],
+        [nameof(TeamWarnings)] = [nameof(TeamHeader), nameof(ShowTeamCard), nameof(ShowTeamNotes)],
+        [nameof(EnemySummary)] = [nameof(ShowTeamCard), nameof(ShowTeamNotes)],
+        [nameof(PrimaryRunes)] = [nameof(RuneSummary), nameof(KeystoneIconUrl)],
+        [nameof(SecondaryRunes)] = [nameof(RuneSummary), nameof(SecondaryIconUrl)],
+        [nameof(PrimaryName)] = [nameof(RuneSummary)],
+        [nameof(SecondaryName)] = [nameof(RuneSummary)],
+        [nameof(Playstyles)] = [nameof(PlaystyleText), nameof(ShowLoadout)],
+        [nameof(ChampionName)] = [nameof(ItemSetText)],
+        [nameof(CounterPicks)] = [nameof(CounterSummary)],
+    };
 }

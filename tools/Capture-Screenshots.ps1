@@ -130,6 +130,8 @@ $shots = [ordered]@{
         Start-Sleep -Seconds 8
         Select-Tab $p "Players"
         Save-Window $p "players.png"
+        Select-Tab $p "Cards"
+        Save-Window $p "players-cards.png"
         Remove-Item (Join-Path $env:LEAGUECLANKER_DATA "settings.json")
         $p
     }

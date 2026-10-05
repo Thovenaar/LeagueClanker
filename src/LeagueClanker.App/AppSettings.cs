@@ -31,6 +31,9 @@ public sealed class AppSettings
     /// <summary>Start augment scores from arammayhem.com's win rates and your champion's most taken cards.</summary>
     public bool UseCommunityAugments { get; set; } = true;
 
+    /// <summary>The Players tab shows threat cards instead of the stats table.</summary>
+    public bool PlayersAsCards { get; set; }
+
     public static AppSettings Load()
     {
         try
@@ -85,6 +88,10 @@ public sealed class SettingsViewModel(AppSettings settings) : INotifyPropertyCha
     public bool Compact { get => settings.Compact; set => Update(settings.Compact, value, v => settings.Compact = v); }
     public bool UsePopularItems { get => settings.UsePopularItems; set => Update(settings.UsePopularItems, value, v => settings.UsePopularItems = v); }
     public bool UseCommunityAugments { get => settings.UseCommunityAugments; set => Update(settings.UseCommunityAugments, value, v => settings.UseCommunityAugments = v); }
+
+    // Radio buttons: the Players tab's Table / Cards switch.
+    public bool PlayersAsCards { get => settings.PlayersAsCards; set { if (Update(settings.PlayersAsCards, value, v => settings.PlayersAsCards = v)) Raise(nameof(PlayersAsTable)); } }
+    public bool PlayersAsTable { get => !settings.PlayersAsCards; set { if (value) PlayersAsCards = false; } }
 
     private bool Update<T>(T current, T value, Action<T> store, [CallerMemberName] string? name = null)
     {

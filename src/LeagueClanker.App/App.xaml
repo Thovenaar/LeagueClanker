@@ -269,5 +269,57 @@
             <Setter Property="Margin" Value="4,0,0,0" />
         </Style>
 
+        <!-- A row that folds open: its content, and a chevron on the right -->
+        <Style x:Key="FoldToggle" TargetType="ToggleButton">
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ToggleButton">
+                        <Border Background="Transparent" Padding="{TemplateBinding Padding}">
+                            <DockPanel>
+                                <TextBlock x:Name="Chevron" DockPanel.Dock="Right" Text="&#x25BE;" Foreground="{StaticResource MutedBrush}" Margin="8,0,0,0" VerticalAlignment="Center" />
+                                <ContentPresenter VerticalAlignment="Center" />
+                            </DockPanel>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Chevron" Property="Text" Value="&#x25B4;" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- A setting as a switch: its text on the left, the switch on the right -->
+        <Style x:Key="SwitchCheck" TargetType="CheckBox">
+            <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="CheckBox">
+                        <Border Background="Transparent" Padding="0,6,0,8" BorderBrush="#FF1B2229" BorderThickness="0,0,0,1">
+                            <DockPanel>
+                                <Border x:Name="Track" DockPanel.Dock="Right" Width="34" Height="18" CornerRadius="9" Background="{StaticResource BorderBrush}"
+                                        Margin="12,0,0,0" VerticalAlignment="Center">
+                                    <Ellipse x:Name="Knob" Width="14" Height="14" Fill="{StaticResource MutedBrush}" HorizontalAlignment="Left" Margin="2,0" />
+                                </Border>
+                                <ContentPresenter VerticalAlignment="Center" />
+                            </DockPanel>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Track" Property="Background" Value="{StaticResource AccentBrush}" />
+                                <Setter TargetName="Knob" Property="Fill" Value="{StaticResource TextBrush}" />
+                                <Setter TargetName="Knob" Property="HorizontalAlignment" Value="Right" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
     </Application.Resources>
 </Application>
