@@ -17,6 +17,7 @@ using LeagueClanker.Core.Spells;
 using LeagueClanker.Core.StaticData;
 using LeagueClanker.Vision;
 using System.Windows.Interop;
+using System.Runtime.InteropServices;
 
 namespace LeagueClanker.App;
 
@@ -239,7 +240,7 @@ public partial class App : Application
             await Task.Delay(TimeSpan.FromSeconds(3), _cts.Token);
             if (_client is not { } client || await client.GetEndOfGameAsync(_cts.Token) is not { } result || !result.Matches(recap))
                 continue;
-            var current = Current(recaps, recap);
+            var current = Stored(recaps, recap);
             var updated = current with { Win = result.Win };
             recaps.Replace(current, updated);
             viewModel.UpdateRecap(updated);
@@ -264,7 +265,7 @@ public partial class App : Application
                 await Task.Delay(TimeSpan.FromSeconds(5), _cts.Token);
                 if (_client is not { } client || await client.GetLastGameAugmentsAsync(_cts.Token) is not { } picked || !picked.Matches(recap))
                     continue;
-                var current = Current(recaps, recap);
+                var current = Stored(recaps, recap);
                 var updated = current with { Augments = picked.Ids.Select(id => names.GetValueOrDefault(id, $"card {id}")).ToList(), AugmentsFromHistory = true };
                 recaps.Replace(current, updated);
                 viewModel.UpdateRecap(updated);
@@ -285,7 +286,7 @@ public partial class App : Application
     private readonly HashSet<DateTime> _fillingAugments = [];
 
     // Two fill-ins can update the same recap; each starts from what's stored now so neither undoes the other.
-    private static GameRecap Current(RecapStore recaps, GameRecap recap) => recaps.Games.FirstOrDefault(g => g.Played == recap.Played) ?? recap;
+    private static GameRecap Stored(RecapStore recaps, GameRecap recap) => recaps.Games.FirstOrDefault(g => g.Played == recap.Played) ?? recap;
     private Func<string, Task>? _useClientLocale;
 
     private async Task UseClientLocaleAsync(LeagueClientApi client)
@@ -438,6 +439,8 @@ public partial class App : Application
         try
         {
             var catalog = await new AugmentDataClient().LoadAsync(set, data.Items, _cts.Token);
+            if (set == AugmentSet.Mayhem)
+                _mayhemCards = catalog.All;
             picker.SetCatalog(set, catalog);
             return catalog;
         }
@@ -489,6 +492,8 @@ public partial class App : Application
                         ? await Task.Run(() => reader.ScanScreenAsync(exclude: ScreenCapture.WindowArea(ownWindow)))
                         : await Task.Run(() => reader.ScanFileAsync(imagePath));
                     picker.OnScan(scan.Offer.Select(d => d.Augment).ToList(), scan.Problem, scan.Layout);
+                    if (scan.Image is { } image)
+                        await LookAtHudAsync(picker, image, cardsOnScreen: scan.Offer.Count >= 2);
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException)
                 {
@@ -501,6 +506,134 @@ public partial class App : Application
         {
         }
     }
+
+    /// <summary>
+    /// While Mayhem cards are up, keeps the latest capture and fetches their icons. Once they close, looks at the HUD
+    /// up to <see cref="HudLooks"/> times for the card you took (<see cref="AugmentHud"/>). Each look is a vote, and
+    /// the capture from while the cards were up shows which slots were already filled.
+    /// </summary>
+    private async Task LookAtHudAsync(AugmentPickerViewModel picker, ScreenImage image, bool cardsOnScreen)
+    {
+        if (cardsOnScreen)
+        {
+            _hudBefore = image;
+            _hudBeforeGray = null;
+            _hudSaved = false;
+            if (picker.CurrentSet == AugmentSet.Mayhem)
+            {
+                // While there's time. Every card's icon guards against a misread offer (AugmentHud.Read).
+                _ = IconsForAsync(picker.HudCandidates);
+                _everyCardIcons ??= IconsForAsync(_mayhemCards ?? [], allOrNothing: false);
+            }
+            return;
+        }
+        if (!picker.WantsHudRead || await IconsForAsync(picker.HudCandidates) is not { Count: > 0 } icons)
+            return;
+
+        var before = _hudBeforeGray ??= _hudBefore is { } b ? await Task.Run(b.ToGray) : null;
+        var everyCard = _everyCardIcons is { IsCompletedSuccessfully: true } loaded && loaded.Result.Count > 0 ? loaded.Result : null;
+        var shot = image;
+        var votes = 0;
+        for (var look = 0; look < HudLooks && picker.WantsHudRead; look++)
+        {
+            if (look > 0)
+            {
+                await Task.Delay(HudLookInterval, _cts.Token);
+                if (await Task.Run(() => ScreenCapture.FindLeagueWindow() is { } game ? ScreenCapture.Capture(game) : null) is not { } next)
+                    return;
+                shot = next;
+            }
+            var current = shot;
+            var read = await Task.Run(() => AugmentHud.Read(current.ToGray(), icons, before, everyCard));
+            Log.Write($"HUD look {look + 1}: {read.Why} ({read.Score:0.00} against {read.RunnerUp:0.00}, HUD scale {read.HudScale:0.00})");
+            if (read.Card is not null)
+                votes++;
+            picker.OnHudRead(read.Card);
+        }
+
+        // Nothing recognized: keep the card slots, so the HUD's position can be measured on this screen.
+        if (votes == 0 && !_hudSaved)
+        {
+            _hudSaved = true;
+            try
+            {
+                var folder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "LeagueClanker", "hud");
+                await AugmentHudReader.SaveSlotsAsync(shot, Path.Combine(folder, $"{DateTime.Now:yyyyMMdd-HHmmss}.png"));
+                foreach (var old in Directory.GetFiles(folder, "*.png").OrderDescending().Skip(KeptHudShots))
+                    File.Delete(old);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                Log.Error("Saving the HUD's card slots", ex);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Cards' icons from Community Dragon. For an offer it's all or nothing: a card without an icon could be the one
+    /// you took, and the HUD would then match its look-alike.
+    /// </summary>
+    private async Task<IReadOnlyList<CardIcons>> IconsForAsync(IReadOnlyList<AugmentInfo> cards, bool allOrNothing = true)
+    {
+        if (cards.Count == 0)
+            return [];
+        try
+        {
+            _iconUrls ??= _iconData.LoadIconUrlsAsync(AugmentSet.Mayhem, _cts.Token);
+            var urls = await _iconUrls;
+            var icons = await Task.WhenAll(cards.Select(c => _cardIcons.TryGetValue(c.Name, out var known) ? known : _cardIcons[c.Name] = LoadIconsAsync(c.Name, urls)));
+            foreach (var none in icons.Where(i => i.Icons.Count == 0))
+                _cardIcons.Remove(none.Name);
+            if (!allOrNothing)
+                return icons.Where(i => i.Icons.Count > 0).ToList();
+            if (icons.FirstOrDefault(i => i.Icons.Count == 0) is { } missing)
+            {
+                Log.Write($"No icon for {missing.Name}, so the HUD isn't read for this offer");
+                return [];
+            }
+            return icons;
+        }
+        catch (Exception ex) when (ex is HttpRequestException or IOException or System.Text.Json.JsonException or TaskCanceledException or ArgumentException or InvalidOperationException)
+        {
+            Log.Error("Loading augment icons", ex);
+            _iconUrls = null;
+            if (!allOrNothing)
+                _everyCardIcons = null;
+            foreach (var failed in _cardIcons.Where(c => c.Value.IsFaulted).Select(c => c.Key).ToList())
+                _cardIcons.Remove(failed);
+            return [];
+        }
+    }
+
+    // An icon that fails to load is left out; a card left with none is tried again next time.
+    private async Task<CardIcons> LoadIconsAsync(string name, IReadOnlyDictionary<string, IReadOnlyList<string>> urls)
+    {
+        var icons = new List<GrayImage>();
+        foreach (var url in AugmentIcons.For(urls, name))
+        {
+            try
+            {
+                icons.Add(await AugmentHudReader.DecodeIconAsync(await _iconData.GetIconAsync(url, _cts.Token)));
+            }
+            catch (Exception ex) when (ex is HttpRequestException or IOException or TaskCanceledException or ArgumentException or COMException)
+            {
+                Log.Error($"Loading the icon of {name}", ex);
+            }
+        }
+        return new CardIcons(name, icons);
+    }
+
+    private const int HudLooks = 4;
+    private const int KeptHudShots = 10;
+    private static readonly TimeSpan HudLookInterval = TimeSpan.FromMilliseconds(300);
+    private readonly AugmentDataClient _iconData = new();
+    private Task<IReadOnlyDictionary<string, IReadOnlyList<string>>>? _iconUrls;
+    private readonly Dictionary<string, Task<CardIcons>> _cardIcons = [];
+    private ScreenImage? _hudBefore;
+    private GrayImage? _hudBeforeGray;
+    private bool _hudSaved;
+    private IReadOnlyList<AugmentInfo>? _mayhemCards;
+    private Task<IReadOnlyList<CardIcons>>? _everyCardIcons;
 
     /// <summary>
     /// While an offer read from the screen is up, notes where you click in the game: the card under the mouse when

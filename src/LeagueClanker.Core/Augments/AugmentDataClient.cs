@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using LeagueClanker.Core.StaticData;
 
 namespace LeagueClanker.Core.Augments;
@@ -13,8 +14,10 @@ public sealed class AugmentDataClient(HttpClient? http = null, string? cacheDire
     public const string Attribution = "Augment data: League of Legends Wiki (CC BY-SA 3.0)";
 
     private static readonly TimeSpan MaxAge = TimeSpan.FromDays(1);
+    private static readonly TimeSpan IconMaxAge = TimeSpan.FromDays(30);
 
     private readonly HttpClient _http = http ?? CreateHttpClient();
+    private readonly ConcurrentDictionary<string, Lazy<Task<byte[]>>> _iconDownloads = new();
 
     private readonly string _cacheDirectory =
         cacheDirectory ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "LeagueClanker", "augments");
@@ -27,13 +30,54 @@ public sealed class AugmentDataClient(HttpClient? http = null, string? cacheDire
         return AugmentCatalog.ParseWikiModule(source, items);
     }
 
-    /// <summary>
-    /// Card names in the client's language ("de_DE"), keyed by English name. Empty for English, so nothing changes there.
-    /// </summary>
     /// <summary>Augment id to English name (Community Dragon), to name the cards in the match history.</summary>
     public async Task<IReadOnlyDictionary<int, string>> LoadNamesByIdAsync(CancellationToken ct = default) =>
         AugmentTranslations.ById(await GetCachedAsync(AugmentTranslations.Url("en_US"), "cherry-augments.default.json", ct));
 
+    /// <summary>Each card's icon URLs (Community Dragon), keyed by <see cref="AugmentCatalog.Key"/>.</summary>
+    public async Task<IReadOnlyDictionary<string, IReadOnlyList<string>>> LoadIconUrlsAsync(AugmentSet set, CancellationToken ct = default) =>
+        AugmentIcons.Urls(await GetCachedAsync(AugmentTranslations.Url("en_US"), "cherry-augments.default.json", ct), set);
+
+    /// <summary>
+    /// An icon's PNG bytes. Icons are kept for 30 days, since Riot rarely redraws one. Cards share icons, so one
+    /// download serves every request for the same URL.
+    /// </summary>
+    public async Task<byte[]> GetIconAsync(string url, CancellationToken ct = default)
+    {
+        var download = _iconDownloads.GetOrAdd(url, u => new Lazy<Task<byte[]>>(() => FetchIconAsync(u, ct)));
+        try
+        {
+            return await download.Value;
+        }
+        catch
+        {
+            _iconDownloads.TryRemove(url, out _); // try again next time
+            throw;
+        }
+    }
+
+    private async Task<byte[]> FetchIconAsync(string url, CancellationToken ct)
+    {
+        var path = Path.Combine(_cacheDirectory, "icons", Path.GetFileName(new Uri(url).AbsolutePath));
+        var cached = File.Exists(path);
+        if (cached && DateTime.UtcNow - File.GetLastWriteTimeUtc(path) < IconMaxAge)
+            return await File.ReadAllBytesAsync(path, ct);
+        try
+        {
+            var bytes = await _http.GetByteArrayAsync(url, ct);
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            await File.WriteAllBytesAsync(path, bytes, ct);
+            return bytes;
+        }
+        catch (HttpRequestException) when (cached)
+        {
+            return await File.ReadAllBytesAsync(path, ct);
+        }
+    }
+
+    /// <summary>
+    /// Card names in the client's language ("de_DE"), keyed by English name. Empty for English, so nothing changes there.
+    /// </summary>
     public async Task<IReadOnlyDictionary<string, IReadOnlyList<string>>> LoadLocalNamesAsync(string locale, CancellationToken ct = default)
     {
         if (AugmentTranslations.IsEnglish(locale))

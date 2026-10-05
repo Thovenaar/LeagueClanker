@@ -25,8 +25,9 @@ using LeagueClanker.Vision;
 //                                             lists and the ability tooltips
 //   LeagueClanker.Cli --mayhem <game.json> --offer "A;B;C" [--picked "X;Y"] [--rerolled "A"] [--golden "B"] [--no-community]
 //                                             rank an augment offer and say which cards to reroll, with arammayhem.com's win rates
-//   LeagueClanker.Cli --scan <image.png | screen> [--verbose] [--locale de_DE]
-//                                             read an augment offer from a screenshot or the game, in the client's language
+//   LeagueClanker.Cli --scan <image.png | screen> [--verbose] [--locale de_DE] [--hud [--offer "A;B;C"]]
+//                                             read an augment offer from a screenshot or the game, in the client's language;
+//                                             --hud also reads the Mayhem HUD's card slots
 //   LeagueClanker.Cli --runes <champion> [--position support] [--style tank] [--mode aram] [--enemies "A;B"] [--source rules]
 //                                             recommend a rune page (from op.gg unless --source rules)
 //   LeagueClanker.Cli --champselect [--style tank] [--source rules] [--apply]
@@ -275,6 +276,34 @@ if (args is ["--scan", var source, ..])
         Console.WriteLine($"Cards on screen: {string.Join(", ", layout.Cards.Select(c => $"{c.Augment.Name} at ({c.X:0},{c.Y:0})"))}");
         if (Option("--click")?.Split(',') is [var cx, var cy])
             Console.WriteLine($"A click at ({cx},{cy}) picks: {layout.CardAt(double.Parse(cx), double.Parse(cy))?.Name ?? "nothing"}");
+    }
+
+    // --hud: the cards in the Mayhem HUD's slots, each compared with every card's icon. With --offer "A;B;C", which of
+    // those three the newest slot holds, as the app decides it after an offer closes.
+    if (args.Contains("--hud"))
+    {
+        var image = scan.Image ?? await AugmentScreenReader.LoadAsync(source);
+        var iconUrls = await augmentData.LoadIconUrlsAsync(AugmentSet.Mayhem, cts.Token);
+        async Task<CardIcons> IconsOf(AugmentInfo card) => new(card.Name, await Task.WhenAll(
+            AugmentIcons.For(iconUrls, card.Name).Select(async url => await AugmentHudReader.DecodeIconAsync(await augmentData.GetIconAsync(url, cts.Token)))));
+        var screen = image.ToGray();
+        var slots = AugmentHud.Slots(screen.Width, screen.Height);
+        var filled = AugmentHud.Filled(screen, slots);
+        Console.WriteLine($"HUD at scale 1: {filled} of {AugmentHud.SlotCount} card slots filled.");
+        var everyCard = await Task.WhenAll(augments.All.Select(IconsOf));
+        for (var i = 0; i < filled; i++)
+        {
+            var best = everyCard.Where(c => c.Icons.Count > 0)
+                .Select(c => (c.Name, Score: c.Icons.Max(icon => AugmentHud.Match(screen, slots[i], i, icon))))
+                .OrderByDescending(c => c.Score).Take(5);
+            Console.WriteLine($"   slot {i + 1}: {string.Join(", ", best.Select(c => $"{c.Name} {c.Score:0.00}"))}");
+        }
+        if (Option("--offer")?.Split(';', StringSplitOptions.TrimEntries) is { } named)
+        {
+            var offered = await Task.WhenAll(named.Select(n => augments.Find(n) ?? throw new ArgumentException($"Unknown card: {n}")).Select(IconsOf));
+            var read = AugmentHud.Read(screen, offered);
+            Console.WriteLine($"Newest card: {read.Card ?? "can't tell"} ({read.Why}; {read.Score:0.00} against {read.RunnerUp:0.00}, HUD scale {read.HudScale:0.00})");
+        }
     }
     return;
 }

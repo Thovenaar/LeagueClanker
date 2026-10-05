@@ -1249,7 +1249,7 @@
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
-                        <TextBlock Text="When you click a card in the game, the app marks it as picked for you. Strength is how well a card fits your champion, items and cards right now; hover a card for the exact score."
+                        <TextBlock Text="When you take a card in the game, the app reads it from your HUD, or from your click, and marks it as picked. Strength is how well a card fits your champion, items and cards right now; hover a card for the exact score."
                                    Foreground="{StaticResource MutedBrush}" FontSize="10" TextWrapping="Wrap" Margin="0,6,0,0" />
                         <TextBlock Text="{Binding Attribution}" Foreground="{StaticResource MutedBrush}" FontSize="10" Margin="0,6,0,0" />
                     </StackPanel>

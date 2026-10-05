@@ -134,7 +134,11 @@ dotnet run --project src/LeagueClanker.Cli -- --matchup - --position top --enemi
 dotnet run --project src/LeagueClanker.Cli -- --scan samples/mayhem/offer-mock.png --verbose
 ```
 
-`samples/mayhem/offer-1440p.png` is a real offer at 2560x1440, the kind plain text recognition couldn't read.
+`samples/mayhem/offer-1440p.png` is a real offer at 2560x1440, the kind plain text recognition couldn't read. Add `--hud` to read the Mayhem HUD's card slots too, each compared with every card's icon, and `--offer` to see which of three offered cards the newest slot holds:
+
+```bash
+dotnet run --project src/LeagueClanker.Cli -- --scan samples/mayhem/offer-1440p.png --hud --offer "Escape Plan;Pinball;Leg Day"
+```
 
 `--history` prints your record per champion and per lane opponent, from the League client's match history and the games the app saved. Give it a file to read other saved games instead:
 
@@ -168,7 +172,7 @@ Tick *dry run* (or add `-f dry_run=true`) to build and test without publishing. 
 
 ## Is it allowed
 
-During a game the app reads Riot's official Live Client Data API on localhost, and Data Dragon. It doesn't read game memory, inject into the client, send input, or draw inside the game. It's an ordinary window next to the game, so Vanguard has nothing to object to.
+During a game the app reads Riot's official Live Client Data API on localhost, and Data Dragon. It doesn't read game memory, inject into the client, send input, or draw inside the game. In ARAM: Mayhem and Arena it takes screenshots of the game window, like a screen recorder, to read the augment cards and the cards in your HUD. It's an ordinary window next to the game, so Vanguard has nothing to object to.
 
 In champ select it reads the League client's local API, the same one Porofessor, Blitz and Mobalytics use to import runes. The only things it changes are what *Apply* writes: your rune page, your summoner spells and an item set for the shop. With *Apply when I lock in* turned on, next to the Apply button or in the settings, that happens when you lock in. Riot doesn't document that API, but it has tolerated rune importers for years.
 
@@ -176,7 +180,7 @@ It also reads your own match history from that API, for your record per champion
 
 Riot's third-party policy allows apps that highlight decisions with multiple choices rather than dictate them. That's why every suggestion comes with an alternative and a reason.
 
-One setting goes against that policy: Riot asks apps not to show augment win rates during a game, and LeagueClanker starts its Mayhem card scores from arammayhem.com's win rates. It's on by default because this is a local tool. Turn off *Start Mayhem augment scores from arammayhem.com's win rates* in the settings to score cards from their effects alone.
+One setting goes against that policy: Riot asks apps not to show augment win rates during a game, and LeagueClanker starts its Mayhem card scores from arammayhem.com's win rates. It's on by default because this is a local tool. Turn off *Mayhem card win rates* in the settings to score cards from their effects alone.
 
 ## How it works
 
@@ -342,7 +346,11 @@ The League client can run in another language. When it does, the app asks the cl
 
 Arena offers augments between rounds, and the game doesn't report rounds. So in Arena the app keeps watching the screen until you have four cards. Arena's card list comes from the wiki's Arena module. Its simulation has no rule against two Silver offers in a row, because that rule is Mayhem's.
 
-While cards read from the screen are up, it notes where you click in the game: every 30 ms it asks Windows whether the left button is down and where the cursor is. Nothing is hooked and the game isn't touched, and clicks only count while League is the window in front. Each card covers the area around its name (measured on a 1440p offer: from 22% of the screen height above the name to 24% below, and most of the gap to the next card sideways), so the reroll buttons under the cards never count. When the cards close, the card you clicked joins your cards: "You took Recursion: read from your click." When the offer closes without a click on a card, it asks instead: press *I picked this* on the card you took. When one or two cards change while the rest stay, those were rerolls: they're marked as used up and the advice updates.
+While cards read from the screen are up, it notes where you click in the game: every 30 ms it asks Windows whether the left button is down and where the cursor is. Nothing is hooked and the game isn't touched, and clicks only count while League is the window in front. Each card covers the area around its name (measured on a 1440p offer: from 22% of the screen height above the name to 24% below, and most of the gap to the next card sideways), so the reroll buttons under the cards never count. When the cards close, the app looks at your HUD for the card you took, and the card you clicked is the backup. When one or two cards change while the rest stay, those were rerolls: they're marked as used up and the advice updates.
+
+In Mayhem the HUD shows the cards you took as icons in five slots left of your champion's portrait, three on top and two below, filled in that order. When the offer closes, the app takes four looks at the newest filled slot, 300 ms apart, and compares it with the icons of the three cards you were offered, which it downloads from Community Dragon (`AugmentHud`). The game tints the gray icons by tier, so only brightness is compared, by normalized cross-correlation. A look is a vote when a card matches at 0.88 or more and beats the next offered card by at least 0.04. The slot also has to have been empty while the offer was up, so hiding the offer without picking doesn't count. And no card that wasn't offered may match it better; when the offer was misread, the card you took isn't among the three, and a look-alike can still score 0.92. Your click is half a vote: it decides when the HUD can't tell and breaks a tie, but loses to a card the HUD saw (`PickVotes`). A lead of two votes settles it right away; otherwise the leader after two scans wins. "You took Recursion: read from the cards in your HUD." With no votes it asks instead: press *I picked this* on the card you took.
+
+Riot reuses one image for several cards (It's Killing Time, Surge Field and Final Form share one), so when two offered cards have the same icon, only your click can tell them apart. The slot positions were measured on a 2560x1440 screen and grow with the screen's height; HUD scales from 60% to 110% are tried too. When no look recognizes a card, the app saves the strip of the screen with the slots to `%LOCALAPPDATA%\LeagueClanker\hud`, keeping the last 10, so the positions can be measured on your screen. The strip leaves out chat and the game world above the HUD.
 
 *Read cards now* next to the search box reads the screen right away, even when no pick is due, and says so when it finds no cards. You can always type cards instead: type part of a name and mark each match as *Offered* (on screen now) or *Picked* (you already have it). Enter adds the top match to the offer. After rerolling a card in game, press *Rerolled* on it and type the card you got. That covers misread names, cards you picked before starting the app, and exclusive fullscreen, where screenshots come back black.
 
@@ -428,6 +436,7 @@ To add a rule, implement `IBuildRule`, return a `Situation` with a label, a sent
 - Augment tags come from description text. Expect some cards to be tagged wrong until they've been reviewed with `--augments`.
 - Screen reading in other languages has been tested with typed and simulated text only, not on a real non-English client. Reading the client's language needs the League client running.
 - Screen reading has been tested in real ARAM: Mayhem games at 2560x1440 in borderless mode. Other resolutions and Arena's card layout haven't been tried yet.
+- Reading the card you took from the HUD is measured on one 2560x1440 screenshot, taken while an offer dimmed the screen. Other resolutions and HUD scales are worked out from it, not tried in a game. Arena's HUD isn't read, so there only your click counts.
 - The core-item lists and weights are my best guess for patch 16.18. Real win-rate data per matchup would beat them.
 - Writing rune pages and item sets works in a real client (the item set sits next to other apps' sets, which stay untouched). Summoner spells and Swiftplay slots have only been tested against a simulated client. The client's local API and op.gg's JSON API are both undocumented and can change.
 - Enemy roles are guessed until the game starts. Flex picks (a mid Gragas, a top Seraphine) can land in the wrong role, and so can the lane opponent.
@@ -446,7 +455,7 @@ Augment data comes from the League of Legends Wiki under CC BY-SA 3.0: [Mayhem](
 
 Rune pages, summoner spells, skill orders, starting and core items, role play rates and matchups come from [op.gg](https://www.op.gg). LeagueClanker isn't affiliated with op.gg.
 
-Augment names in other languages come from [Community Dragon](https://www.communitydragon.org). LeagueClanker isn't affiliated with Community Dragon.
+Augment names in other languages and augment icons come from [Community Dragon](https://www.communitydragon.org). LeagueClanker isn't affiliated with Community Dragon.
 
 League Classic builds come from [Blitz.gg](https://blitz.gg). LeagueClanker isn't affiliated with Blitz.
 

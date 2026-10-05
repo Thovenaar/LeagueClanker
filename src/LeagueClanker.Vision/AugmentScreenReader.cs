@@ -11,6 +11,9 @@ public sealed record ScanResult(IReadOnlyList<DetectedAugment> Offer, IReadOnlyL
 {
     /// <summary>Where the offered cards are on screen, to tell which one you click. Null without an offer.</summary>
     public OfferLayout? Layout { get; init; }
+
+    /// <summary>The capture of the game window that was read, to look at the HUD too. Null for a saved screenshot.</summary>
+    public ScreenImage? Image { get; init; }
 }
 
 /// <summary>
@@ -59,7 +62,7 @@ public sealed class AugmentScreenReader
         var image = ScreenCapture.Capture(game);
         if (exclude is { } own)
             image.Blank(own);
-        return await ScanAsync(image);
+        return await ScanAsync(image) with { Image = image };
     }
 
     /// <summary>Scans a saved screenshot, for testing and demos.</summary>
@@ -123,7 +126,8 @@ public sealed class AugmentScreenReader
             .ToList();
     }
 
-    private static async Task<ScreenImage> LoadAsync(string path)
+    /// <summary>A saved screenshot as a capture.</summary>
+    public static async Task<ScreenImage> LoadAsync(string path)
     {
         var file = await StorageFile.GetFileFromPathAsync(Path.GetFullPath(path));
         using var stream = await file.OpenReadAsync();

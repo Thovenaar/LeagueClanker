@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Runtime.InteropServices;
+using LeagueClanker.Core.Augments;
 
 namespace LeagueClanker.Vision;
 
@@ -59,6 +60,9 @@ public sealed class ScreenImage(byte[] pixels, int width, int height, PixelRect 
         }
         return new ScreenImage(pixels, Width, Height, Origin);
     }
+
+    /// <summary>The brightness of each pixel, for comparing shapes like the HUD's card icons.</summary>
+    public GrayImage ToGray() => GrayImage.FromBgra(Pixels, Width, Height);
 
     /// <summary>Halves both dimensions by averaging 2×2 blocks.</summary>
     public ScreenImage HalfSize()
