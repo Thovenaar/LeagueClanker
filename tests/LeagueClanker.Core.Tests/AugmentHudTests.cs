@@ -38,25 +38,32 @@ public class AugmentHudTests
     }
 
     [Fact]
-    public void Read_IgnoresACardThatWasThereBeforeTheOfferClosed()
+    public void Read_IgnoresAnOlderCard_WhenTheNewOneIsntThere()
     {
-        var screen = RealScreen();
-
-        var read = AugmentHud.Read(screen, [EscapePlan, Pinball, LegDay], before: screen); // hid the offer without picking
+        var read = AugmentHud.Read(RealScreen(), [EscapePlan, Pinball, LegDay], filledAfterPick: 4); // hid the offer without picking
 
         Assert.Null(read.Card);
     }
 
     [Fact]
-    public void Read_CountsANewSlotFromBeforeTheOfferClosed()
+    public void Read_FindsTheCardInTheSlotAfterTheOnesYouHad()
     {
-        var screen = RealScreen();
-        var before = new GrayImage(screen.Width, screen.Height, (float[])screen.Pixels.Clone());
-        foreach (var slot in AugmentHud.Slots(2560, 1440).Skip(2).Take(1))
-            for (var y = slot.Y - 2; y < slot.Y + slot.Size + 2; y++)
-                Array.Fill(before.Pixels, 8f, y * 2560 + slot.X - 2, slot.Size + 4); // the third slot still empty
+        Assert.Equal("Leg Day", AugmentHud.Read(RealScreen(), [EscapePlan, Pinball, LegDay], filledAfterPick: 3).Card);
+    }
 
-        Assert.Equal("Leg Day", AugmentHud.Read(screen, [EscapePlan, Pinball, LegDay], before).Card);
+    [Fact]
+    public void Read_DoesNotGuess_WhileThePanelShowsYourStats()
+    {
+        // The panel left of the portrait can show stats instead of cards: text where the empty slots would be.
+        var screen = RealScreen();
+        foreach (var slot in AugmentHud.Slots(2560, 1440).Skip(3))
+            for (var y = slot.Y + 10; y < slot.Y + 20; y++)
+                for (var x = slot.X + 10; x < slot.X + 40; x += 3)
+                    screen.Pixels[y * 2560 + x] = 200;
+
+        var read = AugmentHud.Read(screen, [EscapePlan, Pinball, LegDay]);
+
+        Assert.Null(read.Card);
     }
 
     [Fact]

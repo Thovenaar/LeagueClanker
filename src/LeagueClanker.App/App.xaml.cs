@@ -484,16 +484,21 @@ public partial class App : Application
         {
             while (await timer.WaitForNextTickAsync(_cts.Token))
             {
-                if (!picker.WantsScan || readerForGame() is not { } reader)
-                    continue;
                 try
                 {
-                    var scan = imagePath is null
-                        ? await Task.Run(() => reader.ScanScreenAsync(exclude: ScreenCapture.WindowArea(ownWindow)))
-                        : await Task.Run(() => reader.ScanFileAsync(imagePath));
-                    picker.OnScan(scan.Offer.Select(d => d.Augment).ToList(), scan.Problem, scan.Layout);
-                    if (scan.Image is { } image)
-                        await LookAtHudAsync(picker, image, cardsOnScreen: scan.Offer.Count >= 2);
+                    if (picker.WantsScan && readerForGame() is { } reader)
+                    {
+                        var scan = imagePath is null
+                            ? await Task.Run(() => reader.ScanScreenAsync(exclude: ScreenCapture.WindowArea(ownWindow)))
+                            : await Task.Run(() => reader.ScanFileAsync(imagePath));
+                        picker.OnScan(scan.Offer.Select(d => d.Augment).ToList(), scan.Problem, scan.Layout);
+                        if (scan.Image is { } image)
+                            await LookAtHudAsync(picker, image, cardsOnScreen: scan.Offer.Count >= 2);
+                    }
+                    else if (imagePath is null && picker.WantsHudRead)
+                    {
+                        await LookAtHudAsync(picker, null, cardsOnScreen: false);
+                    }
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException)
                 {
@@ -508,16 +513,14 @@ public partial class App : Application
     }
 
     /// <summary>
-    /// While Mayhem cards are up, keeps the latest capture and fetches their icons. Once they close, looks at the HUD
-    /// up to <see cref="HudLooks"/> times for the card you took (<see cref="AugmentHud"/>). Each look is a vote, and
-    /// the capture from while the cards were up shows which slots were already filled.
+    /// While Mayhem cards are up, fetches their icons. Once they close, looks at the HUD for the card you took
+    /// (<see cref="AugmentHud"/>): <see cref="HudLooks"/> looks right away, then one per scan tick while the picker
+    /// still wants to confirm the pick, since the panel can show your stats instead of your cards for a while.
     /// </summary>
-    private async Task LookAtHudAsync(AugmentPickerViewModel picker, ScreenImage image, bool cardsOnScreen)
+    private async Task LookAtHudAsync(AugmentPickerViewModel picker, ScreenImage? image, bool cardsOnScreen)
     {
         if (cardsOnScreen)
         {
-            _hudBefore = image;
-            _hudBeforeGray = null;
             _hudSaved = false;
             if (picker.CurrentSet == AugmentSet.Mayhem)
             {
@@ -530,42 +533,42 @@ public partial class App : Application
         if (!picker.WantsHudRead || await IconsForAsync(picker.HudCandidates) is not { Count: > 0 } icons)
             return;
 
-        var before = _hudBeforeGray ??= _hudBefore is { } b ? await Task.Run(b.ToGray) : null;
         var everyCard = _everyCardIcons is { IsCompletedSuccessfully: true } loaded && loaded.Result.Count > 0 ? loaded.Result : null;
-        var shot = image;
-        var votes = 0;
-        for (var look = 0; look < HudLooks && picker.WantsHudRead; look++)
+        var looks = picker.OfferOnScreen ? HudLooks : 1; // the offer just closed and the pick isn't decided yet
+        for (var look = 0; look < looks && picker.WantsHudRead; look++)
         {
             if (look > 0)
-            {
                 await Task.Delay(HudLookInterval, _cts.Token);
-                if (await Task.Run(() => ScreenCapture.FindLeagueWindow() is { } game ? ScreenCapture.Capture(game) : null) is not { } next)
-                    return;
-                shot = next;
-            }
-            var current = shot;
-            var read = await Task.Run(() => AugmentHud.Read(current.ToGray(), icons, before, everyCard));
-            Log.Write($"HUD look {look + 1}: {read.Why} ({read.Score:0.00} against {read.RunnerUp:0.00}, HUD scale {read.HudScale:0.00})");
-            if (read.Card is not null)
-                votes++;
+            var shot = look == 0 && image is not null ? image
+                : await Task.Run(() => ScreenCapture.FindLeagueWindow() is { } game ? ScreenCapture.Capture(game) : null);
+            if (shot is null)
+                return;
+            var filled = picker.HudFilledAfterPick;
+            var read = await Task.Run(() => AugmentHud.Read(shot.ToGray(), icons, filled, everyCard));
+            if (read.Why != _lastHudWhy)
+                Log.Write($"HUD: {read.Why} ({read.Score:0.00} against {read.RunnerUp:0.00}, HUD scale {read.HudScale:0.00})");
+            _lastHudWhy = read.Why;
             picker.OnHudRead(read.Card);
-        }
 
-        // Nothing recognized: keep the card slots, so the HUD's position can be measured on this screen.
-        if (votes == 0 && !_hudSaved)
+            // Cards showing but none recognized: keep the slots, so the HUD's position can be measured on this screen.
+            if (read is { Card: null, Filled: > 0 } && !_hudSaved)
+                await SaveHudSlotsAsync(shot);
+        }
+    }
+
+    private async Task SaveHudSlotsAsync(ScreenImage shot)
+    {
+        _hudSaved = true;
+        try
         {
-            _hudSaved = true;
-            try
-            {
-                var folder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "LeagueClanker", "hud");
-                await AugmentHudReader.SaveSlotsAsync(shot, Path.Combine(folder, $"{DateTime.Now:yyyyMMdd-HHmmss}.png"));
-                foreach (var old in Directory.GetFiles(folder, "*.png").OrderDescending().Skip(KeptHudShots))
-                    File.Delete(old);
-            }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-            {
-                Log.Error("Saving the HUD's card slots", ex);
-            }
+            var folder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "LeagueClanker", "hud");
+            await AugmentHudReader.SaveSlotsAsync(shot, Path.Combine(folder, $"{DateTime.Now:yyyyMMdd-HHmmss}.png"));
+            foreach (var old in Directory.GetFiles(folder, "*.png").OrderDescending().Skip(KeptHudShots))
+                File.Delete(old);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            Log.Error("Saving the HUD's card slots", ex);
         }
     }
 
@@ -629,9 +632,8 @@ public partial class App : Application
     private readonly AugmentDataClient _iconData = new();
     private Task<IReadOnlyDictionary<string, IReadOnlyList<string>>>? _iconUrls;
     private readonly Dictionary<string, Task<CardIcons>> _cardIcons = [];
-    private ScreenImage? _hudBefore;
-    private GrayImage? _hudBeforeGray;
     private bool _hudSaved;
+    private string? _lastHudWhy;
     private IReadOnlyList<AugmentInfo>? _mayhemCards;
     private Task<IReadOnlyList<CardIcons>>? _everyCardIcons;
 

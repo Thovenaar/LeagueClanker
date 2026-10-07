@@ -59,13 +59,15 @@ public static class AugmentHud
     }
 
     /// <summary>
-    /// Which of the offered cards is in the newest filled slot, trying each HUD scale. With <paramref name="before"/>,
-    /// a capture from while the offer was up, the newest slot has to have been empty then. Otherwise hiding the offer
-    /// without picking would leave an older card there to be mistaken for a look-alike offered one. With
-    /// <paramref name="everyCard"/>, a card that wasn't offered mustn't match better: when the offer was misread, the
-    /// card you took isn't among the offered ones, and a look-alike can still score 0.92 (Overextender for Pinball).
+    /// Which of the offered cards is in the newest filled slot, trying each HUD scale. The panel left of the portrait
+    /// can show your stats instead of your cards, so the slots after the filled ones have to be empty too. With
+    /// <paramref name="filledAfterPick"/>, the cards you had before this offer plus one, the newest card has to sit in
+    /// that slot. Otherwise hiding the offer without picking would leave an older card there to be mistaken for a
+    /// look-alike offered one. With <paramref name="everyCard"/>, a card that wasn't offered mustn't match better:
+    /// when the offer was misread, the card you took isn't among the offered ones, and a look-alike can still score
+    /// 0.92 (Overextender for Pinball).
     /// </summary>
-    public static HudRead Read(GrayImage screen, IReadOnlyList<CardIcons> offered, GrayImage? before = null, IReadOnlyList<CardIcons>? everyCard = null)
+    public static HudRead Read(GrayImage screen, IReadOnlyList<CardIcons> offered, int? filledAfterPick = null, IReadOnlyList<CardIcons>? everyCard = null)
     {
         var cards = offered.Where(c => c.Icons.Count > 0).ToList();
         if (cards.Count == 0)
@@ -79,11 +81,11 @@ public static class AugmentHud
             if (slots.Any(s => s.X < 3 || s.Y < 3 || s.X + s.Size + 3 > screen.Width || s.Y + s.Size + 3 > screen.Height))
                 continue;
             var filled = Filled(screen, slots);
-            if (filled == 0)
+            if (filled == 0 || slots.Skip(filled).Select((s, i) => Spread(screen, s, filled + i)).Any(spread => spread >= MinSpread))
                 continue;
-            if (before is not null && before.Width == screen.Width && before.Height == screen.Height && Filled(before, slots) >= filled)
+            if (filledAfterPick is { } expected && filled != expected)
             {
-                best ??= new HudRead(null, 0, 0, filled, scale, "no new card in the HUD yet");
+                best ??= new HudRead(null, 0, 0, filled, scale, $"{filled} cards in the HUD, expected {expected}");
                 continue;
             }
             var newest = filled - 1;
@@ -115,7 +117,7 @@ public static class AugmentHud
             if (better.Name is not null)
                 return best with { Card = null, RunnerUp = better.Score, Why = $"slot {best.Filled} looks more like {better.Name}, which wasn't offered" };
         }
-        return best ?? new HudRead(null, 0, 0, 0, 1, "no filled slots");
+        return best ?? new HudRead(null, 0, 0, 0, 1, "the card panel isn't showing");
     }
 
     /// <summary>How many slots hold a card. They fill in order, so this counts up to the first empty one.</summary>

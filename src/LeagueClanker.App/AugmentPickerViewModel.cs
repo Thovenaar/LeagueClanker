@@ -60,6 +60,14 @@ public sealed class AugmentPickerViewModel : INotifyPropertyChanged
     // with the card you last clicked while they were up as a backup.
     private OfferLayout? _layout;
     private readonly PickVotes _votes = new();
+
+    // The last offer read from the screen, kept after it closes so the HUD can confirm or correct the card you took.
+    // The panel left of the portrait sometimes shows your stats, and then your cards only show up later.
+    private List<AugmentInfo> _hudOffer = [];
+    private int _hudFilled;
+    private DateTime? _hudClosedAt;
+    private bool _hudDone;
+    private static readonly TimeSpan HudWatch = TimeSpan.FromMinutes(5);
     // Rerolls spent on the slot each offered card sits in, the card with the golden reroll, and rerolls
     // pressed by hand whose replacement card hasn't been typed yet.
     private readonly Dictionary<AugmentInfo, int> _rerollsUsed = [];
@@ -219,6 +227,8 @@ public sealed class AugmentPickerViewModel : INotifyPropertyChanged
         _lastDetectedCards = [];
         _layout = null;
         _votes.Clear();
+        _hudOffer = [];
+        _hudClosedAt = null;
         ClearRerolls();
         _offerFromScreen = false;
         OfferOnScreen = false;
@@ -251,6 +261,7 @@ public sealed class AugmentPickerViewModel : INotifyPropertyChanged
     {
         if (Find(name) is not { } augment || _picked.Contains(augment) || _picked.Count >= MaxPicked)
             return;
+        _hudDone = true; // you said which card you have, so the HUD shouldn't change it
         _offer.Remove(augment);
         _picked.Add(augment);
         SearchText = "";
@@ -265,7 +276,6 @@ public sealed class AugmentPickerViewModel : INotifyPropertyChanged
     {
         if (Find(name) is not { } augment || _picked.Count >= MaxPicked)
             return;
-        _votes.Clear();
         _picked.Add(augment);
         _offer.Clear();
         ClearRerolls();
@@ -345,28 +355,49 @@ public sealed class AugmentPickerViewModel : INotifyPropertyChanged
     }
 
     /// <summary>
-    /// The Mayhem offer read from the screen closed in the last two scans and the card you took isn't known yet,
-    /// so the HUD should be checked for it. Arena's HUD isn't measured yet.
+    /// A Mayhem offer read from the screen closed in the last 5 minutes and the HUD hasn't settled which card you
+    /// took, so the HUD should be checked. Arena's HUD isn't measured yet.
     /// </summary>
-    public bool WantsHudRead => _set == AugmentSet.Mayhem && _offerFromScreen && _offer.Count > 0 && _scansWithoutOffer is > 0 and <= 2;
+    public bool WantsHudRead => _set == AugmentSet.Mayhem && _hudOffer.Count > 0 && !_hudDone
+        && _hudClosedAt is { } closed && DateTime.UtcNow - closed < HudWatch;
 
-    /// <summary>The cards to look for in the HUD: the offer that just closed.</summary>
-    public IReadOnlyList<AugmentInfo> HudCandidates => _offerFromScreen ? _offer.ToList() : [];
+    /// <summary>The cards to look for in the HUD: the offer that closed last.</summary>
+    public IReadOnlyList<AugmentInfo> HudCandidates => _hudOffer;
 
-    /// <summary>One look at the HUD after the offer closed: the offered card it recognized, or null when it couldn't tell.</summary>
+    /// <summary>How many cards the HUD shows once you've taken one from that offer.</summary>
+    public int HudFilledAfterPick => _hudFilled;
+
+    /// <summary>
+    /// One look at the HUD after the offer closed: the offered card it recognized, or null when it couldn't tell.
+    /// Before the pick is decided it's a vote; after, two agreeing looks confirm the pick or replace it.
+    /// </summary>
     public void OnHudRead(string? card)
     {
         if (!WantsHudRead)
             return;
-        if (card is not null && _offer.Any(a => a.Name == card))
+        if (card is not null && _hudOffer.Any(a => a.Name == card))
             _votes.Read(card);
-        if (_votes.Sure is { } sure)
+        if (_votes.Sure is not { } sure)
+            return;
+
+        _hudDone = true;
+        var taken = _hudOffer.FirstOrDefault(_picked.Contains);
+        if (taken is null)
             TakeVoted(sure);
+        else if (taken.Name == sure)
+            Status = $"You took {sure}: confirmed in your HUD.";
+        else if (Find(sure) is { } shown)
+        {
+            _picked[_picked.IndexOf(taken)] = shown;
+            Changed();
+            Status = $"Your HUD shows you took {sure}, not {taken.Name}, so I changed it.";
+        }
     }
 
     private void TakeVoted(string card)
     {
         var how = _votes.Seen(card) ? "read from the cards in your HUD" : "read from your click";
+        _hudDone |= _votes.Sure == card;
         Pick(card);
         Status = $"You took {card}: {how}. Wrong card? Remove it under Picked and press the right one.";
     }
@@ -401,14 +432,22 @@ public sealed class AugmentPickerViewModel : INotifyPropertyChanged
             _votes.Clear(); // a click on a card closes the offer; one on a card that's still there was something else
             _offer.Clear();
             _offer.AddRange(detected.Where(a => !_picked.Contains(a)));
+            if (!sameOffer)
+                _hudFilled = _picked.Count + 1;
+            _hudOffer = _offer.ToList();
+            _hudClosedAt = null;
+            _hudDone = false;
             _offerFromScreen = true;
             OfferOnScreen = true;
             Changed();
             Status = $"Read from your screen: {string.Join(", ", detected)}. Fix a card by removing it and typing the right one.";
             OfferDetected?.Invoke(this, EventArgs.Empty);
         }
-        else if (detected.Count == 0 && _offerFromScreen && _offer.Count > 0 && ++_scansWithoutOffer == 2)
+        else if (detected.Count == 0 && _offerFromScreen && _offer.Count > 0 && ++_scansWithoutOffer >= 1)
         {
+            _hudClosedAt ??= DateTime.UtcNow;
+            if (_scansWithoutOffer != 2)
+                return;
             // The cards are gone. Looks at the HUD since the first empty scan, and the card you clicked, say which you took.
             if (_votes.Best is { } card)
             {
@@ -448,6 +487,7 @@ public sealed class AugmentPickerViewModel : INotifyPropertyChanged
 
     public void RemoveFromPicked(string name)
     {
+        _hudDone = true; // you fixed it yourself, so the HUD shouldn't change it back
         _picked.RemoveAll(a => a.Name == name);
         Changed();
     }
