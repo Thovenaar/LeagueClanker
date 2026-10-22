@@ -24,10 +24,20 @@ public sealed class AugmentDataClient(HttpClient? http = null, string? cacheDire
 
     public Task<AugmentCatalog> LoadMayhemAsync(ItemCatalog? items = null, CancellationToken ct = default) => LoadAsync(AugmentSet.Mayhem, items, ct);
 
+    /// <summary>The wiki's cards, with Riot's tiers and the cards the wiki doesn't have yet (<see cref="AugmentSupplement"/>).</summary>
     public async Task<AugmentCatalog> LoadAsync(AugmentSet set, ItemCatalog? items = null, CancellationToken ct = default)
     {
         var source = await GetSourceAsync(set, ct);
-        return AugmentCatalog.ParseWikiModule(source, items);
+        IReadOnlyDictionary<string, AugmentTier>? riotTiers = null;
+        try
+        {
+            riotTiers = AugmentSupplement.RiotTiers(await GetCachedAsync(AugmentTranslations.Url("en_US"), "cherry-augments.default.json", ct), set);
+        }
+        catch (Exception ex) when (ex is HttpRequestException or System.Text.Json.JsonException or IOException or TaskCanceledException)
+        {
+            Log.Error("Loading Riot's augment tiers, so the wiki's are used", ex);
+        }
+        return AugmentSupplement.Apply(AugmentCatalog.ParseWikiModule(source, items), set, riotTiers, items);
     }
 
     /// <summary>Augment id to English name (Community Dragon), to name the cards in the match history.</summary>

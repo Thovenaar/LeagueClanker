@@ -141,6 +141,29 @@ internal static partial class AugmentTagger
             ["Ultra Hydra"] = (AugmentEffect.AttackDamage | AugmentEffect.Damage, AugmentTrigger.None, AugmentEffect.None),
             ["Weighted Popoffs"] = (AugmentEffect.AbilityHaste, AugmentTrigger.AbilityHits, AugmentEffect.None),
             ["Wisdom of Ages"] = (AugmentEffect.AdaptiveForce | AugmentEffect.Health, AugmentTrigger.None, AugmentEffect.None),
+
+            // Mayhem cards from patch 16.21.
+            ["Arcane Axiom"] = (AugmentEffect.AbilityHaste, AugmentTrigger.None, AugmentEffect.None),
+            ["BEES!!!"] = (AugmentEffect.Damage, AugmentTrigger.None, AugmentEffect.None),
+            // Crit damage only pays off with crit chance from elsewhere.
+            ["Big Shot"] = (AugmentEffect.None, AugmentTrigger.Crits, AugmentEffect.None),
+            ["Blue Barrier"] = (AugmentEffect.None, AugmentTrigger.Mana, AugmentEffect.None),
+            ["CRIMSON COBALT"] = (AugmentEffect.AbilityHaste, AugmentTrigger.None, AugmentEffect.None),
+            ["Double Time"] = (AugmentEffect.None, AugmentTrigger.AbilityHits, AugmentEffect.None),
+            // Its butterflies scale with AP and bonus health; they don't give either.
+            ["Enchanting Butterflies"] = (AugmentEffect.Damage, AugmentTrigger.Healing | AugmentTrigger.Shields, AugmentEffect.AbilityPower | AugmentEffect.Health),
+            ["Fruitify"] = (AugmentEffect.Heal, AugmentTrigger.None, AugmentEffect.None),
+            // Only for champions with a targeted heal or shield on allies.
+            ["Group Hug"] = (AugmentEffect.Heal | AugmentEffect.Shield, AugmentTrigger.Healing | AugmentTrigger.Shields, AugmentEffect.None),
+            // The bonus physical damage scales with your AD at long range; the card gives no AD.
+            ["Hands off the Talent"] = (AugmentEffect.None, AugmentTrigger.AttackDamage | AugmentTrigger.Distance, AugmentEffect.AttackDamage),
+            ["No Mana, No Problem"] = (AugmentEffect.None, AugmentTrigger.Mana, AugmentEffect.None),
+            ["Salvation"] = (AugmentEffect.Heal | AugmentEffect.CrowdControl, AugmentTrigger.None, AugmentEffect.None),
+            ["Sound Barrier"] = (AugmentEffect.None, AugmentTrigger.Shields, AugmentEffect.None),
+            // The stacks are on the enemy; "maximum health" is theirs.
+            ["Third Times the Harm"] = (AugmentEffect.OnHit, AugmentTrigger.None, AugmentEffect.Health),
+            ["Tickle Monster"] = (AugmentEffect.OnHit, AugmentTrigger.None, AugmentEffect.None),
+            ["Ultimate Recursion"] = (AugmentEffect.AbilityHaste, AugmentTrigger.None, AugmentEffect.None),
         };
 
     /// <summary>Triggers the patterns read into a card that it doesn't have.</summary>
@@ -148,7 +171,14 @@ internal static partial class AugmentTagger
     {
         // Its shots scale with attack speed, but the card doesn't ask you to attack.
         ["Spin Me Right Round"] = AugmentTrigger.Attacks,
+        // It restores mana to whoever picks the fruit up; it doesn't scale with yours.
+        ["Fruitify"] = AugmentTrigger.Mana,
+        // Dying costs Burden stacks; it doesn't pay off on dying.
+        ["Heavy Is The Crown"] = AugmentTrigger.Death,
     };
+
+    /// <summary>Cards whose wording reads as a drawback without one: "but the total strength is capped".</summary>
+    private static readonly HashSet<string> NoDrawback = new(StringComparer.OrdinalIgnoreCase) { "Blue Barrier" };
 
     public static AugmentInfo Tag(string name, Dictionary<string, object?> entry, ItemCatalog? items)
     {
@@ -179,7 +209,7 @@ internal static partial class AugmentTagger
             CritChanceBonus = Amount(CritGrantRegex(), description),
             AttackSpeedBonus = Amount(AttackSpeedGrantRegex(), description),
             GrantsExtraRerolls = description.Contains("additional reroll", StringComparison.OrdinalIgnoreCase),
-            HasDrawback = DrawbackRegex().IsMatch(description),
+            HasDrawback = DrawbackRegex().IsMatch(description) && !NoDrawback.Contains(name),
             IsRandom = RandomRegex().IsMatch(description),
             IsQuest = entry.ContainsKey("questinfo") || name.StartsWith("Quest:", StringComparison.OrdinalIgnoreCase),
             IsDisabled = description.Contains("currently disabled", StringComparison.OrdinalIgnoreCase),
